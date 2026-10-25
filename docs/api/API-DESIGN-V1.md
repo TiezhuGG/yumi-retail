@@ -1,0 +1,172 @@
+# API 设计基线 V1.1
+
+本文件是接口设计，不是已实现的 API 或完整 OpenAPI 文件。S1 生成并校验 openapi.yaml，后续将路径、DTO、错误码与客户端类型一起维护。
+
+## 1. 通用契约
+
+- 前缀 `/api/v1`，UTF-8 JSON；金额 `*Cents` 为非负整数分，数量为整数，币种固定 CNY。
+- 对外 ID 为不透明字符串，数据库 BIGINT 不直接序列化成 JS number；时间 ISO8601 UTC，界面按 Asia/Shanghai 展示。截止判断使用服务端时间。
+- GET 无副作用；POST 表达业务动作；PATCH 仅允许白名单字段，不提供任意状态修改。版本冲突返回409。
+- 成功：`{ data, requestId }`；分页：`data: { items, nextCursor, hasMore }`。后台固定页码可单独返回 page/pageSize/total，不能在同一接口混用。分页上限100，默认20。
+- 失败：`{ error: { code, message, details? }, requestId }`，配合真实HTTP状态，不能全部200。
+- 消费者 Bearer 会话；员工使用受保护 Cookie 会话及 CSRF；渠道回调不用用户会话，使用渠道签名认证。
+- POST 订单、支付准备、取消、过账、出库、配送动作、退款请求及执行均要求 Idempotency-Key。相同作用域/键绑定请求摘要，终态重试返回首次业务结果，内容不一致409。
+- 键作用域包括主体+动作+业务对象；关键业务键和唯一约束长期保留，不能仅靠短时缓存；临时请求记录可按保留策略清理。进程中断不能使已提交动作失去幂等结果。
+- 客户端变化检查使用 `version`（业务实体版本），不要将浏览器缓存ETag和业务锁版本混为一谈。
+
+| HTTP | 业务码示例 | 客户端行为 |
+|---|---|---|
+| 400/422 | VALIDATION_ERROR | 定位字段并保留输入 |
+| 401 | AUTH_REQUIRED / SESSION_EXPIRED | 登录后恢复上下文，交易结果先查询 |
+| 403 | FORBIDDEN | 不重试越权操作 |
+| 404 | RESOURCE_NOT_FOUND | 对不属于本人的对象可统一404 |
+| 409 | QUOTE_CHANGED / OUT_OF_STOCK / VERSION_CONFLICT / INVALID_TRANSITION / IDEMPOTENCY_CONFLICT | 刷新事实并解释差异 |
+| 422 | OUT_OF_SERVICE_AREA / STORE_CLOSED / BELOW_MINIMUM / REFUND_LIMIT_EXCEEDED | 明确业务原因 |
+| 429 | RATE_LIMITED | 按返回策略退避 |
+| 503 | CHANNEL_UNAVAILABLE / RETRYABLE_CONFLICT | 使用原业务键查询/重试，不能换号重付 |
+
+## 2. 消费者接口
+
+表中“本人”表示每次服务端校验归属，“公开”仍有限流。所有路径均带 `/api/v1` 前缀。
+
+| 方法 / 路径 | 权限 | 主要输入 / 输出 |
+|---|---|---|
+| POST /auth/wechat/session | 登录凭证 | code→业务会话及最小用户信息，不返回微信敏感凭据 |
+| POST /auth/session/refresh；POST /auth/logout | 会话 | 轮换/撤销；refresh令牌受独立限流和校验 |
+| GET /me | 本人 | 业务用户资料 |
+| GET /store | 公开 | 营业/暂停状态、规则版本、服务说明、运费/起送 |
+| GET /service-areas；GET /service-areas/:id/buildings | 公开 | 服务小区及有效楼栋 |
+| GET /categories；GET /home | 公开 | 分类树、推荐与横幅 |
+| GET /products?categoryId=&keyword=&cursor= | 公开 | 可展示商品/SKU，库存为参考 |
+| GET /products/:id | 公开 | SKU与详情、状态、适用资料 |
+| GET/POST /addresses；PATCH/DELETE /addresses/:id | 本人 | 地址字段、默认标记；已用地址通过订单快照保存 |
+| GET /cart；PUT /cart/items/:skuId；DELETE /cart/items/:skuId | 本人 | 绝对数量与选择状态；并发版本校验 |
+| POST /cart/merge | 本人 | 游客条目、合并键→有效/失效项与调整原因 |
+| POST /checkout/quotes | 本人 | 地址ID、SKU数量→报价、明细、规则版本、有效期 |
+| POST /orders | 本人+幂等 | quoteId、地址ID、备注→订单与支付截止 |
+| GET /orders?status=&cursor=；GET /orders/:id | 本人 | 展示状态、三个内部状态映射、快照、可执行动作 |
+| GET /orders/by-request/:key | 本人 | 提交超时后查找同意图订单；只查本人订单创建作用域 |
+| POST /orders/:id/payment-preparations | 本人+幂等 | 订单版本→小程序支付参数；复用同一有效支付单 |
+| GET /orders/:id/payment-status | 本人 | 业务最终状态/待核实；按限流策略驱动查单 |
+| POST /orders/:id/cancel-requests | 本人+幂等 | 原因、版本→取消请求/处理中；已付不直接释放 |
+| GET /orders/:id/refundable-items | 本人 | 各行可退数量/金额、运费规则 |
+| POST /orders/:id/aftersales | 本人+幂等 | 行ID、数量、原因、附件ID→服务端金额与申请 |
+| GET /aftersales/:id | 本人 | 审核和退款进度 |
+| POST /uploads/intents；POST /uploads/:id/complete | 按用途权限 | 图片元数据→短期受限上传；完成校验后可引用 |
+
+## 3. 报价 / 下单示例
+
+示例使用三个固定规格 SKU，不表示已确定真实商品。金额保持全链路一致。
+
+```json
+{
+  "addressId": "addr_demo_01",
+  "items": [
+    { "skuId": "sku_a", "quantity": 2 },
+    { "skuId": "sku_b", "quantity": 1 },
+    { "skuId": "sku_c", "quantity": 1 }
+  ]
+}
+```
+
+```json
+{
+  "data": {
+    "quoteId": "quo_demo_01",
+    "ruleVersion": 1,
+    "expiresAt": "2026-10-25T08:02:00Z",
+    "lines": [
+      { "skuId": "sku_a", "quantity": 2, "unitPriceCents": 450, "subtotalCents": 900 },
+      { "skuId": "sku_b", "quantity": 1, "unitPriceCents": 590, "subtotalCents": 590 },
+      { "skuId": "sku_c", "quantity": 1, "unitPriceCents": 1680, "subtotalCents": 1680 }
+    ],
+    "goodsCents": 3170,
+    "deliveryFeeCents": 300,
+    "discountCents": 0,
+    "payableCents": 3470,
+    "currency": "CNY"
+  },
+  "requestId": "req_demo_01"
+}
+```
+
+`POST /orders` 携带 `Idempotency-Key: <random-purchase-intent>`，输入 `{quoteId,addressId,note}`。报价服务端保存/签名绑定用户、SKU、地址版本与规则，不能相信客户端回传 total。提交时校验报价未过期且重新计算；版本/库存/价格变化返回409，不生成半张订单。
+
+支付准备输出仅包含订单ID及微信调起所需参数（timeStamp、nonceStr、package、signType、paySign等最终以接入官方规范为准），绝不返回商户私钥/APIv3密钥。业务金额只从订单读取。
+
+## 4. 后台商品与运营接口
+
+| 方法 / 路径 | 权限点 | 行为 |
+|---|---|---|
+| POST /staff/auth/session；POST /staff/auth/logout | 员工身份 | Cookie会话；登录限流与审计 |
+| GET /staff/me | 员工 | 角色、仓库范围、权限点 |
+| GET/POST /admin/products；GET/PATCH /admin/products/:id | catalog.read/write | 商品与SKU、版本校验 |
+| POST /admin/products/:id/publish；POST /admin/products/:id/unpublish | catalog.publish | 检查资料与状态，保留历史订单 |
+| GET/POST /admin/categories；PATCH /admin/categories/:id | category.read/write | 两级限制、循环/引用保护 |
+| GET /admin/orders；GET /admin/orders/:id | order.read | 只查询授权仓库订单；脱敏策略 |
+| GET /admin/dashboard；GET /admin/reports/sales | report.read | 时间区间与口径；无静态假指标 |
+| GET/PATCH /admin/store-settings | store.read/write | 白名单字段、规则版本、审计 |
+| GET/PUT /admin/home-content | content.read/write | 推荐与静态横幅，发布校验商品状态 |
+| GET/POST /admin/staff；PATCH /admin/staff/:id | staff.manage | 分配固定角色和仓库范围，不能提升自己权限 |
+| POST /admin/staff/:id/reset-password | staff.manage | 受控重置、撤销旧会话、审计 |
+| GET /admin/audit-logs | audit.read | 只读，不提供业务删除 |
+
+## 5. 仓库接口
+
+所有请求基于员工会话并检查仓库范围。过账和动作接口均需幂等键，数量/库存版本冲突返回409。
+
+| 方法 / 路径 | 权限点 | 行为 |
+|---|---|---|
+| GET /warehouse/stock-balances；GET /warehouse/stock-ledger | stock.read | 按仓库/SKU/库位/批次，返回统一口径 |
+| GET/POST /warehouse/locations；PATCH /warehouse/locations/:id | location.manage | 库位启停；有库存不得直接删除 |
+| GET/POST /warehouse/receipts；PATCH /warehouse/receipts/:id | receipt.write | 草稿，不修改已过账单 |
+| POST /warehouse/receipts/:id/post | receipt.post | 数量、效期、来源核验；原子入库与流水 |
+| POST /warehouse/stock-transfers | stock.move | 同仓移位，成对批次明细；不实现跨仓 |
+| GET/POST /warehouse/stock-counts | count.write | 确定范围、冻结、记录账面快照 |
+| PUT /warehouse/stock-counts/:id/lines/:lineId | count.write | 实盘数量、备注、版本 |
+| POST /warehouse/stock-counts/:id/post；POST /warehouse/stock-counts/:id/abort | count.post | 审核差异/释放冻结；不可吞并预占冲突 |
+| GET/POST /warehouse/write-offs；POST /warehouse/write-offs/:id/post | loss.write/post | 报损审批与过账，不减已被预占部分 |
+| POST /warehouse/returns；POST /warehouse/returns/:id/post | return.receive | 实物验收与可售/隔离入库，独立于退款 |
+| GET /warehouse/pick-tasks；GET /warehouse/pick-tasks/:id | picking.read | 本仓队列与明细 |
+| POST /warehouse/pick-tasks/:id/claim | picking.claim | 领取到当前员工，防重复领取 |
+| PUT /warehouse/pick-tasks/:id/lines/:lineId | picking.execute | 批次/库位、实拣、版本；未决异常不可出库 |
+| POST /warehouse/pick-tasks/:id/shortages | picking.execute | 上报缺货，不自动改已付金额 |
+| POST /warehouse/pick-tasks/:id/dispatch | stock.dispatch | 校验取消/退款/缺货，原子出库并创建配送待办 |
+
+## 6. 调度与骑手接口
+
+| 方法 / 路径 | 权限点 | 行为 |
+|---|---|---|
+| GET /admin/delivery-tasks | delivery.dispatch | 当前仓库待分配/配送/异常 |
+| POST /admin/delivery-tasks/:id/assign | delivery.dispatch | riderId、version、原因；有效骑手且本仓 |
+| POST /admin/delivery-tasks/:id/withdraw | delivery.dispatch | 未开始任务撤回；记录旧指派失效 |
+| GET /rider/tasks；GET /rider/tasks/:id | rider.self | riderId取会话，不能从查询参数任意指定 |
+| POST /rider/tasks/:id/accept；POST /rider/tasks/:id/reject | rider.self | 检查当前指派版本，拒接说明原因 |
+| POST /rider/tasks/:id/start | rider.self | 已接单、已出库、未停止 |
+| POST /rider/tasks/:id/complete | rider.self | 已配送中、证明方式/附件、version；仅改变履约 |
+| POST /rider/tasks/:id/exceptions | rider.self | 原因、说明、可选图片，不伪记送达 |
+| POST /admin/delivery-exceptions/:id/resolve | delivery.resolve | 重送/退回/退款协调；不可任意修改资金 |
+
+动作成功后返回任务、版本和可执行动作。断网使用原键重试；重派后即使客户端还持有旧地址，也不能继续访问详情或提交状态。
+
+## 7. 售后、资金与渠道回调
+
+| 方法 / 路径 | 权限 | 行为 |
+|---|---|---|
+| GET /admin/aftersales；GET /admin/aftersales/:id | aftersales.read | 行与额度、证据、处理历史 |
+| POST /admin/aftersales/:id/approve；POST /admin/aftersales/:id/reject | aftersales.review | version、原因；审核不代表到账 |
+| POST /admin/aftersales/:id/execute-refund | refund.execute | 固定申请金额、稳定退款号，不能任意回传金额 |
+| GET /admin/refunds/:id | refund.read | 渠道状态、查询/重试历史 |
+| POST /admin/refunds/:id/reconcile | refund.reconcile | 触发受限查单，不新生成退款单 |
+| GET /admin/reconciliation-runs；GET /admin/reconciliation-differences | finance.read | 日账单与业务差异 |
+| POST /admin/reconciliation-differences/:id/resolve | finance.resolve | 记录证据与处置，不直接删除差异 |
+| POST /webhooks/wechatpay/payments | 渠道签名 | 原始body验签、解密、字段核验、落库去重 |
+| POST /webhooks/wechatpay/refunds | 渠道签名 | 原始body验签、解密、额度/商户核验、状态更新 |
+
+Webhook 的应答结构与HTTP码遵循接入时官方渠道规范，不套普通业务 envelope。仅在通知已安全持久化并提交后返回成功；验签失败不能成功应答并接受业务事实。验签使用平台证书/公钥模式按官方接入规则配置，包含轮换与未知序列号处理。
+
+## 8. 健康检查与契约验证
+
+`GET /health/live` 仅检查进程，`GET /health/ready` 检查数据库与必要配置，公网上不返回秘密或完整依赖连接串。版本前缀下也可代理健康检查；具体部署探针与应用保持一致。
+
+OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错误码、幂等与版本头说明；渠道回调单独描述。契约测试验证金额/枚举/权限/错误，与前端生成类型一致；接口文档存在不等于实现通过。
