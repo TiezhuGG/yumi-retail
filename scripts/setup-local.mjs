@@ -28,6 +28,7 @@ if (existsSync('.env')) {
 
 const existing = readFileSync('.env', 'utf8');
 const defaults = {
+  PUBLIC_WAREHOUSE_ID: '00000000-0000-4000-8000-000000000002',
   LOCAL_ADMIN_LOGIN: 'admin.local',
   LOCAL_ADMIN_PASSWORD: randomBytes(18).toString('hex'),
   LOCAL_WAREHOUSE_LOGIN: 'warehouse.local',

@@ -10,5 +10,10 @@ module.exports = defineConfig({
   compiler: 'webpack5',
   plugins: ['@tarojs/plugin-platform-weapp'],
   cache: { enable: false },
+  defineConstants: {
+    API_BASE_URL: JSON.stringify(
+      process.env.TARO_APP_API_BASE_URL || 'http://127.0.0.1:3000/api/v1',
+    ),
+  },
   mini: { postcss: { pxtransform: { enable: true }, cssModules: { enable: false } } },
 });

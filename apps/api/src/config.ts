@@ -3,6 +3,7 @@ export interface ApplicationConfig {
   staffOrigins: string[];
   staffSessionSeconds: number;
   docsEnabled: boolean;
+  publicWarehouseId?: string;
 }
 
 export function applicationConfig(env: NodeJS.ProcessEnv = process.env): ApplicationConfig {
@@ -30,6 +31,11 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
       throw new Error('Invalid staff origin configuration.');
   }
   const seconds = Number(env.STAFF_SESSION_SECONDS ?? 28800);
+  if (
+    env.PUBLIC_WAREHOUSE_ID &&
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(env.PUBLIC_WAREHOUSE_ID)
+  )
+    throw new Error('Invalid PUBLIC_WAREHOUSE_ID.');
   if (!Number.isInteger(seconds) || seconds < 60 || seconds > 86400)
     throw new Error('Invalid STAFF_SESSION_SECONDS.');
   return {
@@ -37,5 +43,6 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     staffOrigins: origins,
     staffSessionSeconds: seconds,
     docsEnabled: environment !== 'production',
+    publicWarehouseId: env.PUBLIC_WAREHOUSE_ID || undefined,
   };
 }

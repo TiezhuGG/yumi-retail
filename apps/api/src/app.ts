@@ -15,6 +15,12 @@ import { StaffAuthService } from './staff-auth.js';
 import { Public, StaffGuard } from './staff-guard.js';
 import { StaffAdminController, StaffController, WarehouseController } from './staff-controller.js';
 import { ApiResult, object, text } from './api-result.js';
+import { CatalogService } from './catalog-service.js';
+import {
+  CatalogAdminController,
+  InboundController,
+  PublicCatalogController,
+} from './catalog-controller.js';
 
 export interface AccessEvent {
   requestId: string;
@@ -59,9 +65,18 @@ export async function createApplication(
     }
   }
   @Module({
-    controllers: [HealthController, StaffController, WarehouseController, StaffAdminController],
+    controllers: [
+      HealthController,
+      StaffController,
+      WarehouseController,
+      StaffAdminController,
+      CatalogAdminController,
+      InboundController,
+      PublicCatalogController,
+    ],
     providers: [
       { provide: StaffAuthService, useValue: auth },
+      { provide: CatalogService, useValue: new CatalogService(db, config.publicWarehouseId) },
       { provide: APP_GUARD, useValue: new StaffGuard(auth) },
     ],
   })
@@ -93,8 +108,8 @@ export async function createApplication(
     app,
     new DocumentBuilder()
       .setTitle('玉米百货 API')
-      .setDescription('当前已实现员工认证与仓库权限基础；未实现的商业接口不列为可用。')
-      .setVersion('0.1.0')
+      .setDescription('员工认证、商品与收货入库切片；其余交易接口尚未实现。')
+      .setVersion('0.2.0')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
   );

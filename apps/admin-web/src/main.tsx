@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ConfigProvider, Layout, Typography } from 'antd';
-import { StaffSessionPanel, StaffScopeSummary } from '@yumi/web-ui';
+import { StaffSessionPanel, StaffScopeSummary, CatalogWorkbench } from '@yumi/web-ui';
 const { Header, Content } = Layout;
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -13,7 +13,12 @@ createRoot(document.getElementById('root')!).render(
         <Content style={{ margin: 24 }}>
           <Typography.Title level={2}>开发工作台</Typography.Title>
           <StaffSessionPanel>
-            {(profile) => <StaffScopeSummary profile={profile} />}
+            {(profile) => (
+              <>
+                <StaffScopeSummary profile={profile} />
+                <CatalogWorkbench profile={profile} />
+              </>
+            )}
           </StaffSessionPanel>
         </Content>
       </Layout>

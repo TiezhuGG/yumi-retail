@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import type { StaffProfile, WarehouseSummary } from '@yumi/contracts';
 
 export type { StaffProfile };
+export { CatalogWorkbench } from './catalog.js';
 const button: CSSProperties = {
   background: '#008a42',
   color: 'white',

@@ -1,6 +1,6 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现。2026-10-27已实现下列员工基础接口及健康接口，生成[当前OpenAPI](openapi.json)；其余业务清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产默认关闭。`npm run openapi:export`从当前代码重建契约。
+本文件是业务接口设计，尚非完整实现。2026-10-27已实现员工基础、健康、商品与收货切片，生成[当前OpenAPI](openapi.json)（0.2.0）；后续业务清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产默认关闭。`npm run openapi:export`从当前代码重建契约。
 
 ## 当前已实现的员工切片
 
@@ -18,7 +18,24 @@
 
 Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生产追加Secure。CSRF token只存前端内存，可通过me恢复。没有跨域CORS通配授权，Web通过同源代理访问。无效或未知账号统一401 INVALID_CREDENTIALS；过期/撤销/停用/版本失配401 SESSION_EXPIRED；来源/CSRF校验失败403 ORIGIN_REJECTED/CSRF_REJECTED；限流429 RATE_LIMITED。限流使用数据库15分钟窗口，按直连IP100次、账号+IP10次；暂不信任X-Forwarded-For，生产代理策略需单独验收。
 
-当前权限点仅覆盖已实现行为：SUPER_ADMIN拥有staff.read和warehouse.read；OPERATIONS、WAREHOUSE_MANAGER、PICKER、DISPATCHER拥有warehouse.read；RIDER预留rider.tasks.self，但任务接口尚未实现；CUSTOMER_SERVICE暂无权限。所有仓库访问（含管理员）都需显式绑定范围。后续业务新增权限，不能把角色名字视为所有业务已经可用。
+当前权限点按已实现行为授予：SUPER_ADMIN含员工只读、商品维护、库存只读和收货创建/审核/过账；OPERATIONS可维护商品；WAREHOUSE_MANAGER可读商品、库存及收货创建/审核/过账；PICKER只读商品/库存；DISPATCHER目前仅warehouse.read；RIDER预留rider.tasks.self，任务接口未实现；CUSTOMER_SERVICE暂无权限。所有仓库访问（含管理员）均需显式绑定范围。
+
+## 当前已实现的商品/收货接口
+
+全部前缀`/api/v1`。写动作需员工Cookie、Origin、X-CSRF-Token及UUID Idempotency-Key；创建也使用200成功包裹，避免与现有客户端混用201。单据动作body仅`{version}`；服务端重新校验状态/版本和范围。重复同键返回首次结果，变更请求409 IDEMPOTENCY_CONFLICT；同单不同键重复过账409 VERSION_CONFLICT/INVALID_TRANSITION。
+
+| 方法/路径 | 权限与输入 | 输出与边界 |
+|---|---|---|
+| GET/POST /admin/categories | catalog.read / catalog.write | 最多两级分类，创建name/parentId |
+| GET/POST /admin/products | catalog.read / catalog.write | SPU含SKU；创建categoryId/name/description?/skus[] |
+| POST /admin/products/:id/publish；.../unpublish | catalog.write，version | 专用上下架，不开放任意status赋值 |
+| GET/POST /warehouse/warehouses/:warehouseId/receipts | receipt.read / receipt.write + 范围 | 创建sourceRef、lines[skuId,batchNo,quantity,unitCostCents,producedAt?,expiresAt?]；拣货员无receipt.read，不能读取采购成本 |
+| POST .../receipts/:id/approve；.../post | receipt.approve / receipt.post + 范围 | 独立审核与过账动作，version必填 |
+| GET /warehouse/warehouses/:warehouseId/stock | stock.read + 范围 | onHand/reserved/blocked/safety/version；id是SKU ID的分页别名，不含成本 |
+| GET /products | 匿名 | limit/cursor/keyword/categoryId；仅可展示销售规格，priceCents/available |
+| GET /products/:id | 匿名；id为SKU UUID | 单个销售规格详情，productId另列；不可用404 |
+
+列表均按UUID升序游标，默认20、上限50，返回items/hasMore/nextCursor；不按创建时间声称最新。公开查询拒绝warehouseId参数，实际仓来自服务端PUBLIC_WAREHOUSE_ID；未配置/停用503 STORE_UNAVAILABLE。零库存SKU仍返回available=0，客户端显示缺货；详情不暴露成本、批次、员工和供应来源。SKU编码冲突409 DUPLICATE_RESOURCE；生产/到期或SKU状态无效409 INVALID_EXPIRY/SKU_DISABLED；数量/时间格式400。关键交易尚未提供，不以available替代未来下单事务裁决。
 
 ## 1. 通用契约
 

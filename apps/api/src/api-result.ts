@@ -4,10 +4,13 @@ import type { SchemaObject } from '@nestjs/swagger';
 
 export const text: SchemaObject = { type: 'string' };
 export const strings: SchemaObject = { type: 'array', items: text };
-export function object(properties: Record<string, SchemaObject>): SchemaObject {
+export function object(
+  properties: Record<string, SchemaObject>,
+  required = Object.keys(properties),
+): SchemaObject {
   return {
     type: 'object',
-    required: Object.keys(properties),
+    required,
     properties,
     additionalProperties: false,
   };

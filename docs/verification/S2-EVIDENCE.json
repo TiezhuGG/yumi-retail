@@ -1,0 +1,39 @@
+{
+  "finishedAt": "2026-10-27T04:46:42.623Z",
+  "checks": [
+    "strict inputs category depth and durable create idempotency",
+    "draft approval posting public catalog and balanced ledger",
+    "20 retry and 10 competing keys produce one posting each",
+    "concurrent receipts do not lose updates",
+    "multi SKU failure rolls back and original key can recover",
+    "expiry required and revalidated during posting",
+    "expiry and all saleability gates enforced server side",
+    "scope role CSRF version and disabled warehouse enforced",
+    "bounded cursor pagination search and fixed operating warehouse",
+    "database quantities composite keys and append only facts"
+  ],
+  "testDatabase": "yumi_test",
+  "isolation": "per-run disposable schema",
+  "schemaRemoved": true,
+  "result": {
+    "passed": 10,
+    "failed": 0
+  },
+  "browser": {
+    "account": "disposable synthetic test account",
+    "isolatedSchemaRemoved": true,
+    "flow": [
+      "login",
+      "create category",
+      "create SKU at 450 cents",
+      "publish",
+      "receive 10 units",
+      "approve",
+      "post",
+      "public available=10",
+      "ops onHand=10",
+      "reload session",
+      "logout"
+    ]
+  }
+}

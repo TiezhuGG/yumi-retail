@@ -33,6 +33,8 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 
 ## 兼容性决策
 
+商品入库切片未新增/升级依赖；同一锁文件和上述S1版本通过新切片测试。观察快照见[S2安装版本](S2-INSTALLED-VERSIONS.json)，业务结果见[S2报告](S2-CATALOG-INBOUND-2026-10-27.md)。
+
 2026-10-27 S1补充：@nestjs/swagger **12.0.4**、ESLint/@eslint/js **9.39.1**、typescript-eslint **8.72.1**、Prettier **3.7.4**；其余上述版本保持不变。Swagger的Nest12/TypeScript6 peer已核对，typescript-eslint支持TS<6.1；已编译及实际HTTP测试。安装观察与本轮锁文件摘要见[S1安装版本](S1-INSTALLED-VERSIONS.json)，S0历史证据不覆盖。新增共享包web-ui复用React18员工登录与权限展示。
 
 - 本机已有pnpm11启动器无法解析其自动下载的@pnpm/exe，改用官方pnpm10.28.2 JS CLI；项目本地依赖也提供该版本，npm run脚本优先使用它，不修改全局环境。

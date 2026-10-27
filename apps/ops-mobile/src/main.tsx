@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { StaffSessionPanel, StaffScopeSummary } from '@yumi/web-ui';
+import { StaffSessionPanel, StaffScopeSummary, CatalogWorkbench } from '@yumi/web-ui';
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <main
@@ -14,7 +14,14 @@ createRoot(document.getElementById('root')!).render(
     >
       <h1 style={{ color: '#008a42', fontSize: 24 }}>玉米百货 · 移动作业</h1>
       <p>仓库与骑手工作入口</p>
-      <StaffSessionPanel>{(profile) => <StaffScopeSummary profile={profile} />}</StaffSessionPanel>
+      <StaffSessionPanel>
+        {(profile) => (
+          <>
+            <StaffScopeSummary profile={profile} />
+            <CatalogWorkbench profile={profile} />
+          </>
+        )}
+      </StaffSessionPanel>
     </main>
   </React.StrictMode>,
 );
