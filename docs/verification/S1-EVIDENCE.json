@@ -1,0 +1,18 @@
+{
+  "finishedAt": "2026-10-27T03:32:17.110Z",
+  "checks": [
+    "uniform errors and strict input",
+    "credential rejection",
+    "opaque persistent sessions and minimal profile",
+    "CSRF origin and logout revocation",
+    "login origin check",
+    "role permissions and warehouse scope",
+    "expiry disable and version revocation",
+    "permission changes take effect immediately",
+    "database-backed multi-instance session",
+    "persistent login throttling",
+    "implemented API specification and production configuration",
+    "audit and redacted access logging"
+  ],
+  "logEvents": 53
+}

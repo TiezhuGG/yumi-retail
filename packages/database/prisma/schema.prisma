@@ -43,3 +43,77 @@ model ValidationLedger {
   @@index([stockId], map: "validation_ledger_stock_idx")
   @@map("validation_ledger")
 }
+
+model Warehouse {
+  id String @id @db.Uuid
+  code String @unique
+  name String
+  enabled Boolean @default(true)
+  staffScopes StaffWarehouse[]
+  @@map("warehouses")
+}
+
+model Staff {
+  id String @id @db.Uuid
+  loginName String @unique @map("login_name")
+  displayName String @map("display_name")
+  passwordHash String @map("password_hash")
+  enabled Boolean @default(true)
+  authVersion Int @default(0) @map("auth_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  roles StaffRole[]
+  warehouses StaffWarehouse[]
+  sessions StaffSession[]
+  auditEvents AuthAuditEvent[]
+  @@map("staff")
+}
+
+model StaffRole {
+  staffId String @map("staff_id") @db.Uuid
+  roleCode String @map("role_code")
+  staff Staff @relation(fields:[staffId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  @@id([staffId, roleCode])
+  @@map("staff_roles")
+}
+
+model StaffWarehouse {
+  staffId String @map("staff_id") @db.Uuid
+  warehouseId String @map("warehouse_id") @db.Uuid
+  staff Staff @relation(fields:[staffId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  warehouse Warehouse @relation(fields:[warehouseId], references:[id], onDelete:Restrict, onUpdate:NoAction)
+  @@id([staffId,warehouseId])
+  @@index([warehouseId])
+  @@map("staff_warehouses")
+}
+
+model StaffSession {
+  id String @id @db.Uuid
+  staffId String @map("staff_id") @db.Uuid
+  tokenHash String @unique @map("token_hash") @db.Char(64)
+  authVersion Int @map("auth_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  staff Staff @relation(fields:[staffId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([staffId,expiresAt])
+  @@map("staff_sessions")
+}
+
+model StaffLoginThrottle {
+  key String @id @db.Char(64)
+  attemptCount Int @map("attempt_count")
+  windowStartedAt DateTime @map("window_started_at") @db.Timestamptz(3)
+  @@map("staff_login_throttles")
+}
+
+model AuthAuditEvent {
+  id String @id @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  action String
+  outcome String
+  requestId String @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+  @@index([actorId,createdAt])
+  @@map("auth_audit_events")
+}

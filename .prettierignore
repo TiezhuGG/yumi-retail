@@ -1,0 +1,11 @@
+node_modules
+**/dist
+**/generated
+.local
+.tmp
+docs
+pnpm-lock.yaml
+README.md
+AGENTS.md
+project.config.json
+project.private.config.json

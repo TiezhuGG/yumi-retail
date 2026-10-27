@@ -1,5 +1,16 @@
 {
-  "name": "@yumi/contracts", "version": "0.0.0", "private": true, "type": "module",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "scripts": { "typecheck": "tsc --noEmit", "build": "tsc -p tsconfig.build.json" }
+  "name": "@yumi/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  }
 }

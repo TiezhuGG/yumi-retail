@@ -4,10 +4,19 @@ import { resolve, dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
 
 const groups = {
-  '.': ['pnpm', 'typescript', 'tsx'],
-  'apps/api': ['@nestjs/common', '@nestjs/core', '@nestjs/platform-express'],
+  '.': ['pnpm', 'typescript', 'tsx', 'eslint', 'typescript-eslint', 'prettier'],
+  'apps/api': ['@nestjs/common', '@nestjs/core', '@nestjs/platform-express', '@nestjs/swagger'],
   'apps/admin-web': ['react', 'react-dom', 'vite', 'antd', '@vitejs/plugin-react'],
-  'apps/consumer-mini': ['@tarojs/cli', '@tarojs/taro', '@tarojs/plugin-framework-react', '@tarojs/webpack5-runner', 'vite', 'less', '@babel/core', '@babel/preset-react'],
+  'apps/consumer-mini': [
+    '@tarojs/cli',
+    '@tarojs/taro',
+    '@tarojs/plugin-framework-react',
+    '@tarojs/webpack5-runner',
+    'vite',
+    'less',
+    '@babel/core',
+    '@babel/preset-react',
+  ],
   'packages/database': ['prisma', '@prisma/client', '@prisma/adapter-pg', 'pg'],
 };
 const installed = {};
@@ -16,12 +25,16 @@ for (const [workspace, packages] of Object.entries(groups)) {
   installed[workspace] = {};
   for (const name of packages) {
     let file;
-    try { file = require.resolve(`${name}/package.json`); }
-    catch {
+    try {
+      file = require.resolve(`${name}/package.json`);
+    } catch {
       let directory = dirname(require.resolve(name));
       while (directory !== dirname(directory)) {
         const candidate = join(directory, 'package.json');
-        if (existsSync(candidate) && JSON.parse(readFileSync(candidate, 'utf8')).name === name) { file = candidate; break; }
+        if (existsSync(candidate) && JSON.parse(readFileSync(candidate, 'utf8')).name === name) {
+          file = candidate;
+          break;
+        }
         directory = dirname(directory);
       }
     }
@@ -30,7 +43,8 @@ for (const [workspace, packages] of Object.entries(groups)) {
   }
 }
 const result = {
-  observedAt: new Date().toISOString(), node: process.version,
+  observedAt: new Date().toISOString(),
+  node: process.version,
   platform: `${process.platform}/${process.arch}`,
   lockfileSha256: createHash('sha256').update(readFileSync('pnpm-lock.yaml')).digest('hex'),
   installed,

@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.28.2",
-  "engines": { "node": "24.22.1" },
+  "engines": {
+    "node": "24.22.1"
+  },
   "scripts": {
     "setup:local": "node scripts/setup-local.mjs",
     "db:up": "node scripts/docker.mjs compose up -d --wait --wait-timeout 60",
@@ -26,11 +28,26 @@
     "build:server": "pnpm --filter @yumi/api... --filter @yumi/worker... build",
     "pretest:s0": "npm run build:server",
     "test:s0": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/s0.integration.test.ts",
+    "pretest:s1": "npm run build:server",
+    "test:s1": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/s1.integration.test.ts",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "openapi:export": "npm run build:server && node --env-file=.env scripts/export-openapi.mjs",
     "verify:mini": "node scripts/verify-mini-artifacts.mjs"
   },
-  "pnpm": { "overrides": { "terser-webpack-plugin": "5.3.10", "schema-utils@^4": "4.3.2" } },
+  "pnpm": {
+    "overrides": {
+      "terser-webpack-plugin": "5.3.10",
+      "schema-utils@^4": "4.3.2"
+    }
+  },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "@eslint/js": "9.39.1",
+    "eslint": "9.39.1",
+    "typescript-eslint": "8.72.1",
+    "prettier": "3.7.4",
     "pg": "8.23.1",
     "pnpm": "10.28.2",
     "tsx": "4.23.15",

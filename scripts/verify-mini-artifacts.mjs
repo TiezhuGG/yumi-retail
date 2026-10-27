@@ -6,4 +6,6 @@ for (const name of ['app.js', 'app.json', 'pages/index/index.js', 'pages/index/i
 }
 const config = JSON.parse(readFileSync(`${root}/app.json`, 'utf8'));
 assert.deepEqual(config.pages, ['pages/index/index']);
-console.log('WeChat build artifacts verified. This does not replace developer-tool or real-device verification.');
+console.log(
+  'WeChat build artifacts verified. This does not replace developer-tool or real-device verification.',
+);

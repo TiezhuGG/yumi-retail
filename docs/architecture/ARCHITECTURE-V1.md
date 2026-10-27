@@ -126,7 +126,7 @@ PostgreSQL 采用经集成测试确认的隔离级别（建议业务显式 READ 
 
 - 小程序业务会话使用高熵随机令牌，服务端只保存令牌摘要与有效期；请求携带 Bearer。提供轮换、失效与退出，微信身份凭据不下发。
 - 员工 Web/H5 建议同域代理 API，HttpOnly/Secure/SameSite Cookie 会话；写操作验证 CSRF 和 Origin；会话与消费者隔离。会话超时先保存可恢复表单，不缓存敏感页面到离线存储。
-- 密码使用受维护的密码哈希实现（如 Argon2id），限流与登录审计；敏感退款操作可二次核验/短会话。精确会话时限在实施时配置。
+- 当前员工密码采用Node内置异步scrypt（N=65536、r=8、p=2、16字节随机盐、64字节输出），时序安全比较，编码携带参数；避免本机新增原生编译依赖。参数依据[OWASP密码存储建议](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)与[Node crypto文档](https://nodejs.org/docs/latest-v24.x/api/crypto.html)。登录限流与认证审计落PostgreSQL。会话默认8小时绝对过期、无自动续期，可配置60–86400秒；这是技术默认值，非经营策略确认。敏感退款二次核验仍待业务阶段实现。
 - 业务服务同时检查身份、权限点、资源归属、warehouse_id 与 rider_id；无法通过传入 user_id 切换用户。
 - 价格、应付、退款额度、仓库和骑手指派以服务端为准。请求字段白名单校验，禁止批量绑定覆盖内部状态。
 - 商品图片可公开只读；售后与签收证据私有、短时签名、按归属授权；上传校验扩展名、MIME、文件头、体积和图片尺寸，避免 SVG/脚本伪装。

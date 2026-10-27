@@ -1,6 +1,24 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现或完整OpenAPI。当前健康接口已落地实测；S1仍需生成并校验OpenAPI，后续将路径、DTO、错误码与客户端类型一起维护。
+本文件是业务接口设计，尚非完整实现。2026-10-27已实现下列员工基础接口及健康接口，生成[当前OpenAPI](openapi.json)；其余业务清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产默认关闭。`npm run openapi:export`从当前代码重建契约。
+
+## 当前已实现的员工切片
+
+全部路径带`/api/v1`。成功和错误均带requestId；请求头`X-Request-ID`由服务端生成，不采用客户端任意值。
+
+| 方法/路径 | 输入与权限 | 当前结果 |
+|---|---|---|
+| POST /staff/auth/session | loginName/password；精确允许的Origin | 登录名trim并转小写；严格字段白名单；设置HttpOnly Cookie，只返回expiresAt |
+| GET /staff/me | 员工会话 | 最小身份、角色、权限、warehouseIds、csrfToken |
+| POST /staff/auth/logout | 会话、Origin、X-CSRF-Token | 撤销本次会话并清Cookie |
+| GET /warehouse/warehouses | warehouse.read | 仅授权且启用的仓库 |
+| GET /warehouse/warehouses/:warehouseId | warehouse.read和实际仓库范围 | 范围外403，不信任查询参数切换范围 |
+| GET /admin/staff | staff.read | 最多100条只读员工；不含密码摘要与会话 |
+| GET /health/live；GET /health/ready | 公开 | 进程存活；实际数据库连接 |
+
+Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生产追加Secure。CSRF token只存前端内存，可通过me恢复。没有跨域CORS通配授权，Web通过同源代理访问。无效或未知账号统一401 INVALID_CREDENTIALS；过期/撤销/停用/版本失配401 SESSION_EXPIRED；来源/CSRF校验失败403 ORIGIN_REJECTED/CSRF_REJECTED；限流429 RATE_LIMITED。限流使用数据库15分钟窗口，按直连IP100次、账号+IP10次；暂不信任X-Forwarded-For，生产代理策略需单独验收。
+
+当前权限点仅覆盖已实现行为：SUPER_ADMIN拥有staff.read和warehouse.read；OPERATIONS、WAREHOUSE_MANAGER、PICKER、DISPATCHER拥有warehouse.read；RIDER预留rider.tasks.self，但任务接口尚未实现；CUSTOMER_SERVICE暂无权限。所有仓库访问（含管理员）都需显式绑定范围。后续业务新增权限，不能把角色名字视为所有业务已经可用。
 
 ## 1. 通用契约
 
@@ -107,7 +125,8 @@
 | GET /admin/dashboard；GET /admin/reports/sales | report.read | 时间区间与口径；无静态假指标 |
 | GET/PATCH /admin/store-settings | store.read/write | 白名单字段、规则版本、审计 |
 | GET/PUT /admin/home-content | content.read/write | 推荐与静态横幅，发布校验商品状态 |
-| GET/POST /admin/staff；PATCH /admin/staff/:id | staff.manage | 分配固定角色和仓库范围，不能提升自己权限 |
+| GET /admin/staff | staff.read | 已实现最小只读列表，最多100条 |
+| POST /admin/staff；PATCH /admin/staff/:id | staff.manage（待实现） | 分配固定角色和仓库范围，不能提升自己权限 |
 | POST /admin/staff/:id/reset-password | staff.manage | 受控重置、撤销旧会话、审计 |
 | GET /admin/audit-logs | audit.read | 只读，不提供业务删除 |
 

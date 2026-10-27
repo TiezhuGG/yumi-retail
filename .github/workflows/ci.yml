@@ -26,8 +26,12 @@ jobs:
       - run: npm run db:migrate
       - run: npm run db:migrate:test
       - run: npm run build
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm run typecheck
       - run: npm run test:s0
+      - run: npm run test:s1
+      - run: npm run db:seed
       - run: npm run verify:mini
       - name: Stop project containers
         if: always()
