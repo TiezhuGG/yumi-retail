@@ -1,0 +1,8 @@
+{
+  "description": "玉米百货 S0 编译验证；无真实支付",
+  "miniprogramRoot": "dist/",
+  "projectname": "yumi-retail",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "setting": { "es6": true, "minified": true, "urlCheck": true }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.tmp/
+.local/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+coverage/
+output/
+apps/consumer-mini/project.private.config.json
+packages/database/src/generated/
+

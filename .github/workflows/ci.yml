@@ -1,0 +1,34 @@
+name: engineering-validation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@10.28.2
+      - name: Create local-only configuration
+        run: node scripts/setup-local.mjs
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Start isolated PostgreSQL
+        run: npm run db:up
+      - run: npm run db:init
+      - run: npm run db:generate
+      - run: npm run db:migrate
+      - run: npm run db:migrate:test
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm run test:s0
+      - run: npm run verify:mini
+      - name: Stop project containers
+        if: always()
+        run: node scripts/docker.mjs compose stop

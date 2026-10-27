@@ -1,15 +1,17 @@
 # 数据库与库存账本设计 V1.1
 
-这是逻辑/物理设计草案，供下一阶段转成 Prisma schema 和受版本控制的 SQL 迁移。本轮未创建数据库、执行迁移或验证 SQL。不能直接复制示意语句到生产。
+2026-10-26：用户已确认[PostgreSQL决策](../architecture/ADR-002-DATABASE-CHOICE.md)。以下为PostgreSQL业务设计草案；S0迁移仅建立带validation_前缀的隔离验证模型，不代表所有业务表已实现。
+
+这是业务逻辑/物理设计草案，尚未全部转成业务Prisma schema。当前已建立真实PostgreSQL开发/测试库，并对validation_模型执行迁移、回滚和并发验证；正式业务表仍待实现。不能直接复制示意SQL到生产。
 
 ## 1. 统一数据约定
 
-- MySQL8.4/InnoDB、utf8mb4。事务关联用真实外键；历史交易不级联删除。字典停用，员工/商品软停用，订单/支付/流水不物理业务删除。
+- PostgreSQL17、UTF8；本机Docker Desktop隔离开发与测试库。事务关联用真实外键；历史交易不级联删除。字典停用，员工/商品软停用，订单/支付/流水不物理业务删除。
 - 内部主键可 BIGINT，外部 public_id 用不可预测ID并设唯一；API只返回字符串。订单号/商户单号为独立唯一字符串，不依赖时间戳毫秒防碰撞。
 - 金额 BIGINT整数分（API返回前验证安全范围），数量 INT整数且非负；不使用FLOAT/DOUBLE金额。成本也是分，成本来源不齐时不计算毛利。
-- 时间 DATETIME(3) 以UTC写入；到期日期按经营时区定义后转换 cutoff_at。日期边界、含当日与否必须用样例测试。
+- 时间 TIMESTAMPTZ(3) 表达绝对时间，按UTC存取；到期日期按经营时区定义后转换 cutoff_at。日期边界、含当日与否必须用样例测试。
 - 业务实体有 created_at、updated_at、version；流水有 created_at、业务发生时间和操作者，不允许编辑已过账事实。
-- 字符串字段长度、枚举、CHECK与索引在迁移中显式定义。JSON只承载不可变快照、元信息与脱敏审计差异，不把需要索引的核心数量/状态全塞JSON。
+- 字符串字段长度、枚举、CHECK与索引在迁移中显式定义。JSONB只承载不可变快照、元信息与脱敏审计差异，不把需要索引的核心数量/状态全塞JSON。
 
 ## 2. 主要实体关系
 
@@ -97,10 +99,11 @@ erDiagram
 -- 仅示意一个SKU的汇总条件更新；真实实现必须与订单、批次位置、
 -- reservation_lines、ledger、幂等记录同事务提交。
 UPDATE stock_balances
-SET reserved = reserved + :qty, version = version + 1
-WHERE warehouse_id = :warehouse_id AND sku_id = :sku_id
-  AND on_hand - blocked - reserved - safety >= :qty;
--- affected_rows 必须为1，否则整体回滚。
+SET reserved = reserved + $1, version = version + 1
+WHERE warehouse_id = $2 AND sku_id = $3
+  AND on_hand - blocked - reserved - safety >= $1
+RETURNING warehouse_id, sku_id, reserved;
+-- 返回行数必须为1，否则整体回滚；实际实现使用参数化查询。
 ```
 
 实际实现顺序：锁/确认幂等记录 → 按SKU排序锁汇总 → 检查冻结 → 锁可用批次位置（近效期/先进先出）→ 校验商品价格与全部数量 → 分配预占 → 写订单与快照 → 写流水/Outbox/幂等结果 → 提交。可通过参数化原生SQL完成条件写，禁止字符串拼SQL。

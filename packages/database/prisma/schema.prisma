@@ -1,0 +1,45 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ValidationStock {
+  id          String @id @db.Uuid
+  label       String
+  onHand      Int    @map("on_hand")
+  reserved    Int    @default(0)
+  version     Int    @default(0)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reservations ValidationReservation[]
+  ledger       ValidationLedger[]
+
+  @@map("validation_stock")
+}
+
+model ValidationReservation {
+  id         String @id @db.Uuid
+  requestKey String @unique @map("request_key")
+  stockId    String @map("stock_id") @db.Uuid
+  quantity   Int
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  stock      ValidationStock @relation(fields: [stockId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@index([stockId], map: "validation_reservation_stock_idx")
+  @@map("validation_reservation")
+}
+
+model ValidationLedger {
+  id            String @id @db.Uuid
+  actionKey     String @unique @map("action_key")
+  stockId       String @map("stock_id") @db.Uuid
+  deltaReserved Int @map("delta_reserved")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  stock         ValidationStock @relation(fields: [stockId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@index([stockId], map: "validation_ledger_stock_idx")
+  @@map("validation_ledger")
+}

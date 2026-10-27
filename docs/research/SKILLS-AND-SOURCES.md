@@ -1,6 +1,6 @@
 # Skills、插件与官方资料调研
 
-调研日期：2026-10-25。已通过 skill-installer 的官方目录脚本查询 `openai/skills/skills/.curated`，并用插件目录搜索 Figma/设计协作能力。本轮仅查询和评估，没有安装技能、连接外部账号或向外部设计平台上传素材。
+初次调研：2026-10-25；安装更新：2026-10-26。已通过skill-installer查询官方目录，并在用户授权后安装playwright、security-best-practices、security-threat-model、gh-fix-ci。没有连接外部账号或向设计平台上传素材。安装状态与运行条件见[环境初检](../roadmap/ENVIRONMENT-CHECK-2026-10-26.md)。
 
 ## 1. 区分三类工具
 
@@ -16,15 +16,15 @@
 |---|---|---|---|
 | skill-installer | 本会话可用，本轮已使用 | 查询官方技能、后续按需安装 | 目录清单不代表技能已安装或适合Windows |
 | plugin-management | 本会话可用，本轮已使用 | 搜索设计/项目外部连接 | 插件推荐不等于账户已连接 |
-| [playwright](https://github.com/openai/skills/tree/main/skills/.curated/playwright) | 官方目录可安装，未安装 | 后台/仓库/骑手H5的真实浏览器交互检查 | 已查看说明：偏CLI交互，不等同于生成Playwright Test测试套件；不能代替微信真机 |
+| [playwright](https://github.com/openai/skills/tree/main/skills/.curated/playwright) | 2026-10-26已安装，下一轮可用 | 后台/仓库/骑手H5的真实浏览器交互检查 | 偏CLI交互；已验证Git Bash可解析npx，CLI/浏览器尚未实跑；不能代替微信真机 |
 | [figma](https://github.com/openai/skills/tree/main/skills/.curated/figma) | 官方目录可安装，未安装 | 读取设计节点/变量/素材并协助实现 | 需要Figma连接和可访问设计节点，当前仅有PNG |
 | figma-create-design-system-rules / figma-implement-design | 官方目录可安装，未安装 | 后续设计系统和设计到代码候选 | 本轮只核实目录存在，未实测完整流程 |
-| [security-best-practices](https://github.com/openai/skills/tree/main/skills/.curated/security-best-practices) | 官方目录可安装，未安装 | 代码出现后，明确发起安全审查时使用 | 已查看说明：支持JS/TS等，有明确触发边界；不是通用架构技能 |
-| [security-threat-model](https://github.com/openai/skills/tree/main/skills/.curated/security-threat-model) | 官方目录可安装，未安装 | 发布前专项威胁建模 | 需要代码和真实边界、明确专项请求；当前空项目不伪造代码级报告 |
-| gh-fix-ci / gh-address-comments | 官方目录可安装，未安装 | 建GitHub仓库后处理CI失败和评审 | 需要仓库、授权与实际失败/评论 |
+| [security-best-practices](https://github.com/openai/skills/tree/main/skills/.curated/security-best-practices) | 2026-10-26已安装，下一轮可用 | 代码出现后，明确发起安全审查时使用 | 支持JS/TS等，有明确触发边界；不是通用架构技能 |
+| [security-threat-model](https://github.com/openai/skills/tree/main/skills/.curated/security-threat-model) | 2026-10-26已安装，下一轮可用 | 发布前专项威胁建模 | 需要代码和真实边界、明确专项请求；当前空项目不伪造代码级报告 |
+| gh-fix-ci / gh-address-comments | gh-fix-ci已安装，后者未安装 | 建GitHub仓库后处理CI失败和评审 | 本机gh尚未检测到，GitHub授权与实际失败上下文未验证 |
 | sentry | 官方目录可安装，未安装 | 有错误监控服务后查询问题 | 非首版必装，需服务账号与运行数据 |
 
-上表推荐能力基于[官方技能目录](https://github.com/openai/skills/tree/main/skills/.curated)；具体执行前读取对应SKILL并核对依赖。已查看playwright、figma、安全两项说明只是评估，不表示本轮执行了浏览器测试、Figma实现或专项安全审查。
+上表能力基于[官方技能目录](https://github.com/openai/skills/tree/main/skills/.curated)；具体执行前读取对应SKILL并核对依赖。技能安装和文件存在不表示执行了浏览器测试、Figma实现、安全审查或CI检查。
 
 目前无需为了开始编码一次安装全部技能。优先级：开始后台/作业端验证时选择浏览器技能；需要可编辑设计协作时选择Figma；形成业务代码后做安全专项；CI出现问题再增加对应工具。
 

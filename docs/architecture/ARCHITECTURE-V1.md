@@ -1,8 +1,10 @@
 # 系统架构与技术决策 V1.1
 
+2026-10-26决策：用户已确认PostgreSQL与本机Docker Desktop，见[ADR-002](ADR-002-DATABASE-CHOICE.md)。S0指定自动技术检查已通过，精确版本与未验证项见验证报告及版本矩阵。
+
 ## 1. 架构原则
 
-首期使用模块化单体：一个业务代码库、一套 MySQL 业务数据库，API 与 Worker 使用同一镜像的不同启动入口。消费者、员工后台、仓库与骑手通过明确接口访问。无需为单仓业务先搭建微服务、服务网格、Kafka 或 Kubernetes。
+首期使用模块化单体：一个业务代码库、一套 PostgreSQL 业务数据库，API 与 Worker 使用同一镜像的不同启动入口。消费者、员工后台、仓库与骑手通过明确接口访问。无需为单仓业务先搭建微服务、服务网格、Kafka 或 Kubernetes。
 
 单体不等于把业务写在一个大文件里。各领域拥有自己的服务与表，跨领域写入由应用服务编排事务；Controller 不直接操作多个领域表。仓储和配送有独立领域模型，后续是否独立服务取决于团队与负载。
 
@@ -15,12 +17,12 @@
 | 后台 | React/Vite/Ant Design | 锁版本并验证表单、路由、构建 |
 | 作业 H5 | React/Vite，复用后台类型和轻量组件 | 弱网重试、手机触控、会话失效；不默认依赖手机相机扫码 |
 | 服务端 | NestJS 稳定版本，统一 TS | Nest 大版本、TS 与 ESM 配置必须一起验证 |
-| ORM | 支持 MySQL 的 Prisma 稳定版本，优先验证7系列 | 不直接使用 latest；若官方支持/维护状态或驱动验证不满足，再以 ADR 选择替代，不暗中换栈 |
-| 数据库 | MySQL8.4、InnoDB、utf8mb4 | 本地真实数据库迁移、锁竞争、事务回滚验证 |
+| ORM | 支持 PostgreSQL 的 Prisma 稳定版本，优先验证7系列 | 不直接使用 latest；若官方支持/维护状态或驱动验证不满足，再以 ADR 选择替代，不暗中换栈 |
+| 数据库 | PostgreSQL17、UTF8，开发使用本机Docker Desktop | 本地真实数据库迁移、锁竞争、事务回滚验证 |
 | 任务 | 数据库任务表+Outbox，独立 Worker | 多进程领取、租约恢复、退避、死信 |
 | 缓存 | 初始可不部署 Redis | 限流/缓存出现明确需求后再引入，不能变成交易单点真相 |
 
-Taro [安装文档](https://docs.taro.zone/docs/GETTING-STARTED)与[React18说明](https://docs.taro.zone/docs/react-18)支持这一路线。Nest 当前[迁移指南](https://docs.nestjs.com/migration-guide)区分运行和生成器门槛，不能只看运行时最低版本。Prisma 当前[主文档](https://docs.prisma.io/docs/orm)与[7系列文档](https://docs.prisma.io/docs/orm/v7)存在版本差异，主入口列出新版本的 MySQL 尚未支持、7系列仍受支持；因此选定大版本后必须针对该版本验证，避免按搜索摘要混用配置。
+Taro [安装文档](https://docs.taro.zone/docs/GETTING-STARTED)与[React18说明](https://docs.taro.zone/docs/react-18)支持这一路线。Nest 当前[迁移指南](https://docs.nestjs.com/migration-guide)区分运行和生成器门槛，不能只看运行时最低版本。Prisma 当前[主文档](https://docs.prisma.io/docs/orm)与[7系列文档](https://docs.prisma.io/docs/orm/v7)存在版本差异，主入口的新大版本仍有发布状态与接口差异、7系列仍受支持；因此选定大版本后必须针对该版本验证，避免按搜索摘要混用配置。
 
 兼容性验证输出一份 VERSION-MATRIX，记录 Node/pnpm/TS/Taro/React/Nest/Prisma/数据库的精确版本、来源与实测结果。通过最小编译、迁移、CRUD、条件更新、事务回滚和微信真机后才算技术栈落地；本文件不声称这些已经通过。
 
@@ -73,7 +75,7 @@ docs/                   需求、设计、契约、ADR、验证证据
 sequenceDiagram
     participant C as 消费者
     participant A as API
-    participant D as MySQL
+    participant D as PostgreSQL
     participant W as 微信支付
     participant J as Worker
     C->>A: 报价(地址、SKU、数量)
@@ -101,7 +103,7 @@ sequenceDiagram
 
 库存流水只追加，业务数量与流水同事务。入库过账、出库、取消释放、报损、盘点差异、退货、库位移动均有唯一业务动作键。死锁/序列化冲突有限重试，超限返回可重试错误；重试不能更换购买意图或业务单号。
 
-MySQL 采用经集成测试确认的隔离级别（建议业务显式 READ COMMITTED + 行锁与条件写）；不假设某 ORM 默认隔离即可保证不超卖。生产查询需要执行计划与索引支持，避免全表锁。
+PostgreSQL 采用经集成测试确认的隔离级别（建议业务显式 READ COMMITTED + 行锁与条件写）；不假设某 ORM 默认隔离即可保证不超卖。生产查询需要执行计划与索引支持，避免全表锁。
 
 ## 7. 状态竞争与补偿
 
@@ -135,7 +137,7 @@ MySQL 采用经集成测试确认的隔离级别（建议业务显式 READ COMMI
 
 API、任务、订单、支付、库存动作贯穿 requestId 与业务单号，禁止把电话当追踪ID。监测 API错误与延迟、数据库锁等待、连接池、任务积压、支付待核实、退款失败和库存不变量。
 
-首轮容量假设为 ≤2000 SKU、≤300日订单、100并发浏览用户、10并发提交订单；这是压测起点，不是云机性能保证。使用真实 MySQL、包含多SKU和最后一件争抢场景验证，再根据目标调整。后台图片走对象存储，商品查询分页，不把整个目录返回给小程序。
+首轮容量假设为 ≤2000 SKU、≤300日订单、100并发浏览用户、10并发提交订单；这是压测起点，不是云机性能保证。使用真实 PostgreSQL、包含多SKU和最后一件争抢场景验证，再根据目标调整。后台图片走对象存储，商品查询分页，不把整个目录返回给小程序。
 
 ## 10. 演进触发条件
 

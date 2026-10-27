@@ -1,0 +1,39 @@
+{
+  "name": "yumi-retail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "engines": { "node": "24.22.1" },
+  "scripts": {
+    "setup:local": "node scripts/setup-local.mjs",
+    "db:up": "node scripts/docker.mjs compose up -d --wait --wait-timeout 60",
+    "db:stop": "node scripts/docker.mjs compose stop",
+    "db:init": "node scripts/init-databases.mjs",
+    "db:generate": "pnpm --filter @yumi/database generate",
+    "db:migrate": "pnpm --filter @yumi/database migrate",
+    "db:migrate:test": "node --env-file=.env scripts/migrate-test.mjs",
+    "db:seed": "node --env-file=.env --import tsx packages/database/prisma/seed.ts",
+    "predev:api": "npm run build:server",
+    "dev:api": "node --env-file=.env apps/api/dist/main.js",
+    "predev:worker": "npm run build:server",
+    "dev:worker": "node --env-file=.env apps/worker/dist/main.js",
+    "dev:admin": "pnpm --filter @yumi/admin-web dev",
+    "dev:ops": "pnpm --filter @yumi/ops-mobile dev",
+    "build:mini": "pnpm --filter @yumi/consumer-mini build",
+    "typecheck": "pnpm -r typecheck && tsc --noEmit",
+    "build": "pnpm -r build",
+    "build:server": "pnpm --filter @yumi/api... --filter @yumi/worker... build",
+    "pretest:s0": "npm run build:server",
+    "test:s0": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/s0.integration.test.ts",
+    "verify:mini": "node scripts/verify-mini-artifacts.mjs"
+  },
+  "pnpm": { "overrides": { "terser-webpack-plugin": "5.3.10", "schema-utils@^4": "4.3.2" } },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "pg": "8.23.1",
+    "pnpm": "10.28.2",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "observedAt": "2026-10-27T01:48:03.086Z",
+  "node": "v24.22.1",
+  "platform": "win32/x64",
+  "lockfileSha256": "531c5aecf7c7c5099f652edf38d350b753d042f3ced0b9b5da20c080510e7078",
+  "installed": {
+    ".": {
+      "pnpm": "10.28.2",
+      "typescript": "6.0.3",
+      "tsx": "4.23.15"
+    },
+    "apps/api": {
+      "@nestjs/common": "12.2.0",
+      "@nestjs/core": "12.2.0",
+      "@nestjs/platform-express": "12.2.0"
+    },
+    "apps/admin-web": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1",
+      "vite": "7.3.1",
+      "antd": "5.29.3",
+      "@vitejs/plugin-react": "4.7.0"
+    },
+    "apps/consumer-mini": {
+      "@tarojs/cli": "4.3.1",
+      "@tarojs/taro": "4.3.1",
+      "@tarojs/plugin-framework-react": "4.3.1",
+      "@tarojs/webpack5-runner": "4.3.1",
+      "vite": "4.5.14",
+      "less": "4.2.2",
+      "@babel/core": "7.29.7",
+      "@babel/preset-react": "7.28.5"
+    },
+    "packages/database": {
+      "prisma": "7.10.1",
+      "@prisma/client": "7.10.1",
+      "@prisma/adapter-pg": "7.10.1",
+      "pg": "8.23.1"
+    }
+  }
+}
