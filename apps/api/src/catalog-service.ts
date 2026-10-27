@@ -29,6 +29,7 @@ export class CatalogService {
     action: string,
     resourceId: string,
     warehouseId: string | null = null,
+    reason: string | null = null,
   ) {
     await tx.businessAudit.create({
       data: {
@@ -37,6 +38,7 @@ export class CatalogService {
         action,
         resourceId,
         warehouseId,
+        reason,
         requestId: request.requestId,
       },
     });
@@ -228,8 +230,9 @@ export class CatalogService {
             });
             await tx.$executeRaw`INSERT INTO stock_balances(warehouse_id,sku_id) VALUES(${warehouseId}::uuid,${line.skuId}::uuid) ON CONFLICT(warehouse_id,sku_id) DO NOTHING`;
             const changed =
-              await tx.$executeRaw`UPDATE stock_balances SET on_hand=on_hand+${line.quantity},version=version+1 WHERE warehouse_id=${warehouseId}::uuid AND sku_id=${line.skuId}::uuid AND on_hand<=1000000000-${line.quantity}`;
-            if (changed !== 1) throw failure(409, 'STOCK_LIMIT', '库存超出允许范围');
+              await tx.$executeRaw`UPDATE stock_balances SET on_hand=on_hand+${line.quantity},version=version+1 WHERE warehouse_id=${warehouseId}::uuid AND sku_id=${line.skuId}::uuid AND NOT inventory_hold AND on_hand<=1000000000-${line.quantity}`;
+            if (changed !== 1)
+              throw failure(409, 'STOCK_UNAVAILABLE', '库存已暂停或超出允许范围，请先核对');
             const lotId = randomUUID();
             await tx.stockLot.create({
               data: {
@@ -244,9 +247,25 @@ export class CatalogService {
                 expiresAt: line.expiresAt,
               },
             });
+            const location = await tx.warehouseLocation.findUniqueOrThrow({
+              where: { warehouseId_code: { warehouseId, code: 'DEFAULT' } },
+            });
+            if (!location.enabled) throw failure(409, 'LOCATION_DISABLED', '默认收货位已停用');
+            const positionId = randomUUID();
+            await tx.stockPosition.create({
+              data: {
+                id: positionId,
+                warehouseId,
+                skuId: line.skuId,
+                lotId,
+                locationId: location.id,
+                onHand: line.quantity,
+              },
+            });
+            const ledgerId = randomUUID();
             await tx.stockLedger.create({
               data: {
-                id: randomUUID(),
+                id: ledgerId,
                 lotId,
                 warehouseId,
                 skuId: line.skuId,
@@ -254,6 +273,19 @@ export class CatalogService {
                 deltaOnHand: line.quantity,
                 actorId: request.staffContext!.staffId,
                 requestId: request.requestId,
+              },
+            });
+            await tx.positionLedger.create({
+              data: {
+                id: randomUUID(),
+                positionId,
+                warehouseId,
+                skuId: line.skuId,
+                lotId,
+                stockLedgerId: ledgerId,
+                deltaOnHand: line.quantity,
+                deltaReserved: 0,
+                deltaBlocked: 0,
               },
             });
           }
@@ -301,11 +333,13 @@ export class CatalogService {
       }>
     >`
       SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",s.spec,s.unit,s.price_cents AS "priceCents",
-        LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,l.on_hand-l.reserved-l.blocked)) FILTER(WHERE l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP),0))::int AS available
+        CASE WHEN COALESCE(b.inventory_hold,false) THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
       FROM skus s JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
       JOIN warehouses w ON w.id=${warehouseId}::uuid AND w.enabled
       LEFT JOIN stock_balances b ON b.sku_id=s.id AND b.warehouse_id=${warehouseId}::uuid
       LEFT JOIN stock_lots l ON l.sku_id=s.id AND l.warehouse_id=${warehouseId}::uuid
+      LEFT JOIN stock_positions sp ON sp.lot_id=l.id
+      LEFT JOIN warehouse_locations loc ON loc.id=sp.location_id
       WHERE s.enabled AND p.status='PUBLISHED' AND c.enabled AND (parent.id IS NULL OR parent.enabled)
         AND (${query.cursor ?? null}::uuid IS NULL OR s.id>${query.cursor ?? null}::uuid)
         AND (${query.skuId ?? null}::uuid IS NULL OR s.id=${query.skuId ?? null}::uuid)

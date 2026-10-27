@@ -9,6 +9,7 @@ import type {
   WarehouseSummary,
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
+import { InventoryWorkbench } from './inventory.js';
 
 const panel: CSSProperties = {
   background: '#fff',
@@ -165,7 +166,7 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
   return (
     <section>
       <h2>商品与收货工作台</h2>
-      <p>金额填写整数分；收货先审核再入库。当前库存记在仓库默认货位。</p>
+      <p>金额填写整数分；收货先审核再入 DEFAULT，下方可执行同仓移位与账本核对。</p>
       {message && (
         <p role="status" style={{ padding: 12, background: '#f0fdf4' }}>
           {message}
@@ -527,6 +528,7 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
                 加载更多库存
               </button>
             )}
+            <InventoryWorkbench key={warehouseId} profile={profile} warehouseId={warehouseId} />
           </section>
         )}
       </fieldset>

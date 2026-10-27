@@ -15,6 +15,8 @@ import { StaffAuthService } from './staff-auth.js';
 import { Public, StaffGuard } from './staff-guard.js';
 import { StaffAdminController, StaffController, WarehouseController } from './staff-controller.js';
 import { ApiResult, object, text } from './api-result.js';
+import { InventoryController } from './inventory-controller.js';
+import { InventoryService } from './inventory-service.js';
 import { CatalogService } from './catalog-service.js';
 import {
   CatalogAdminController,
@@ -42,6 +44,7 @@ export async function createApplication(
   const db = createDatabase(databaseUrl);
   const config = options.config ?? applicationConfig();
   const auth = new StaffAuthService(db, config);
+  const catalog = new CatalogService(db, config.publicWarehouseId);
 
   @Controller('health')
   class HealthController {
@@ -73,10 +76,12 @@ export async function createApplication(
       CatalogAdminController,
       InboundController,
       PublicCatalogController,
+      InventoryController,
     ],
     providers: [
       { provide: StaffAuthService, useValue: auth },
-      { provide: CatalogService, useValue: new CatalogService(db, config.publicWarehouseId) },
+      { provide: CatalogService, useValue: catalog },
+      { provide: InventoryService, useValue: new InventoryService(catalog) },
       { provide: APP_GUARD, useValue: new StaffGuard(auth) },
     ],
   })
@@ -109,7 +114,7 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription('员工认证、商品与收货入库切片；其余交易接口尚未实现。')
-      .setVersion('0.2.0')
+      .setVersion('0.3.0')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
   );

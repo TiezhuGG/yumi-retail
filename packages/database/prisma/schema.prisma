@@ -47,13 +47,14 @@ model ValidationLedger {
 }
 
 model Warehouse {
-  id          String           @id @db.Uuid
-  code        String           @unique
+  id          String              @id @db.Uuid
+  code        String              @unique
   name        String
-  enabled     Boolean          @default(true)
+  enabled     Boolean             @default(true)
   staffScopes StaffWarehouse[]
   receipts    InboundReceipt[]
   balances    StockBalance[]
+  locations   WarehouseLocation[]
 
   @@map("warehouses")
 }
@@ -74,6 +75,7 @@ model Staff {
   reviewedReceipts InboundReceipt[] @relation("receiptReviewer")
   businessAudits   BusinessAudit[]
   stockLedger      StockLedger[]
+  inventoryChecks  InventoryCheck[]
 
   @@map("staff")
 }
@@ -220,16 +222,18 @@ model InboundLine {
 }
 
 model StockBalance {
-  warehouseId String     @map("warehouse_id") @db.Uuid
-  skuId       String     @map("sku_id") @db.Uuid
-  onHand      Int        @default(0) @map("on_hand")
-  reserved    Int        @default(0)
-  blocked     Int        @default(0)
-  safety      Int        @default(0)
-  version     Int        @default(0)
-  warehouse   Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  sku         Sku        @relation(fields: [skuId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  lots        StockLot[]
+  warehouseId     String           @map("warehouse_id") @db.Uuid
+  skuId           String           @map("sku_id") @db.Uuid
+  onHand          Int              @default(0) @map("on_hand")
+  reserved        Int              @default(0)
+  blocked         Int              @default(0)
+  safety          Int              @default(0)
+  version         Int              @default(0)
+  inventoryHold   Boolean          @default(false) @map("inventory_hold")
+  warehouse       Warehouse        @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  sku             Sku              @relation(fields: [skuId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  lots            StockLot[]
+  inventoryChecks InventoryCheck[]
 
   @@id([warehouseId, skuId])
   @@index([skuId])
@@ -237,22 +241,23 @@ model StockBalance {
 }
 
 model StockLot {
-  id            String        @id @db.Uuid
-  warehouseId   String        @map("warehouse_id") @db.Uuid
-  skuId         String        @map("sku_id") @db.Uuid
-  receiptLineId String        @unique @map("receipt_line_id") @db.Uuid
-  batchNo       String        @map("batch_no") @db.VarChar(64)
-  locationCode  String        @default("DEFAULT") @map("location_code") @db.VarChar(32)
-  onHand        Int           @map("on_hand")
-  reserved      Int           @default(0)
-  blocked       Int           @default(0)
-  unitCostCents BigInt        @map("unit_cost_cents")
-  producedAt    DateTime?     @map("produced_at") @db.Timestamptz(3)
-  expiresAt     DateTime?     @map("expires_at") @db.Timestamptz(3)
-  receivedAt    DateTime      @default(now()) @map("received_at") @db.Timestamptz(3)
-  balance       StockBalance  @relation(fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
-  receiptLine   InboundLine   @relation(fields: [receiptLineId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  id            String          @id @db.Uuid
+  warehouseId   String          @map("warehouse_id") @db.Uuid
+  skuId         String          @map("sku_id") @db.Uuid
+  receiptLineId String          @unique @map("receipt_line_id") @db.Uuid
+  batchNo       String          @map("batch_no") @db.VarChar(64)
+  locationCode  String          @default("DEFAULT") @map("location_code") @db.VarChar(32)
+  onHand        Int             @map("on_hand")
+  reserved      Int             @default(0)
+  blocked       Int             @default(0)
+  unitCostCents BigInt          @map("unit_cost_cents")
+  producedAt    DateTime?       @map("produced_at") @db.Timestamptz(3)
+  expiresAt     DateTime?       @map("expires_at") @db.Timestamptz(3)
+  receivedAt    DateTime        @default(now()) @map("received_at") @db.Timestamptz(3)
+  balance       StockBalance    @relation(fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  receiptLine   InboundLine     @relation(fields: [receiptLineId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
   ledger        StockLedger[]
+  positions     StockPosition[]
 
   @@unique([receiptLineId, warehouseId, skuId])
   @@unique([id, warehouseId, skuId])
@@ -261,20 +266,23 @@ model StockLot {
 }
 
 model StockLedger {
-  id            String   @id @db.Uuid
-  lotId         String   @map("lot_id") @db.Uuid
-  warehouseId   String   @map("warehouse_id") @db.Uuid
-  skuId         String   @map("sku_id") @db.Uuid
-  actionKey     String   @unique @map("action_key") @db.VarChar(128)
-  deltaOnHand   Int      @map("delta_on_hand")
-  deltaReserved Int      @default(0) @map("delta_reserved")
-  deltaBlocked  Int      @default(0) @map("delta_blocked")
-  actorId       String   @map("actor_id") @db.Uuid
-  requestId     String   @map("request_id") @db.Uuid
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  lot           StockLot @relation(fields: [lotId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
-  actor         Staff    @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id              String           @id @db.Uuid
+  lotId           String           @map("lot_id") @db.Uuid
+  warehouseId     String           @map("warehouse_id") @db.Uuid
+  skuId           String           @map("sku_id") @db.Uuid
+  actionKey       String           @unique @map("action_key") @db.VarChar(128)
+  deltaOnHand     Int              @map("delta_on_hand")
+  deltaReserved   Int              @default(0) @map("delta_reserved")
+  deltaBlocked    Int              @default(0) @map("delta_blocked")
+  actorId         String           @map("actor_id") @db.Uuid
+  requestId       String           @map("request_id") @db.Uuid
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  lot             StockLot         @relation(fields: [lotId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  actor           Staff            @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  positionEntries PositionLedger[]
+  transfer        StockTransfer?
 
+  @@unique([id, warehouseId, skuId, lotId])
   @@index([warehouseId, skuId, createdAt])
   @@map("stock_ledger")
 }
@@ -283,6 +291,7 @@ model BusinessAudit {
   id          String   @id @db.Uuid
   actorId     String   @map("actor_id") @db.Uuid
   action      String   @db.VarChar(64)
+  reason      String?  @db.VarChar(200)
   resourceId  String   @map("resource_id") @db.Uuid
   warehouseId String?  @map("warehouse_id") @db.Uuid
   requestId   String   @map("request_id") @db.Uuid
@@ -302,4 +311,97 @@ model IdempotencyRecord {
 
   @@id([scope, keyHash])
   @@map("idempotency_records")
+}
+
+model WarehouseLocation {
+  id          String          @id @db.Uuid
+  warehouseId String          @map("warehouse_id") @db.Uuid
+  code        String          @db.VarChar(32)
+  name        String          @db.VarChar(80)
+  enabled     Boolean         @default(true)
+  version     Int             @default(0)
+  warehouse   Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  positions   StockPosition[]
+
+  @@unique([warehouseId, code])
+  @@unique([id, warehouseId])
+  @@map("warehouse_locations")
+}
+
+model StockPosition {
+  id          String            @id @db.Uuid
+  warehouseId String            @map("warehouse_id") @db.Uuid
+  skuId       String            @map("sku_id") @db.Uuid
+  lotId       String            @map("lot_id") @db.Uuid
+  locationId  String            @map("location_id") @db.Uuid
+  onHand      Int               @map("on_hand")
+  reserved    Int               @default(0)
+  blocked     Int               @default(0)
+  version     Int               @default(0)
+  lot         StockLot          @relation(fields: [lotId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  location    WarehouseLocation @relation(fields: [locationId, warehouseId], references: [id, warehouseId], onDelete: Restrict, onUpdate: NoAction)
+  entries     PositionLedger[]
+  outgoing    StockTransfer[]   @relation("transferSource")
+  incoming    StockTransfer[]   @relation("transferTarget")
+
+  @@unique([lotId, locationId])
+  @@unique([id, warehouseId, skuId, lotId])
+  @@index([warehouseId, skuId, id])
+  @@index([locationId])
+  @@map("stock_positions")
+}
+
+model PositionLedger {
+  id            String        @id @db.Uuid
+  positionId    String        @map("position_id") @db.Uuid
+  warehouseId   String        @map("warehouse_id") @db.Uuid
+  skuId         String        @map("sku_id") @db.Uuid
+  lotId         String        @map("lot_id") @db.Uuid
+  stockLedgerId String        @map("stock_ledger_id") @db.Uuid
+  deltaOnHand   Int           @map("delta_on_hand")
+  deltaReserved Int           @map("delta_reserved")
+  deltaBlocked  Int           @map("delta_blocked")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  position      StockPosition @relation(fields: [positionId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+  stockLedger   StockLedger   @relation(fields: [stockLedgerId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([stockLedgerId, positionId])
+  @@index([positionId])
+  @@map("position_ledger")
+}
+
+model StockTransfer {
+  id               String        @id @db.Uuid
+  warehouseId      String        @map("warehouse_id") @db.Uuid
+  skuId            String        @map("sku_id") @db.Uuid
+  lotId            String        @map("lot_id") @db.Uuid
+  sourcePositionId String        @map("source_position_id") @db.Uuid
+  targetPositionId String        @map("target_position_id") @db.Uuid
+  quantity         Int
+  reason           String        @db.VarChar(200)
+  stockLedgerId    String        @unique @map("stock_ledger_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  source           StockPosition @relation("transferSource", fields: [sourcePositionId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+  target           StockPosition @relation("transferTarget", fields: [targetPositionId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+  stockLedger      StockLedger   @relation(fields: [stockLedgerId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([stockLedgerId, warehouseId, skuId, lotId])
+  @@index([warehouseId, createdAt, id])
+  @@map("stock_transfers")
+}
+
+model InventoryCheck {
+  id          String       @id @db.Uuid
+  warehouseId String       @map("warehouse_id") @db.Uuid
+  skuId       String       @map("sku_id") @db.Uuid
+  actorId     String       @map("actor_id") @db.Uuid
+  status      String       @db.VarChar(20)
+  issueCount  Int          @map("issue_count")
+  issues      Json
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  balance     StockBalance @relation(fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  actor       Staff        @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([warehouseId, skuId, createdAt])
+  @@map("inventory_checks")
 }

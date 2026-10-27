@@ -34,6 +34,8 @@
     "test:s1": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/s1.integration.test.ts",
     "pretest:s2": "npm run build:server",
     "test:s2": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/catalog-inbound.integration.test.ts",
+    "pretest:inventory": "npm run build:server",
+    "test:inventory": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/inventory-locations.integration.test.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

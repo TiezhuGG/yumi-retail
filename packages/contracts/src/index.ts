@@ -79,3 +79,62 @@ export interface SaleSku {
   priceCents: number;
   available: number;
 }
+
+export interface WarehouseLocation {
+  id: string;
+  warehouseId: string;
+  code: string;
+  name: string;
+  enabled: boolean;
+  version: number;
+}
+export interface StockPosition {
+  id: string;
+  warehouseId: string;
+  skuId: string;
+  lotId: string;
+  locationId: string;
+  onHand: number;
+  reserved: number;
+  blocked: number;
+  version: number;
+  locationCode: string;
+  locationName: string;
+  locationEnabled: boolean;
+  batchNo: string;
+  producedAt: string | null;
+  expiresAt: string | null;
+  receivedAt: string;
+  expired: boolean;
+  name: string;
+  spec: string;
+  skuCode: string;
+}
+export interface PositionLedgerEntry {
+  id: string;
+  positionId: string;
+  stockLedgerId: string;
+  deltaOnHand: number;
+  deltaReserved: number;
+  deltaBlocked: number;
+  createdAt: string;
+  actionKey: string;
+  requestId: string;
+  reason: string | null;
+}
+export interface InventoryIssue {
+  kind: string;
+  resourceId: string;
+  expected: { onHand: string; reserved: string; blocked: string };
+  actual: { onHand: string; reserved: string; blocked: string };
+}
+export interface InventoryCheck {
+  id: string;
+  warehouseId: string;
+  skuId: string;
+  actorId: string;
+  status: string;
+  issueCount: number;
+  issues: InventoryIssue[];
+  createdAt: string;
+}

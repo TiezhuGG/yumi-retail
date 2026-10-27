@@ -361,6 +361,7 @@ export class InboundController {
   @Get('stock')
   @Permissions('stock.read')
   @paging()
+  @ApiQuery({ name: 'skuId', required: false, type: String })
   @ApiResult(
     paged(
       object({
@@ -371,6 +372,7 @@ export class InboundController {
         reserved: int,
         blocked: int,
         safety: int,
+        inventoryHold: bool,
         version: int,
       }),
     ),
@@ -383,8 +385,13 @@ export class InboundController {
     warehouseId = uuid(warehouseId);
     await this.service.warehouse(this.service.db, request, warehouseId);
     const { limit, cursor } = page(query);
+    const skuId = query.skuId === undefined ? undefined : uuid(query.skuId);
     const rows = await this.service.db.stockBalance.findMany({
-      where: { warehouseId, ...(cursor ? { skuId: { gt: cursor } } : {}) },
+      where: {
+        warehouseId,
+        ...(skuId ? { skuId } : {}),
+        ...(cursor ? { AND: [{ skuId: { gt: cursor } }] } : {}),
+      },
       orderBy: { skuId: 'asc' },
       take: limit + 1,
     });

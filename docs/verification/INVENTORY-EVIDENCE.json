@@ -1,0 +1,54 @@
+{
+  "finishedAt": "2026-10-27T06:22:01.871Z",
+  "checks": [
+    "legacy values unchanged positions and historical ledger backfilled",
+    "inconsistent legacy migration stops without partial schema or quantity repair",
+    "location create idempotency uniqueness empty enable disable and default protection",
+    "new receiving maintains both ledgers and positions",
+    "20 retries move once paired ledger and quantity saleability preserved",
+    "concurrent move version and nonnegative source",
+    "reserved blocked unavailable cross warehouse invalid input refusal",
+    "late failure is atomic and original intent can recover",
+    "expiry follows batch across locations",
+    "mismatch blocks sales without repair and explicit clean checked release",
+    "offsetting corruption cannot hide behind aggregate equality",
+    "append only facts and deferred complete event invariant",
+    "role scope no cost leakage cursor limits and traceable ledger"
+  ],
+  "isolation": "local yumi_test disposable schema",
+  "schemaRemoved": true,
+  "result": {
+    "failed": 0,
+    "passed": 13
+  },
+  "regressions": {
+    "staff": 12,
+    "catalogInbound": 10,
+    "s0": 6,
+    "totalWithInventory": 41
+  },
+  "browser": {
+    "temporaryServersStopped": true,
+    "normal": [
+      "create A-01",
+      "move 3 of 10 from DEFAULT",
+      "positions=7+3",
+      "public available=10",
+      "position ledger +3",
+      "check consistent",
+      "nonempty location disable rejected"
+    ],
+    "anomaly": [
+      "test-only summary fault=11 vs positions=10",
+      "check reports differences without repair",
+      "public available=0",
+      "test-only fault removed",
+      "consistent check keeps hold",
+      "explicit reason and fresh verification release hold",
+      "public available=10",
+      "ops page reads same positions and reports"
+    ],
+    "isolatedSchemaRemoved": true,
+    "account": "disposable synthetic test account"
+  }
+}

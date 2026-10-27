@@ -1,6 +1,6 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现。2026-10-27已实现员工基础、健康、商品与收货切片，生成[当前OpenAPI](openapi.json)（0.2.0）；后续业务清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产默认关闭。`npm run openapi:export`从当前代码重建契约。
+本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位与库存核对，生成[当前OpenAPI](openapi.json)（0.3.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
 
 ## 当前已实现的员工切片
 
@@ -38,6 +38,27 @@ Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生�
 列表均按UUID升序游标，默认20、上限50，返回items/hasMore/nextCursor；不按创建时间声称最新。公开查询拒绝warehouseId参数，实际仓来自服务端PUBLIC_WAREHOUSE_ID；未配置/停用503 STORE_UNAVAILABLE。零库存SKU仍返回available=0，客户端显示缺货；详情不暴露成本、批次、员工和供应来源。SKU编码冲突409 DUPLICATE_RESOURCE；生产/到期或SKU状态无效409 INVALID_EXPIRY/SKU_DISABLED；数量/时间格式400。关键交易尚未提供，不以available替代未来下单事务裁决。
 
 ## 1. 通用契约
+
+### 库位与核对增量（已实现）
+
+以下前缀均为`/api/v1/warehouse/warehouses/:warehouseId`；服务端每次校验仓库范围。所有POST要求员工Cookie、Origin、CSRF及UUID Idempotency-Key；同键结果持久化且绑定请求摘要。
+
+| 路径/方法 | 权限/输入 | 当前行为 |
+|---|---|---|
+| GET /locations | stock.read；cursor/limit | 本仓普通库位（含停用） |
+| POST /locations | location.write；code/name | 仓内唯一编码，DEFAULT保留 |
+| POST /locations/:id/disable；.../enable | location.write；version | 仅空位能停用，默认位拒绝停用 |
+| GET /positions | stock.read；skuId?/cursor/limit | 批次位置、货位、数量、版本、效期及销售规格名称；无成本 |
+| GET /positions/:id/ledger | stock.read；cursor/limit | 位置增量、主动作键、时间/requestId及移位原因 |
+| GET /stock-transfers | stock.read；cursor/limit | 本仓不可改移位记录 |
+| POST /stock-transfers | stock.transfer；sourcePositionId/targetLocationId/quantity/version/reason | 一次过账，同仓成对数量流水，不改变汇总数量 |
+| POST /inventory-checks | stock.check；skuId | 保存单SKU核对；差异设置核对销售暂停，不修数 |
+| GET /inventory-checks | stock.read；skuId?/cursor/limit | 不可改报告，完整issueCount和前100项证据 |
+| POST /stock/:skuId/release-check-hold | stock.release-hold；version/reason | 事务中重新核对，一致才解除核对暂停并审计 |
+
+新增4个写权限仅授予SUPER_ADMIN、WAREHOUSE_MANAGER；PICKER可只读上述无成本仓库数据。stock原查询新增skuId过滤、返回inventoryHold；公开products保持原契约，但核对暂停时available=0，正常可售按启用库位的未到期位置数量与汇总上限求小值。
+
+分页默认20、上限50，UUID升序游标，不声称时间倒序。核对证据expected/actual里的三种数量为十进制整数字符串。错误：409 VERSION_CONFLICT/STOCK_RESERVED/INSUFFICIENT_STOCK/LOCATION_NOT_EMPTY/INVENTORY_HOLD/INVENTORY_MISMATCH；403 LOCATION_UNAVAILABLE用于越仓或停用目标；同位移位/非法数量400。核对暂停下收货409 STOCK_UNAVAILABLE。库存核对不是实物盘点，不提供直接改库存接口。
 
 - 前缀 `/api/v1`，UTF-8 JSON；金额 `*Cents` 为非负整数分，数量为整数，币种固定 CNY。
 - 对外 ID 为不透明字符串，数据库 BIGINT 不直接序列化成 JS number；时间 ISO8601 UTC，界面按 Asia/Shanghai 展示。截止判断使用服务端时间。

@@ -86,6 +86,7 @@ after(async () => {
     await db.staffRole.deleteMany({ where: { staffId: { in: staffIds } } });
     await db.staffWarehouse.deleteMany({ where: { staffId: { in: staffIds } } });
     await db.staff.deleteMany({ where: { id: { in: staffIds } } });
+    await db.warehouseLocation.deleteMany({ where: { warehouseId: { in: warehouseIds } } });
     await db.warehouse.deleteMany({ where: { id: { in: warehouseIds } } });
     const hash = (value: string) => createHash('sha256').update(value).digest('hex');
     const throttleKeys = [
