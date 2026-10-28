@@ -93,13 +93,30 @@ export function Workspace({
   sessionControl: ReactNode;
   mobile?: boolean;
 }) {
-  const allowed = routes.filter((r) => profile.permissions.includes(r.permission));
+  const pickerOnly =
+    mobile && profile.roles.includes('PICKER') && !profile.permissions.includes('stock.transfer');
+  const mobileViews = new Set<WorkspaceView>(
+    pickerOnly
+      ? ['stock', 'locations']
+      : ['overview', 'stock', 'receipts', 'locations', 'counts', 'dispositions', 'reversals'],
+  );
+  const allowed = routes.filter(
+    (r) => profile.permissions.includes(r.permission) && (!mobile || mobileViews.has(r.id)),
+  );
   const [view, setView] = useState<WorkspaceView>(allowed[0]?.id ?? 'overview');
   const activeNav = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const reveal = () => activeNav.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
-    reveal();
     const mobileWidth = window.matchMedia('(max-width: 680px)');
+    const reveal = () => {
+      const button = activeNav.current;
+      const nav = button?.parentElement;
+      if (!button || !nav || !mobileWidth.matches) return;
+      const left =
+        button.getBoundingClientRect().left - nav.getBoundingClientRect().left + nav.scrollLeft;
+      nav.scrollTo({ left: left - (nav.clientWidth - button.offsetWidth) / 2 });
+    };
+    window.scrollTo({ top: 0, left: 0 });
+    reveal();
     mobileWidth.addEventListener('change', reveal);
     return () => mobileWidth.removeEventListener('change', reveal);
   }, [view]);
@@ -108,7 +125,9 @@ export function Workspace({
     <div className={`workspace ${mobile ? 'mobile-workspace' : ''}`}>
       <aside className="sidebar">
         <Brand />
-        <div className="nav-label">{mobile ? '仓库作业' : '运营管理'}</div>
+        <div className="nav-label">
+          {mobile ? (pickerOnly ? '拣货查询' : '仓库作业') : '运营管理'}
+        </div>
         <nav aria-label="主导航">
           {allowed.map((r) => (
             <button

@@ -9,6 +9,8 @@ const candidate =
 const executable = candidate && existsSync(candidate) ? candidate : 'docker';
 const result = spawnSync(executable, process.argv.slice(2), { stdio: 'inherit', shell: false });
 if (result.error) {
-  console.error('Docker command could not start. Check Docker Desktop and CLI installation.');
+  console.error(
+    'Docker command could not start. Check Docker Desktop or Docker Engine and the Docker CLI installation.',
+  );
 }
 process.exit(result.status ?? 1);

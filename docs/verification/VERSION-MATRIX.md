@@ -53,3 +53,7 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 2026-10-28隔离/报损切片：新增11项与原55项通过，共66项；未新增或升级依赖，锁文件SHA256不变。精确安装观察见[本轮快照](DISPOSITION-INSTALLED-VERSIONS.json)，检查与边界见[报告](S2-STOCK-DISPOSITION-2026-10-28.md)。
 
 2026-10-28收货逆向纠错切片：新增12项与原66项通过，共78项；全工作区/Taro编译通过。依赖与锁文件未变，见[精确安装观察](REVERSAL-INSTALLED-VERSIONS.json)及[本轮报告](S2-RECEIPT-REVERSAL-2026-10-28.md)。
+
+## 2026-10-28 Linux仓储UI接续观察
+
+本轮实际Node24.22.0、pnpm10.28.2、Docker Engine29.9.1（Ubuntu主机），没有Docker Desktop。使用缓存PostgreSQL17.11 Debian trixie镜像进行本地测试，原bookworm镜像锁定和pnpm-lock.yaml未改；仅本机 `.local/compose.engine.yaml` 覆盖缓存镜像digest。Prisma7.10.1生成、开发/测试两库9条既有迁移、相关23项集成及真实API双员工浏览器闭环通过。Web/H5构建及类型/规范检查通过；此观察不替换原Node24.22.1/Windows/bookworm矩阵，也不代表本轮重验全工作区或Taro/微信。详见[报告](UI-STOCK-TASKS-2026-10-28.md)。

@@ -1521,3 +1521,134 @@ small {
     max-height: 90dvh;
   }
 }
+
+.task-workbench .surface-head {
+  padding: 0 0 16px;
+}
+.task-workbench .toolbar {
+  margin: 16px 0;
+}
+.task-workbench .toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.task-workbench .toolbar span {
+  color: #687d70;
+  font-size: 12px;
+}
+.task-detail {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.task-detail label {
+  display: block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #526b5b;
+}
+.task-detail p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #526b5b;
+}
+.task-detail h4 {
+  margin: 16px 0 10px;
+}
+.task-detail form + form {
+  border-top: 1px solid #e0e9e3;
+  margin-top: 20px;
+  padding-top: 12px;
+}
+.task-detail input:not([type='checkbox']),
+.task-detail select {
+  border: 1px solid #dfe8e2;
+  border-radius: 7px;
+  background: #fcfdfc;
+}
+.task-summary {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f4f8f5;
+  margin-top: 16px;
+}
+.business-area .task-card {
+  margin: 12px 0 !important;
+}
+@media (max-width: 680px) {
+  .task-workbench .toolbar label,
+  .task-workbench .toolbar select {
+    width: 100%;
+  }
+}
+@media (min-width: 681px) {
+  .task-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 24px;
+    align-items: center;
+  }
+  .task-card > :not(button) {
+    grid-column: 1;
+  }
+  .task-card > button {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+  }
+}
+.task-error,
+.task-detail .task-error,
+.business-area .task-error {
+  color: #a52d24;
+  background: #fff2ef;
+  border: 1px solid #f5d2cc;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.location-workbench .task-detail label input,
+.location-workbench .task-detail label select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 7px 0 14px;
+  padding: 11px;
+  box-sizing: border-box;
+}
+.location-workbench .task-detail {
+  overflow-wrap: anywhere;
+}
+.location-row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.selector-support {
+  margin: 12px 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (min-width: 681px) {
+  .task-card > .location-row-actions {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+  }
+}
+@media (max-width: 680px) {
+  .location-workbench .subnav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .location-workbench .task-card {
+    display: block;
+  }
+  .location-row-actions {
+    margin-top: 12px;
+  }
+}
+.task-workbench .toolbar label {
+  white-space: nowrap;
+}
