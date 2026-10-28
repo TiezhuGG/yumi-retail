@@ -189,7 +189,7 @@ export function StockDispositionWorkbench({
                   ))}
               </select>
             </label>
-            <p>这里使用上方库存位置列表；找不到时先按规格筛选或加载更多位置。</p>
+            <p>选择需要处理的批次；如未找到，可先加载更多可选批次位置。</p>
             <label>
               隔离数量
               <input
@@ -217,7 +217,10 @@ export function StockDispositionWorkbench({
             <p>
               隔离 {i.quantity} 件 · 剩余 {i.remaining} 件 · {i.reason}
             </p>
-            <p>隔离编号 {i.id}</p>
+            <details>
+              <summary>记录编号 …{i.id.slice(-8)}</summary>
+              <p>{i.id}</p>
+            </details>
             <button style={button} onClick={() => void work(() => openIsolation(i.id))}>
               查看隔离并申请处置
             </button>
@@ -235,7 +238,7 @@ export function StockDispositionWorkbench({
               {position.name} · {position.batchNo} · {position.locationCode}
             </p>
             <p>
-              {selected.id} · 剩余 {selected.remaining} 件
+              剩余 {selected.remaining} 件 · 记录尾号 {selected.id.slice(-8)}
             </p>
             <p>
               实物 {position.onHand} / 预占 {position.reserved} / 不可售 {position.blocked} ·{' '}
@@ -303,7 +306,7 @@ export function StockDispositionWorkbench({
             </strong>
             <p>{name(d.positionId)}</p>
             <p>
-              {d.reason} · 单号 {d.id}
+              {d.reason} · 单号尾号 {d.id.slice(-8)}
             </p>
             <button
               style={button}
@@ -327,14 +330,22 @@ export function StockDispositionWorkbench({
         {document && (
           <section style={box} aria-label="处置单详情">
             <h4>当前处置单详情</h4>
-            <p>{document.id}</p>
+            <details>
+              <summary>单号 …{document.id.slice(-8)}</summary>
+              <p>{document.id}</p>
+            </details>
             <p>
               {document.kind === 'DAMAGE' ? '报损' : '解除隔离'} {document.quantity} 件 ·{' '}
               {states[document.status]}
             </p>
             <p>申请原因：{document.reason}</p>
             <p>
-              申请员工 {document.createdBy} · 审批员工 {document.reviewedBy ?? '待审批'}
+              申请人：{document.createdBy === profile.id ? '你' : '其他授权员工'} · 审批：
+              {document.reviewedBy
+                ? document.reviewedBy === profile.id
+                  ? '你已审批'
+                  : '已由其他员工审批'
+                : '待独立审批'}
             </p>
             {document.reviewReason && <p>审批说明：{document.reviewReason}</p>}
             {document.cancelReason && <p>取消说明：{document.cancelReason}</p>}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, CSSProperties } from 'react';
+import type { FormEvent } from 'react';
 import type {
   Category,
   Page,
@@ -10,33 +10,10 @@ import type {
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
 import { InventoryWorkbench } from './inventory.js';
+import { Modal } from './modal.js';
+import { ProductArt } from './brand.js';
+import type { WorkspaceView } from './workspace.js';
 
-const panel: CSSProperties = {
-  background: '#fff',
-  padding: 20,
-  border: '1px solid #e4e7ec',
-  borderRadius: 12,
-  marginTop: 20,
-};
-const control: CSSProperties = {
-  padding: 10,
-  border: '1px solid #d0d5dd',
-  borderRadius: 6,
-  width: '100%',
-  boxSizing: 'border-box',
-  minHeight: 44,
-};
-const button: CSSProperties = {
-  padding: '10px 16px',
-  background: '#008a42',
-  color: '#fff',
-  border: 0,
-  borderRadius: 6,
-  minHeight: 44,
-  cursor: 'pointer',
-  margin: '8px 8px 0 0',
-};
-const label: CSSProperties = { display: 'block', marginTop: 12 };
 const status: Record<string, string> = {
   DRAFT: '草稿',
   APPROVED: '已审核',
@@ -54,7 +31,19 @@ interface StockRow {
   activeCountId: string | null;
   inventoryHold: boolean;
 }
-export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
+export function CatalogWorkbench({
+  profile,
+  view = 'overview',
+  onNavigate = () => {},
+}: {
+  profile: StaffProfile;
+  view?: WorkspaceView;
+  onNavigate?: (view: WorkspaceView) => void;
+}) {
+  const [modal, setModal] = useState<'product' | 'category' | 'receipt' | null>(null),
+    [search, setSearch] = useState(''),
+    [categoryFilter, setCategoryFilter] = useState(''),
+    [statusFilter, setStatusFilter] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]);
@@ -65,6 +54,7 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
   const [selectedSku, setSelectedSku] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [categoryCursor, setCategoryCursor] = useState<string | null>(null);
   const [productCursor, setProductCursor] = useState<string | null>(null);
   const [receiptCursor, setReceiptCursor] = useState<string | null>(null);
@@ -110,9 +100,14 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
   useEffect(() => {
     let active = true;
     if (can('catalog.read'))
-      Promise.all([categoriesPage(), productsPage()]).catch((err: Error) => {
-        if (active) setMessage(err.message);
-      });
+      Promise.all([categoriesPage(), productsPage()])
+        .catch((err: Error) => {
+          if (active) setMessage(err.message);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    else setLoading(false);
     if (can('stock.read'))
       staffRequest<{ items: WarehouseSummary[] }>('/warehouse/warehouses')
         .then(({ items }) => {
@@ -168,57 +163,623 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
     return { element: event.currentTarget, data: new FormData(event.currentTarget) };
   }
   if (!can('catalog.read') && !can('stock.read')) return null;
+  if (loading)
+    return (
+      <div className="surface empty-state" role="status">
+        正在准备你的工作资料…
+      </div>
+    );
+  const currency = (v: number) => (v / 100).toFixed(2);
+  const filteredProducts = products.filter(
+    (p) =>
+      (!search ||
+        [p.name, ...p.skus.map((s) => s.code)].some((s) =>
+          s.toLowerCase().includes(search.toLowerCase()),
+        )) &&
+      (!categoryFilter || p.categoryId === categoryFilter) &&
+      (!statusFilter || p.status === statusFilter),
+  );
+  const filteredStock = stock.filter((s) => {
+    const sku = skus.find((k) => k.id === s.skuId);
+    return (
+      !search || [sku?.name, sku?.code].some((v) => v?.toLowerCase().includes(search.toLowerCase()))
+    );
+  });
+  const pending = receipts.filter((r) => r.status !== 'POSTED');
+  const refresh = () =>
+    work(async () => {
+      await Promise.all([productsPage(), categoriesPage(), receiptsPage(warehouseId)]);
+    });
+  const warehouseControl = (
+    <select
+      className="warehouse-select"
+      aria-label="作业仓库"
+      value={warehouseId}
+      onChange={(e) => setWarehouseId(e.target.value)}
+    >
+      {!warehouses.length && <option value="">暂无授权仓库</option>}
+      {warehouses.map((w) => (
+        <option key={w.id} value={w.id}>
+          {w.name}
+        </option>
+      ))}
+    </select>
+  );
+  function closeModal() {
+    setModal(null);
+  }
   return (
-    <section>
-      <h2>商品与收货工作台</h2>
-      <p>金额填写整数分；收货先审核再入 DEFAULT，下方可执行同仓移位与账本核对。</p>
+    <>
       {message && (
-        <p role="status" style={{ padding: 12, background: '#f0fdf4' }}>
+        <div role="status" className="notice">
           {message}
-        </p>
+        </div>
       )}
-      <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
-        {can('catalog.write') && (
-          <>
-            <form
-              style={panel}
-              onSubmit={(event) => {
-                const { data, element } = form(event);
-                void work(async () => {
+      {view === 'overview' && (
+        <>
+          <section className="welcome-banner">
+            <h2>你好，{profile.displayName}。今天也一起用心经营。</h2>
+            <p>从整理商品到核对每一份收货，让邻里需要的好物都准备妥当。</p>
+          </section>
+          <div className="stat-grid">
+            {[
+              {
+                title: '商品档案',
+                value: products.length,
+                hint: productCursor ? '当前已载入，仍有更多' : '当前商品目录',
+                icon: '▣',
+                to: 'products',
+              },
+              {
+                title: '已上架商品',
+                value: products.filter((p) => p.status === 'PUBLISHED').length,
+                hint: productCursor ? '当前已载入商品中' : '面向顾客展示',
+                icon: '↗',
+                to: 'products',
+              },
+              {
+                title: '待处理收货',
+                value: pending.length,
+                hint: receiptCursor ? '当前已载入，仍有更多' : '待审核或待入库',
+                icon: '↓',
+                to: 'receipts',
+              },
+              {
+                title: '需关注库存',
+                value: stock.filter(
+                  (s) =>
+                    s.inventoryHold ||
+                    s.activeCountId ||
+                    s.onHand - s.reserved - s.blocked <= s.safety,
+                ).length,
+                hint: stockCursor ? '当前库存页' : '缺货、盘点或核对暂停',
+                icon: '◇',
+                to: 'stock',
+              },
+            ]
+              .filter((s) =>
+                can(
+                  s.to === 'receipts'
+                    ? 'receipt.read'
+                    : s.to === 'stock'
+                      ? 'stock.read'
+                      : 'catalog.read',
+                ),
+              )
+              .map((s) => (
+                <button
+                  className="stat-card"
+                  style={{ textAlign: 'left', cursor: 'pointer' }}
+                  key={s.title}
+                  onClick={() => onNavigate(s.to as WorkspaceView)}
+                >
+                  <p>{s.title}</p>
+                  <strong>{s.value}</strong>
+                  <i>{s.icon}</i>
+                  <small>{s.hint}</small>
+                </button>
+              ))}
+          </div>
+          <div className="overview-columns">
+            <section className="surface">
+              <div className="surface-head">
+                <h2>常用功能</h2>
+                <small>轻松完成日常作业</small>
+              </div>
+              <div className="shortcut-grid">
+                {[
+                  { to: 'products', title: '整理商品', icon: '▣', permission: 'catalog.read' },
+                  { to: 'receipts', title: '收货入库', icon: '↓', permission: 'receipt.read' },
+                  { to: 'stock', title: '查看库存', icon: '▦', permission: 'stock.read' },
+                  { to: 'counts', title: '实物盘点', icon: '☑', permission: 'stock.read' },
+                  { to: 'dispositions', title: '隔离报损', icon: '◇', permission: 'stock.read' },
+                  { to: 'reversals', title: '收货纠错', icon: '↶', permission: 'stock.read' },
+                ]
+                  .filter((r) => can(r.permission))
+                  .map((r) => (
+                    <button
+                      key={r.to}
+                      className="shortcut"
+                      onClick={() => onNavigate(r.to as WorkspaceView)}
+                    >
+                      <span>{r.icon}</span>
+                      {r.title}
+                    </button>
+                  ))}
+              </div>
+            </section>
+            <section className="surface" hidden={!can('receipt.read')}>
+              <div className="surface-head">
+                <h2>收货待办</h2>
+                <button className="text-button" onClick={() => onNavigate('receipts')}>
+                  查看收货 →
+                </button>
+              </div>
+              {pending.length ? (
+                pending.slice(0, 5).map((r) => (
+                  <div className="task-row" key={r.id}>
+                    <span>{r.sourceRef}</span>
+                    <span className={`badge ${r.status === 'DRAFT' ? 'amber' : 'green'}`}>
+                      {status[r.status]}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state" style={{ padding: '45px 10px' }}>
+                  ✓ 暂无收货待办
+                  <br />
+                  <small>新收货单将显示在这里</small>
+                </div>
+              )}
+            </section>
+          </div>
+        </>
+      )}
+      {view === 'products' && (
+        <section className="surface">
+          <div className="surface-head">
+            <div>
+              <h2>商品列表</h2>
+              <p>分类清晰，好物一目了然</p>
+            </div>
+            <div className="surface-head-actions">
+              <button className="secondary-button" disabled={busy} onClick={() => void refresh()}>
+                ↻ 刷新
+              </button>
+              {can('catalog.write') && (
+                <button
+                  className="primary-button"
+                  onClick={() => {
+                    setMessage('');
+                    setModal('product');
+                  }}
+                >
+                  ＋ 新增商品
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="toolbar">
+            <input
+              aria-label="搜索商品"
+              placeholder="搜索已载入商品名称、SKU编码…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              aria-label="筛选分类"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <option value="">全部分类</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="筛选状态"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="">全部状态</option>
+              <option value="PUBLISHED">已上架</option>
+              <option value="DRAFT">草稿</option>
+              <option value="UNPUBLISHED">已下架</option>
+            </select>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                setSearch('');
+                setCategoryFilter('');
+                setStatusFilter('');
+              }}
+            >
+              重置
+            </button>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>商品信息</th>
+                  <th>分类</th>
+                  <th>规格 / SKU</th>
+                  <th>售价</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.flatMap((p) =>
+                  p.skus.map((s, i) => (
+                    <tr key={s.id}>
+                      <td>
+                        <div className="product-cell">
+                          <ProductArt name={p.name} />
+                          <div>
+                            <strong>{p.name}</strong>
+                            <small>
+                              {s.unit} · {s.expiryManaged ? '管理效期' : '常规商品'}
+                            </small>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{categories.find((c) => c.id === p.categoryId)?.name ?? '未载入分类'}</td>
+                      <td>
+                        {s.spec}
+                        <small>{s.code}</small>
+                      </td>
+                      <td className="money">¥{currency(s.priceCents)}</td>
+                      <td>
+                        <span className={`badge ${p.status === 'PUBLISHED' ? 'green' : 'amber'}`}>
+                          {status[p.status]}
+                        </span>
+                      </td>
+                      <td>
+                        {i === 0 && can('catalog.write') ? (
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void work(async () => {
+                                await action(
+                                  `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
+                                  { version: p.version },
+                                );
+                                await productsPage();
+                              })
+                            }
+                          >
+                            {p.status === 'PUBLISHED' ? '下架' : '上架'}
+                          </button>
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+          {!filteredProducts.length && <div className="empty-state">没有找到符合条件的商品</div>}
+          <div className="table-footer">
+            <span>
+              已载入 {products.length} 个商品 · 当前匹配 {filteredProducts.length} 个
+              {productCursor ? ' · 可继续加载更多' : ''}
+            </span>
+            {productCursor && (
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => void work(() => productsPage(productCursor))}
+              >
+                加载更多商品
+              </button>
+            )}
+            <small>商品图为包装示意</small>
+          </div>
+        </section>
+      )}
+      {view === 'categories' && (
+        <section className="surface">
+          <div className="surface-head">
+            <div>
+              <h2>商品分类</h2>
+              <p>最多两级分类，组织清晰的商品目录</p>
+            </div>
+            {can('catalog.write') && (
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setMessage('');
+                  setModal('category');
+                }}
+              >
+                ＋ 新增分类
+              </button>
+            )}
+          </div>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>分类名称</th>
+                  <th>所属分类</th>
+                  <th>层级</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categories.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <strong>
+                        {c.parentId ? '↳　' : '▤　'}
+                        {c.name}
+                      </strong>
+                    </td>
+                    <td>{categories.find((k) => k.id === c.parentId)?.name ?? '—'}</td>
+                    <td>{c.parentId ? '二级分类' : '一级分类'}</td>
+                    <td>
+                      <span className={`badge ${c.enabled ? 'green' : ''}`}>
+                        {c.enabled ? '启用' : '停用'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!categories.length && (
+            <div className="empty-state">还没有商品分类，先为好物建立分类吧。</div>
+          )}
+          {categoryCursor && (
+            <button
+              className="secondary-button"
+              onClick={() => void work(() => categoriesPage(categoryCursor))}
+            >
+              加载更多分类
+            </button>
+          )}
+        </section>
+      )}
+      {view === 'receipts' && (
+        <section className="surface">
+          <div className="surface-head">
+            <div>
+              <h2>收货单</h2>
+              <p>先审核，再确认入库</p>
+            </div>
+            <div className="surface-head-actions">
+              {warehouseControl}
+              {can('receipt.write') && (
+                <button
+                  className="primary-button"
+                  disabled={!warehouseId}
+                  onClick={() => {
+                    setMessage('');
+                    setSelectedSku('');
+                    setModal('receipt');
+                  }}
+                >
+                  ＋ 新建收货单
+                </button>
+              )}
+            </div>
+          </div>
+          <button
+            className="secondary-button"
+            disabled={busy}
+            onClick={() => void work(() => receiptsPage(warehouseId))}
+          >
+            ↻ 刷新收货
+          </button>
+          <div className="table-wrap" style={{ marginTop: 20 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>来源 / 收货单</th>
+                  <th>商品与批次</th>
+                  <th>数量</th>
+                  <th>成本</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {receipts.flatMap((r) =>
+                  r.lines.map((line, i) => (
+                    <tr key={line.id}>
+                      <td>
+                        <strong>{r.sourceRef}</strong>
+                        <small>…{r.id.slice(-8)}</small>
+                      </td>
+                      <td>
+                        {skus.find((s) => s.id === line.skuId)?.name ?? '未载入商品'}
+                        <small>{line.batchNo}</small>
+                      </td>
+                      <td>{line.quantity} 件</td>
+                      <td>¥{currency(line.unitCostCents)}/件</td>
+                      <td>
+                        <span className={`badge ${r.status === 'POSTED' ? 'green' : 'amber'}`}>
+                          {status[r.status]}
+                        </span>
+                      </td>
+                      <td>
+                        {i === 0 &&
+                          ((r.status === 'DRAFT' && can('receipt.approve')) ||
+                            (r.status === 'APPROVED' && can('receipt.post'))) && (
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() =>
+                                void work(async () => {
+                                  await action(
+                                    `/warehouse/warehouses/${warehouseId}/receipts/${r.id}/${r.status === 'DRAFT' ? 'approve' : 'post'}`,
+                                    { version: r.version },
+                                  );
+                                  await receiptsPage(warehouseId);
+                                })
+                              }
+                            >
+                              {r.status === 'DRAFT' ? '审核收货单' : '确认入库'}
+                            </button>
+                          )}
+                      </td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
+          </div>
+          {!receipts.length && <div className="empty-state">暂无收货单，收货时从右上角新建。</div>}
+          <div className="table-footer">
+            <span>已载入 {receipts.length} 张收货单</span>
+            {receiptCursor && (
+              <button
+                className="secondary-button"
+                onClick={() => void work(() => receiptsPage(warehouseId, receiptCursor))}
+              >
+                加载更多收货单
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+      {view === 'stock' && (
+        <section className="surface">
+          <div className="surface-head">
+            <div>
+              <h2>库存明细</h2>
+              <p>实物、预占与不可售分开查看；可售还受效期和安全库存限制</p>
+            </div>
+            <div className="surface-head-actions">
+              {warehouseControl}
+              <button className="primary-button" onClick={() => onNavigate('receipts')}>
+                ＋ 收货入库
+              </button>
+            </div>
+          </div>
+          <div className="toolbar">
+            <input
+              aria-label="搜索库存"
+              placeholder="搜索已载入商品名称、SKU编码…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void work(() => stockPage(warehouseId))}
+            >
+              ↻ 刷新库存
+            </button>
+          </div>
+          <div className="table-wrap">
+            <table className="data-table stock-table">
+              <thead>
+                <tr>
+                  <th>商品信息</th>
+                  <th>SKU编码</th>
+                  <th>实物库存</th>
+                  <th>预占</th>
+                  <th>不可售</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStock.map((s) => {
+                  const sku = skus.find((k) => k.id === s.skuId);
+                  return (
+                    <tr key={s.id}>
+                      <td>
+                        <div className="product-cell">
+                          <ProductArt name={sku?.name ?? ''} />
+                          <div>
+                            <strong>{sku?.name ?? '未载入商品'}</strong>
+                            <small>{sku?.spec}</small>
+                          </div>
+                        </div>
+                      </td>
+                      <td data-label="SKU编码">{sku?.code ?? '—'}</td>
+                      <td className="money" data-label="实物库存">{s.onHand}</td>
+                      <td data-label="预占">{s.reserved}</td>
+                      <td data-label="不可售">{s.blocked}</td>
+                      <td>
+                        <span
+                          className={`badge ${s.inventoryHold ? 'red' : s.activeCountId ? 'amber' : 'green'}`}
+                        >
+                          {s.inventoryHold ? '核对暂停' : s.activeCountId ? '盘点冻结' : '正常'}
+                        </span>
+                      </td>
+                      <td>
+                        <button className="text-button" onClick={() => onNavigate('locations')}>
+                          查看库位
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {!filteredStock.length && (
+            <div className="empty-state">暂无匹配库存，请收货入库或调整搜索条件。</div>
+          )}
+          <div className="table-footer">
+            <span>已载入 {stock.length} 条库存</span>
+            {stockCursor && (
+              <button
+                className="secondary-button"
+                onClick={() => void work(() => stockPage(warehouseId, stockCursor))}
+              >
+                加载更多库存
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+      {['locations', 'counts', 'dispositions', 'reversals'].includes(view) && (
+        <>
+          <div className="surface-head">
+            {warehouseControl}
+            <small>当前仓库的授权作业</small>
+          </div>
+          <div className="business-area">
+            <InventoryWorkbench
+              key={`${warehouseId}-${view}`}
+              profile={profile}
+              warehouseId={warehouseId}
+              mode={view as 'locations' | 'counts' | 'dispositions' | 'reversals'}
+              onStockChanged={() => stockPage(warehouseId)}
+            />
+          </div>
+        </>
+      )}
+      {modal && (
+        <Modal
+          busy={busy}
+          title={
+            modal === 'product' ? '新增商品' : modal === 'category' ? '新增分类' : '新建收货单'
+          }
+          onClose={closeModal}
+        >
+          <form
+            className="business-form"
+            onSubmit={(event) => {
+              const { data } = form(event);
+              void work(async () => {
+                if (modal === 'category') {
                   await action('/admin/categories', {
                     name: data.get('name'),
                     parentId: data.get('parentId') || null,
                   });
-                  element.reset();
                   await categoriesPage();
-                });
-              }}
-            >
-              <h3>新增分类</h3>
-              <label style={label}>
-                分类名称
-                <input style={control} name="name" required maxLength={80} />
-              </label>
-              <label style={label}>
-                父分类
-                <select style={control} name="parentId">
-                  <option value="">一级分类</option>
-                  {categories
-                    .filter((c) => !c.parentId && c.enabled)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <button style={button}>保存分类</button>
-            </form>
-            <form
-              style={panel}
-              onSubmit={(event) => {
-                const { data, element } = form(event);
-                void work(async () => {
+                } else if (modal === 'product') {
                   await action('/admin/products', {
                     categoryId: data.get('categoryId'),
                     name: data.get('name'),
@@ -228,322 +789,201 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
                         code: data.get('code'),
                         spec: data.get('spec'),
                         unit: data.get('unit'),
-                        priceCents: Number(data.get('priceCents')),
+                        priceCents: Math.round(Number(data.get('price')) * 100),
                         expiryManaged: data.get('expiryManaged') === 'on',
                       },
                     ],
                   });
-                  element.reset();
                   await productsPage();
-                });
-              }}
-            >
-              <h3>新增商品与规格</h3>
-              <label style={label}>
-                分类
-                <select style={control} name="categoryId" required>
-                  <option value="">请选择</option>
-                  {categories
-                    .filter((c) => c.enabled)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label style={label}>
-                商品名称
-                <input style={control} name="name" required maxLength={120} />
-              </label>
-              <label style={label}>
-                商品说明
-                <textarea style={control} name="description" maxLength={2000} />
-              </label>
-              <label style={label}>
-                SKU编码
-                <input
-                  style={control}
-                  name="code"
-                  pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
-                  required
-                  maxLength={64}
-                />
-              </label>
-              <label style={label}>
-                规格
-                <input
-                  style={control}
-                  name="spec"
-                  placeholder="例如 10只装"
-                  required
-                  maxLength={100}
-                />
-              </label>
-              <label style={label}>
-                单位
-                <input style={control} name="unit" placeholder="例如 包" required maxLength={16} />
-              </label>
-              <label style={label}>
-                售价（分）
-                <input
-                  style={control}
-                  name="priceCents"
-                  type="number"
-                  min={1}
-                  max={100000000}
-                  step={1}
-                  required
-                />
-              </label>
-              <label style={label}>
-                <input name="expiryManaged" type="checkbox" /> 管理生产与到期时间
-              </label>
-              <button style={button}>保存商品草稿</button>
-            </form>
-          </>
-        )}
-        {categoryCursor && (
-          <button style={button} onClick={() => void work(() => categoriesPage(categoryCursor))}>
-            加载更多分类
-          </button>
-        )}
-        {can('catalog.read') && (
-          <section style={panel}>
-            <h3>商品目录</h3>
-            <button style={button} onClick={() => void work(() => productsPage())}>
-              刷新商品
-            </button>
-            {!products.length && <p>暂无商品，请先由运营创建。</p>}
-            {products.map((p) => (
-              <article key={p.id} style={{ borderTop: '1px solid #e4e7ec', padding: '12px 0' }}>
-                <strong>{p.name}</strong> · {status[p.status] ?? p.status}
-                {p.skus.map((s) => (
-                  <p key={s.id}>
-                    {s.code} · {s.spec} · ¥{(s.priceCents / 100).toFixed(2)}/{s.unit}
-                    {s.expiryManaged ? ' · 管理效期' : ''}
-                  </p>
-                ))}
-                {can('catalog.write') && (
-                  <button
-                    style={button}
-                    onClick={() =>
-                      void work(async () => {
-                        await action(
-                          `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
-                          { version: p.version },
-                        );
-                        await productsPage();
-                      })
-                    }
-                  >
-                    {p.status === 'PUBLISHED' ? '下架商品' : '上架商品'}
-                  </button>
-                )}
-              </article>
-            ))}
-            {productCursor && (
-              <button style={button} onClick={() => void work(() => productsPage(productCursor))}>
-                加载更多商品
-              </button>
-            )}
-          </section>
-        )}
-        {can('stock.read') && (
-          <section style={panel}>
-            <h3>收货入库</h3>
-            <label style={label}>
-              作业仓库
-              <select
-                style={control}
-                value={warehouseId}
-                onChange={(event) => setWarehouseId(event.target.value)}
-              >
-                {warehouses.map((w) => (
-                  <option value={w.id} key={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!warehouseId && <p>没有已授权仓库，请联系管理员。</p>}
-            {can('receipt.write') && warehouseId && (
-              <form
-                onSubmit={(event) => {
-                  const { data, element } = form(event);
-                  void work(async () => {
-                    const date = (name: string) =>
-                      data.get(name) ? new Date(String(data.get(name))).toISOString() : null;
-                    await action(`/warehouse/warehouses/${warehouseId}/receipts`, {
-                      sourceRef: data.get('sourceRef'),
-                      lines: [
-                        {
-                          skuId: data.get('skuId'),
-                          batchNo: data.get('batchNo'),
-                          quantity: Number(data.get('quantity')),
-                          unitCostCents: Number(data.get('unitCostCents')),
-                          producedAt: date('producedAt'),
-                          expiresAt: date('expiresAt'),
-                        },
-                      ],
-                    });
-                    element.reset();
-                    setSelectedSku('');
-                    await receiptsPage(warehouseId);
+                } else {
+                  const date = (name: string) =>
+                    data.get(name) ? new Date(String(data.get(name))).toISOString() : null;
+                  await action(`/warehouse/warehouses/${warehouseId}/receipts`, {
+                    sourceRef: data.get('sourceRef'),
+                    lines: [
+                      {
+                        skuId: data.get('skuId'),
+                        batchNo: data.get('batchNo'),
+                        quantity: Number(data.get('quantity')),
+                        unitCostCents: Math.round(Number(data.get('cost')) * 100),
+                        producedAt: date('producedAt'),
+                        expiresAt: date('expiresAt'),
+                      },
+                    ],
                   });
-                }}
-              >
-                <label style={label}>
-                  来源单号/说明
-                  <input style={control} name="sourceRef" required maxLength={100} />
+                  await receiptsPage(warehouseId);
+                }
+                closeModal();
+              });
+            }}
+          >
+            {modal === 'category' ? (
+              <>
+                <label className="full">
+                  分类名称
+                  <input name="name" required maxLength={80} />
                 </label>
-                <label style={label}>
-                  收货规格
-                  <select
-                    style={control}
-                    name="skuId"
-                    required
-                    value={selectedSku}
-                    onChange={(event) => setSelectedSku(event.target.value)}
-                  >
-                    <option value="">请选择规格</option>
-                    {skus
-                      .filter((s) => s.enabled)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} · {s.spec} · {s.code}
+                <label className="full">
+                  父分类
+                  <select name="parentId">
+                    <option value="">一级分类</option>
+                    {categories
+                      .filter((c) => !c.parentId && c.enabled)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
                         </option>
                       ))}
                   </select>
                 </label>
-                <label style={label}>
+              </>
+            ) : modal === 'product' ? (
+              <>
+                <label className="full">
+                  商品名称
+                  <input name="name" required maxLength={120} placeholder="例如 柔软抽纸" />
+                </label>
+                <label>
+                  商品分类
+                  <select name="categoryId" required>
+                    <option value="">请选择分类</option>
+                    {categories
+                      .filter((c) => c.enabled)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  SKU编码
+                  <input
+                    name="code"
+                    pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
+                    maxLength={64}
+                    required
+                    placeholder="例如 PAPER-001"
+                  />
+                </label>
+                <label>
+                  规格
+                  <input name="spec" required maxLength={100} placeholder="例如 3包装" />
+                </label>
+                <label>
+                  单位
+                  <input name="unit" required maxLength={16} placeholder="例如 包" />
+                </label>
+                <label>
+                  售价（元）
+                  <input
+                    name="price"
+                    type="number"
+                    required
+                    min="0.01"
+                    max="1000000"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </label>
+                <label style={{ alignSelf: 'center' }}>
+                  <input name="expiryManaged" type="checkbox" /> 管理生产与到期时间
+                </label>
+                <label className="full">
+                  商品说明
+                  <textarea
+                    name="description"
+                    maxLength={2000}
+                    rows={3}
+                    placeholder="介绍商品的材质、用途与特点"
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <label className="full">
+                  来源单号 / 说明
+                  <input
+                    name="sourceRef"
+                    required
+                    maxLength={100}
+                    placeholder="例如 采购单编号或供应方说明"
+                  />
+                </label>
+                <label className="full">
+                  收货商品
+                  <select
+                    name="skuId"
+                    required
+                    value={selectedSku}
+                    onChange={(e) => setSelectedSku(e.target.value)}
+                  >
+                    <option value="">请选择商品与规格</option>
+                    {skus.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} · {s.spec} · {s.code}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
                   供应批次
-                  <input style={control} name="batchNo" required maxLength={64} />
+                  <input name="batchNo" required maxLength={64} />
                 </label>
-                <label style={label}>
+                <label>
                   收货数量（件）
-                  <input
-                    style={control}
-                    name="quantity"
-                    type="number"
-                    min={1}
-                    max={100000}
-                    step={1}
-                    required
-                  />
+                  <input name="quantity" type="number" min={1} max={100000} step={1} required />
                 </label>
-                <label style={label}>
-                  单件成本（分）
-                  <input
-                    style={control}
-                    name="unitCostCents"
-                    type="number"
-                    min={0}
-                    max={100000000}
-                    step={1}
-                    required
-                  />
+                <label>
+                  单件成本（元）
+                  <input name="cost" type="number" min={0} max={1000000} step="0.01" required />
                 </label>
-                <label style={label}>
-                  生产时间（本机时区）
+                <span />
+                <label>
+                  生产时间
                   <input
-                    style={control}
                     name="producedAt"
                     type="datetime-local"
                     required={skus.find((s) => s.id === selectedSku)?.expiryManaged}
                   />
                 </label>
-                <label style={label}>
-                  到期截止时间（本机时区）
+                <label>
+                  到期时间
                   <input
-                    style={control}
                     name="expiresAt"
                     type="datetime-local"
                     required={skus.find((s) => s.id === selectedSku)?.expiryManaged}
                   />
                 </label>
-                <button style={button}>保存收货草稿</button>
-              </form>
+              </>
             )}
-            <button style={button} onClick={() => void work(() => receiptsPage(warehouseId))}>
-              刷新收货单
-            </button>
-            {!receipts.length && <p>暂无收货单。</p>}
-            {receipts.map((r) => (
-              <article key={r.id} style={{ borderTop: '1px solid #e4e7ec', padding: '12px 0' }}>
-                <strong>{r.sourceRef}</strong> · {status[r.status] ?? r.status}
-                <p style={{ overflowWrap: 'anywhere' }}>单号 {r.id}</p>
-                {r.lines.map((line) => (
-                  <p key={line.id}>
-                    {skus.find((s) => s.id === line.skuId)?.name ?? line.skuId} · {line.batchNo} ·{' '}
-                    {line.quantity}件 · 成本 ¥{(line.unitCostCents / 100).toFixed(2)}/件
-                  </p>
-                ))}
-                {((r.status === 'DRAFT' && can('receipt.approve')) ||
-                  (r.status === 'APPROVED' && can('receipt.post'))) && (
-                  <button
-                    style={button}
-                    onClick={() =>
-                      void work(async () => {
-                        await action(
-                          `/warehouse/warehouses/${warehouseId}/receipts/${r.id}/${r.status === 'DRAFT' ? 'approve' : 'post'}`,
-                          { version: r.version },
-                        );
-                        await receiptsPage(warehouseId);
-                      })
-                    }
-                  >
-                    {r.status === 'DRAFT' ? '审核收货单' : '确认入库'}
-                  </button>
-                )}
-              </article>
-            ))}
-            {receiptCursor && (
+            {message && (
+              <p role="status" className="notice full">
+                {message}
+              </p>
+            )}
+            <footer>
               <button
-                style={button}
-                onClick={() => void work(() => receiptsPage(warehouseId, receiptCursor))}
+                type="button"
+                className="secondary-button"
+                onClick={closeModal}
+                disabled={busy}
               >
-                加载更多收货单
+                取消
               </button>
-            )}
-            <h3>账面库存</h3>
-            <p>实物包含占用及不可售数量，实际可售还须检查批次效期。</p>
-            {!stock.length && <p>暂无入库库存。</p>}
-            {stock.map((row) => (
-              <article
-                key={row.id}
-                style={{
-                  borderTop: '1px solid #e4e7ec',
-                  padding: '12px 0',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                <strong>{skus.find((s) => s.id === row.skuId)?.name ?? row.skuId}</strong>
-                <p>
-                  实物 {row.onHand} 件 · 预占 {row.reserved} · 不可售 {row.blocked} · 安全库存{' '}
-                  {row.safety}
-                </p>
-                {row.activeCountId && <p>实物盘点冻结中：{row.activeCountId}</p>}
-                {row.inventoryHold && <p>库存核对暂停中，需复核后明确解除。</p>}
-              </article>
-            ))}
-            {stockCursor && (
-              <button
-                style={button}
-                onClick={() => void work(() => stockPage(warehouseId, stockCursor))}
-              >
-                加载更多库存
+              <button className="primary-button" disabled={busy}>
+                {busy
+                  ? '正在保存…'
+                  : modal === 'receipt'
+                    ? '保存收货草稿'
+                    : modal === 'product'
+                      ? '保存商品草稿'
+                      : '保存分类'}
               </button>
-            )}
-            <InventoryWorkbench
-              key={warehouseId}
-              profile={profile}
-              warehouseId={warehouseId}
-              onStockChanged={() => stockPage(warehouseId)}
-            />
-          </section>
-        )}
-      </fieldset>
-    </section>
+            </footer>
+          </form>
+        </Modal>
+      )}
+    </>
   );
 }

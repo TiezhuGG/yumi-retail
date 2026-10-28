@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./styles.css": "./src/styles.css",
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"

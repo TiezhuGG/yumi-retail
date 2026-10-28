@@ -4,6 +4,8 @@ import type { StaffProfile, WarehouseSummary } from '@yumi/contracts';
 
 export type { StaffProfile };
 export { CatalogWorkbench } from './catalog.js';
+export { Workspace } from './workspace.js';
+import { Brand } from './brand.js';
 const button: CSSProperties = {
   background: '#008a42',
   color: 'white',
@@ -33,8 +35,10 @@ export async function staffRequest<T>(path: string, init: RequestInit = {}): Pro
 
 export function StaffSessionPanel({
   children,
+  workspace = false,
 }: {
-  children: (profile: StaffProfile) => ReactNode;
+  children: (profile: StaffProfile, sessionControl: ReactNode) => ReactNode;
+  workspace?: boolean;
 }) {
   const [profile, setProfile] = useState<StaffProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,7 +92,119 @@ export function StaffSessionPanel({
       setBusy(false);
     }
   }
-  if (loading) return <p role="status">正在确认登录状态…</p>;
+  if (loading)
+    return (
+      <div className="session-loading" role="status">
+        <Brand />
+        <p>正在进入工作空间…</p>
+      </div>
+    );
+  const sessionControl = (
+    <button className="logout-button" disabled={busy} onClick={() => void logout()}>
+      退出登录
+    </button>
+  );
+  if (workspace && profile)
+    return (
+      <>
+        {message && (
+          <p role="alert" className="session-error">
+            {message}
+          </p>
+        )}
+        {children(profile, sessionControl)}
+      </>
+    );
+  if (workspace && !profile)
+    return (
+      <div className="login-page">
+        <header>
+          <Brand />
+          <span>用心服务，近在身边</span>
+        </header>
+        <main className="login-layout">
+          <section className="login-story">
+            <span className="eyebrow">YOUR NEIGHBORHOOD, OUR CARE</span>
+            <h1>
+              让社区生活
+              <br />
+              更简单<span>。</span>
+            </h1>
+            <p>
+              好物触手可及，经营井然有序。
+              <br />
+              每一份日常，都值得用心对待。
+            </p>
+            <div className="shop-illustration" aria-hidden="true">
+              <div className="shop-sun" />
+              <div className="shop-tree left" />
+              <div className="shop-tree right" />
+              <div className="shop-building">
+                <div className="shop-sign">🌽 玉米百货</div>
+                <div className="shop-awning" />
+                <div className="shop-windows">
+                  <i />
+                  <b />
+                  <i />
+                </div>
+                <div className="shop-step" />
+              </div>
+              <div className="shop-parcel one">好物</div>
+              <div className="shop-parcel two">日常</div>
+              <div className="shop-ground" />
+            </div>
+            <div className="story-benefits">
+              <span>✧ 品质好物</span>
+              <span>⌂ 社区配送</span>
+              <span>✓ 放心经营</span>
+            </div>
+          </section>
+          <section className="login-card">
+            <span className="login-kicker">欢迎回来</span>
+            <h2>登录工作空间</h2>
+            <p>玉米百货 · 运营与仓库作业</p>
+            <form onSubmit={(e) => void login(e)}>
+              <label>
+                员工账号
+                <input
+                  name="loginName"
+                  autoComplete="username"
+                  required
+                  maxLength={64}
+                  placeholder="请输入员工账号"
+                />
+              </label>
+              <label>
+                登录密码
+                <input
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  maxLength={128}
+                  placeholder="请输入登录密码"
+                />
+              </label>
+              {message && (
+                <p className="form-error" role="alert">
+                  {message}
+                </p>
+              )}
+              <button className="primary-button login-submit" disabled={busy}>
+                {busy ? '正在登录…' : '登录工作空间 →'}
+              </button>
+            </form>
+            <div className="login-help">账号由管理员分配 · 需要帮助请联系负责人</div>
+            <div className="login-security">
+              <span className="live-dot" /> 员工专属 · 安全访问
+            </div>
+          </section>
+        </main>
+        <footer>
+          玉米百货 <span>社区里的好生活</span>
+        </footer>
+      </div>
+    );
   return (
     <section>
       {message && (
@@ -112,7 +228,7 @@ export function StaffSessionPanel({
               退出登录
             </button>
           </div>
-          {children(profile)}
+          {children(profile, sessionControl)}
         </>
       ) : (
         <form

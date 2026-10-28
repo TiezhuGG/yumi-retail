@@ -160,7 +160,7 @@ export function ReceiptReversalWorkbench({
               ))}
             </select>
           </label>
-          <p>位置来自上方列表；找不到时先按规格筛选或加载更多。</p>
+          <p>请选择原收货批次所在位置；如未找到，可加载更多可选批次位置。</p>
           <button style={button}>核对原收货及额度</button>
         </form>
         {source && (
@@ -170,9 +170,13 @@ export function ReceiptReversalWorkbench({
               {selectedPosition?.name ?? source.positionId} · 批次 {source.batchNo}
             </p>
             <p>
-              原单 {source.receiptId} · {source.sourceRef}
+              {source.sourceRef} · 原单尾号 {source.receiptId.slice(-8)}
             </p>
-            <p>原收货行 {source.receiptLineId}</p>
+            <details>
+              <summary>原始记录编号</summary>
+              <p>收货单 {source.receiptId}</p>
+              <p>收货行 {source.receiptLineId}</p>
+            </details>
             <p>
               原入库 {source.originalQuantity} 件 · 已冲回 {source.reversedQuantity} 件 ·
               批次剩余额度 {source.remaining} 件
@@ -223,7 +227,7 @@ export function ReceiptReversalWorkbench({
             <p>
               {positions.find((p) => p.id === d.positionId)?.name ?? d.positionId} · {d.reason}
             </p>
-            <p>单号 {d.id}</p>
+            <p>单号尾号 {d.id.slice(-8)}</p>
             <button style={button} onClick={() => void work(() => open(d.id))}>
               查看逆向单
             </button>
@@ -237,13 +241,21 @@ export function ReceiptReversalWorkbench({
         {selected && (
           <section style={box} aria-label="逆向单详情">
             <h4>当前逆向单详情</h4>
-            <p>{selected.id}</p>
+            <details>
+              <summary>单号 …{selected.id.slice(-8)}</summary>
+              <p>{selected.id}</p>
+            </details>
             <p>
               冲回 {selected.quantity} 件 · {states[selected.status]}
             </p>
             <p>原因：{selected.reason}</p>
             <p>
-              申请员工 {selected.createdBy} · 审批员工 {selected.reviewedBy ?? '待审批'}
+              申请人：{selected.createdBy === profile.id ? '你' : '其他授权员工'} · 审批：
+              {selected.reviewedBy
+                ? selected.reviewedBy === profile.id
+                  ? '你已审批'
+                  : '已由其他员工审批'
+                : '待独立审批'}
             </p>
             {selected.reviewReason && <p>审批说明：{selected.reviewReason}</p>}
             {selected.physicalEvidence && <p>核验说明：{selected.physicalEvidence}</p>}

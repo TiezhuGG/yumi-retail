@@ -56,11 +56,14 @@ export function InventoryWorkbench({
   profile,
   warehouseId,
   onStockChanged,
+  mode = 'locations',
 }: {
   profile: StaffProfile;
   warehouseId: string;
   onStockChanged: () => Promise<void>;
+  mode?: 'locations' | 'counts' | 'dispositions' | 'reversals';
 }) {
+  const [pane, setPane] = useState('positions');
   const [locations, setLocations] = useState<WarehouseLocation[]>([]),
     [locationCursor, setLocationCursor] = useState<string | null>(null);
   const [positions, setPositions] = useState<StockPosition[]>([]),
@@ -182,355 +185,405 @@ export function InventoryWorkbench({
   if (!warehouseId || !can('stock.read')) return null;
   return (
     <section style={box}>
-      <h3>库位、批次与账本核对</h3>
-      <p>核对不会修改数量。差异暂停销售后，须复核一致并填写原因才能解除。</p>
+      {mode === 'locations' && (
+        <>
+          <h3>库位与批次管理</h3>
+          <div className="subnav">
+            {[
+              { id: 'positions', name: '批次位置' },
+              { id: 'locations', name: '存储库位' },
+              { id: 'transfer', name: '同仓移位' },
+              { id: 'check', name: '库存核对' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                className={pane === t.id ? 'active' : ''}
+                onClick={() => setPane(t.id)}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {mode === 'locations' && pane === 'check' && (
+        <p>核对不会修改数量。差异暂停销售后，须复核一致并填写原因才能解除。</p>
+      )}
       {message && (
         <p role="status" style={{ background: '#f0fdf4', padding: 12 }}>
           {message}
         </p>
       )}
-      <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
-        <button style={button} onClick={() => void work(refresh)}>
-          刷新库位与批次
-        </button>
-        {can('location.write') && (
-          <form
-            style={box}
-            onSubmit={(event) => {
-              const { data, element } = form(event);
-              void work(async () => {
-                await action('locations', { code: data.get('code'), name: data.get('name') });
-                element.reset();
-                await loadLocations();
-              });
-            }}
-          >
-            <h4>新增存储库位</h4>
-            <label style={label}>
-              库位编码
-              <input
-                name="code"
-                style={control}
-                required
-                maxLength={32}
-                pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
-                placeholder="例如 A-01"
-              />
-            </label>
-            <label style={label}>
-              库位名称
-              <input name="name" style={control} required maxLength={80} />
-            </label>
-            <button style={button}>保存库位</button>
-          </form>
-        )}
-        <section style={box}>
-          <h4>库位列表</h4>
-          {locations.map((loc) => (
-            <article key={loc.id}>
-              <p>
-                <strong>{loc.code}</strong> · {loc.name} · {loc.enabled ? '启用' : '停用'}
-              </p>
-              {can('location.write') && loc.code !== 'DEFAULT' && (
-                <button
-                  style={button}
-                  onClick={() =>
-                    void work(async () => {
-                      await action(`locations/${loc.id}/${loc.enabled ? 'disable' : 'enable'}`, {
-                        version: loc.version,
-                      });
-                      await loadLocations();
-                    })
-                  }
-                >
-                  {loc.enabled ? '停用' : '启用'} {loc.code}
-                </button>
-              )}
-            </article>
-          ))}
-          {locationCursor && (
-            <button style={button} onClick={() => void work(() => loadLocations(locationCursor))}>
-              加载更多库位
-            </button>
-          )}
-        </section>
-        <section style={box}>
-          <h4>批次位置</h4>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void work(async () => {
-                const selected = filter.trim();
-                await loadPositions(undefined, selected);
-                setSkuFilter(selected);
-                setSourceId('');
-              });
-            }}
-          >
-            <label style={label}>
-              按规格ID筛选（留空查看全部）
-              <input
-                style={control}
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                maxLength={36}
-              />
-            </label>
-            <button style={button}>筛选库存位置</button>
-          </form>
-          {!positions.length && <p>暂无符合条件的库存位置，请先收货入库。</p>}
-          {positions.map((p) => (
-            <article style={box} key={p.id}>
-              <strong>
-                {p.name} · {p.spec}
-              </strong>
-              <p>
-                {p.locationCode} · 批次 {p.batchNo} · 实物 {p.onHand} · 预占 {p.reserved} · 不可售{' '}
-                {p.blocked}
-              </p>
-              <p>规格ID {p.skuId}</p>
-              <p>
-                {p.expiresAt
-                  ? `到期 ${new Date(p.expiresAt).toLocaleString('zh-CN')}${p.expired ? ' · 已过期，不可售' : ''}`
-                  : '无到期时间'}
-              </p>
-              <button style={button} onClick={() => void work(() => loadLedger(p.id))}>
-                查看 {p.locationCode} 位置流水
-              </button>
-            </article>
-          ))}
-          {positionCursor && (
-            <button style={button} onClick={() => void work(() => loadPositions(positionCursor))}>
-              加载更多库存位置
-            </button>
-          )}
-        </section>
-        {can('stock.transfer') && (
-          <form
-            style={box}
-            onSubmit={(event) => {
-              const { data, element } = form(event);
-              if (!source) return;
-              void work(async () => {
-                await action('stock-transfers', {
-                  sourcePositionId: source.id,
-                  targetLocationId: data.get('targetLocationId'),
-                  quantity: Number(data.get('quantity')),
-                  version: source.version,
-                  reason: data.get('reason'),
-                });
-                element.reset();
-                setSourceId('');
-                await refresh();
-                if (ledgerPosition) await loadLedger(ledgerPosition);
-              });
-            }}
-          >
-            <h4>同仓移位</h4>
-            <label style={label}>
-              源库存位置
-              <select
-                style={control}
-                value={sourceId}
-                onChange={(event) => setSourceId(event.target.value)}
-                required
-              >
-                <option value="">请选择</option>
-                {positions
-                  .filter((p) => p.onHand > 0)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} · {p.batchNo} · {p.locationCode} · {p.onHand}件
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {source?.reserved ? <p>源位置有预占，暂不允许移动。</p> : null}
-            {source?.expired && <p>过期库存只做实物移位，不会恢复可售。</p>}
-            <label style={label}>
-              目标库位
-              <select name="targetLocationId" style={control} required>
-                <option value="">请选择目标库位</option>
-                {locations
-                  .filter((loc) => loc.enabled && loc.id !== source?.locationId)
-                  .map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.code} · {loc.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label style={label}>
-              移位数量（件）
-              <input
-                style={control}
-                name="quantity"
-                type="number"
-                step={1}
-                min={1}
-                max={source ? Math.min(100000, source.onHand - source.blocked) : 100000}
-                required
-              />
-            </label>
-            <label style={label}>
-              移位原因
-              <input style={control} name="reason" maxLength={200} required />
-            </label>
-            <button style={button} disabled={!source || source.reserved > 0}>
-              确认同仓移位
-            </button>
-          </form>
-        )}
-        {ledgerPosition && (
-          <section style={box}>
-            <h4>位置流水</h4>
-            {ledger.map((entry) => (
-              <article key={entry.id}>
-                <p>
-                  {entry.actionKey.startsWith('TRANSFER:')
-                    ? '移位'
-                    : entry.actionKey.startsWith('RECEIPT:')
-                      ? '收货'
-                      : '历史记录'}{' '}
-                  · 实物 {entry.deltaOnHand > 0 ? '+' : ''}
-                  {entry.deltaOnHand} · 预占 {entry.deltaReserved} · 不可售 {entry.deltaBlocked}
-                </p>
-                <p>
-                  {new Date(entry.createdAt).toLocaleString('zh-CN')} {entry.reason ?? ''}
-                </p>
-              </article>
-            ))}
-            {ledgerCursor && (
-              <button
-                style={button}
-                onClick={() => void work(() => loadLedger(ledgerPosition, ledgerCursor))}
-              >
-                加载更多位置流水
-              </button>
-            )}
-          </section>
-        )}
-        <section style={box}>
-          <h4>库存核对</h4>
-          <label style={label}>
-            核对规格
-            <select
-              style={control}
-              value={skuId}
-              onChange={(event) => setSkuId(event.target.value)}
-            >
-              <option value="">请选择规格</option>
-              {skus.map((sku) => (
-                <option value={sku.id} key={sku.id}>
-                  {sku.name} · {sku.code}
-                </option>
-              ))}
-            </select>
-          </label>
-          {balance && (
-            <p>
-              当前账面 {balance.onHand} 件 · {balance.inventoryHold ? '核对暂停销售' : '无核对暂停'}
-            </p>
-          )}
-          {can('stock.check') && (
-            <button
-              style={button}
-              disabled={!skuId}
-              onClick={() =>
-                void work(async () => {
-                  await action('inventory-checks', { skuId });
-                  await Promise.all([loadReports(), loadBalance()]);
-                })
-              }
-            >
-              执行账本核对
-            </button>
-          )}
-          {balance?.inventoryHold && can('stock.release-hold') && (
+      {mode === 'locations' && (
+        <fieldset disabled={busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
+          <button style={button} onClick={() => void work(refresh)}>
+            刷新库位与批次
+          </button>
+          {can('location.write') && pane === 'locations' && (
             <form
+              style={box}
               onSubmit={(event) => {
                 const { data, element } = form(event);
                 void work(async () => {
-                  await action(`stock/${skuId}/release-check-hold`, {
-                    version: balance.version,
-                    reason: data.get('reason'),
-                  });
+                  await action('locations', { code: data.get('code'), name: data.get('name') });
                   element.reset();
-                  await refresh();
+                  await loadLocations();
+                });
+              }}
+            >
+              <h4>新增存储库位</h4>
+              <label style={label}>
+                库位编码
+                <input
+                  name="code"
+                  style={control}
+                  required
+                  maxLength={32}
+                  pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
+                  placeholder="例如 A-01"
+                />
+              </label>
+              <label style={label}>
+                库位名称
+                <input name="name" style={control} required maxLength={80} />
+              </label>
+              <button style={button}>保存库位</button>
+            </form>
+          )}
+          <section style={box} hidden={pane !== 'locations'}>
+            <h4>库位列表</h4>
+            {locations.map((loc) => (
+              <article key={loc.id}>
+                <p>
+                  <strong>{loc.code}</strong> · {loc.name} · {loc.enabled ? '启用' : '停用'}
+                </p>
+                {can('location.write') && loc.code !== 'DEFAULT' && (
+                  <button
+                    style={button}
+                    onClick={() =>
+                      void work(async () => {
+                        await action(`locations/${loc.id}/${loc.enabled ? 'disable' : 'enable'}`, {
+                          version: loc.version,
+                        });
+                        await loadLocations();
+                      })
+                    }
+                  >
+                    {loc.enabled ? '停用' : '启用'} {loc.code}
+                  </button>
+                )}
+              </article>
+            ))}
+            {locationCursor && (
+              <button style={button} onClick={() => void work(() => loadLocations(locationCursor))}>
+                加载更多库位
+              </button>
+            )}
+          </section>
+          <section style={box} hidden={pane !== 'positions'}>
+            <h4>批次位置</h4>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void work(async () => {
+                  const selected = filter.trim();
+                  await loadPositions(undefined, selected);
+                  setSkuFilter(selected);
+                  setSourceId('');
                 });
               }}
             >
               <label style={label}>
-                解除暂停原因
-                <input name="reason" style={control} maxLength={200} required />
+                筛选商品规格
+                <select
+                  style={control}
+                  value={filter}
+                  onChange={(event) => setFilter(event.target.value)}
+                >
+                  <option value="">全部商品规格</option>
+                  {skus.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {s.code}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <button style={button}>复核并解除核对暂停</button>
+              <button style={button}>筛选库存位置</button>
+            </form>
+            {!positions.length && <p>暂无符合条件的库存位置，请先收货入库。</p>}
+            {positions.map((p) => (
+              <article style={box} key={p.id}>
+                <strong>
+                  {p.name} · {p.spec}
+                </strong>
+                <p>
+                  {p.locationCode} · 批次 {p.batchNo} · 实物 {p.onHand} · 预占 {p.reserved} · 不可售{' '}
+                  {p.blocked}
+                </p>
+                <details>
+                  <summary>查看内部编号</summary>
+                  <p>{p.skuId}</p>
+                </details>
+                <p>
+                  {p.expiresAt
+                    ? `到期 ${new Date(p.expiresAt).toLocaleString('zh-CN')}${p.expired ? ' · 已过期，不可售' : ''}`
+                    : '无到期时间'}
+                </p>
+                <button style={button} onClick={() => void work(() => loadLedger(p.id))}>
+                  查看 {p.locationCode} 位置流水
+                </button>
+              </article>
+            ))}
+            {positionCursor && (
+              <button style={button} onClick={() => void work(() => loadPositions(positionCursor))}>
+                加载更多库存位置
+              </button>
+            )}
+          </section>
+          {can('stock.transfer') && pane === 'transfer' && (
+            <form
+              style={box}
+              onSubmit={(event) => {
+                const { data, element } = form(event);
+                if (!source) return;
+                void work(async () => {
+                  await action('stock-transfers', {
+                    sourcePositionId: source.id,
+                    targetLocationId: data.get('targetLocationId'),
+                    quantity: Number(data.get('quantity')),
+                    version: source.version,
+                    reason: data.get('reason'),
+                  });
+                  element.reset();
+                  setSourceId('');
+                  await refresh();
+                  if (ledgerPosition) await loadLedger(ledgerPosition);
+                });
+              }}
+            >
+              <h4>同仓移位</h4>
+              <label style={label}>
+                源库存位置
+                <select
+                  style={control}
+                  value={sourceId}
+                  onChange={(event) => setSourceId(event.target.value)}
+                  required
+                >
+                  <option value="">请选择</option>
+                  {positions
+                    .filter((p) => p.onHand > 0)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} · {p.batchNo} · {p.locationCode} · {p.onHand}件
+                      </option>
+                    ))}
+                </select>
+              </label>
+              {source?.reserved ? <p>源位置有预占，暂不允许移动。</p> : null}
+              {source?.expired && <p>过期库存只做实物移位，不会恢复可售。</p>}
+              <label style={label}>
+                目标库位
+                <select name="targetLocationId" style={control} required>
+                  <option value="">请选择目标库位</option>
+                  {locations
+                    .filter((loc) => loc.enabled && loc.id !== source?.locationId)
+                    .map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.code} · {loc.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label style={label}>
+                移位数量（件）
+                <input
+                  style={control}
+                  name="quantity"
+                  type="number"
+                  step={1}
+                  min={1}
+                  max={source ? Math.min(100000, source.onHand - source.blocked) : 100000}
+                  required
+                />
+              </label>
+              <label style={label}>
+                移位原因
+                <input style={control} name="reason" maxLength={200} required />
+              </label>
+              <button style={button} disabled={!source || source.reserved > 0}>
+                确认同仓移位
+              </button>
             </form>
           )}
-          {!reports.length && <p>尚无核对报告。</p>}
-          {reports.map((report) => (
-            <article style={box} key={report.id}>
-              <strong>{report.status === 'CONSISTENT' ? '账本一致' : '发现差异'}</strong>
-              <p>
-                {new Date(report.createdAt).toLocaleString('zh-CN')} · {report.issueCount}项差异
-              </p>
-              <p>规格ID {report.skuId}</p>
-              {report.issues.map((issue, i) => (
-                <div key={i}>
+          {ledgerPosition && pane === 'positions' && (
+            <section style={box}>
+              <h4>位置流水</h4>
+              {ledger.map((entry) => (
+                <article key={entry.id}>
                   <p>
-                    {kinds[issue.kind] ?? issue.kind} · {issue.resourceId}
+                    {entry.actionKey.startsWith('TRANSFER:')
+                      ? '移位'
+                      : entry.actionKey.startsWith('RECEIPT:')
+                        ? '收货'
+                        : '历史记录'}{' '}
+                    · 实物 {entry.deltaOnHand > 0 ? '+' : ''}
+                    {entry.deltaOnHand} · 预占 {entry.deltaReserved} · 不可售 {entry.deltaBlocked}
                   </p>
                   <p>
-                    账面：实物 {issue.expected.onHand} / 预占 {issue.expected.reserved} / 不可售{' '}
-                    {issue.expected.blocked}
+                    {new Date(entry.createdAt).toLocaleString('zh-CN')} {entry.reason ?? ''}
                   </p>
-                  <p>
-                    核对值：实物 {issue.actual.onHand} / 预占 {issue.actual.reserved} / 不可售{' '}
-                    {issue.actual.blocked}
-                  </p>
-                </div>
+                </article>
               ))}
-              {report.issueCount > report.issues.length && (
-                <p>只展示前100项，请按该规格继续排查。</p>
+              {ledgerCursor && (
+                <button
+                  style={button}
+                  onClick={() => void work(() => loadLedger(ledgerPosition, ledgerCursor))}
+                >
+                  加载更多位置流水
+                </button>
               )}
-            </article>
-          ))}
-          {reportCursor && (
-            <button style={button} onClick={() => void work(() => loadReports(reportCursor))}>
-              加载更多核对报告
-            </button>
+            </section>
           )}
-        </section>
-      </fieldset>
-      <StockCountWorkbench
-        key={warehouseId}
-        profile={profile}
-        warehouseId={warehouseId}
-        onChanged={async () => {
-          await refresh();
-          await onStockChanged();
-        }}
-      />
-      <StockDispositionWorkbench
-        key={`disposition-${warehouseId}`}
-        profile={profile}
-        warehouseId={warehouseId}
-        positions={positions}
-        onChanged={async () => {
-          await refresh();
-          await onStockChanged();
-        }}
-      />
-      <ReceiptReversalWorkbench
-        key={`reversal-${warehouseId}`}
-        profile={profile}
-        warehouseId={warehouseId}
-        positions={positions}
-        onChanged={async () => {
-          await refresh();
-          await onStockChanged();
-        }}
-      />
+          <section style={box} hidden={pane !== 'check'}>
+            <h4>库存核对</h4>
+            <label style={label}>
+              核对规格
+              <select
+                style={control}
+                value={skuId}
+                onChange={(event) => setSkuId(event.target.value)}
+              >
+                <option value="">请选择规格</option>
+                {skus.map((sku) => (
+                  <option value={sku.id} key={sku.id}>
+                    {sku.name} · {sku.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {balance && (
+              <p>
+                当前账面 {balance.onHand} 件 ·{' '}
+                {balance.inventoryHold ? '核对暂停销售' : '无核对暂停'}
+              </p>
+            )}
+            {can('stock.check') && (
+              <button
+                style={button}
+                disabled={!skuId}
+                onClick={() =>
+                  void work(async () => {
+                    await action('inventory-checks', { skuId });
+                    await Promise.all([loadReports(), loadBalance()]);
+                  })
+                }
+              >
+                执行账本核对
+              </button>
+            )}
+            {balance?.inventoryHold && can('stock.release-hold') && (
+              <form
+                onSubmit={(event) => {
+                  const { data, element } = form(event);
+                  void work(async () => {
+                    await action(`stock/${skuId}/release-check-hold`, {
+                      version: balance.version,
+                      reason: data.get('reason'),
+                    });
+                    element.reset();
+                    await refresh();
+                  });
+                }}
+              >
+                <label style={label}>
+                  解除暂停原因
+                  <input name="reason" style={control} maxLength={200} required />
+                </label>
+                <button style={button}>复核并解除核对暂停</button>
+              </form>
+            )}
+            {!reports.length && <p>尚无核对报告。</p>}
+            {reports.map((report) => (
+              <article style={box} key={report.id}>
+                <strong>{report.status === 'CONSISTENT' ? '账本一致' : '发现差异'}</strong>
+                <p>
+                  {new Date(report.createdAt).toLocaleString('zh-CN')} · {report.issueCount}项差异
+                </p>
+                <p>规格ID {report.skuId}</p>
+                {report.issues.map((issue, i) => (
+                  <div key={i}>
+                    <p>
+                      {kinds[issue.kind] ?? issue.kind} · {issue.resourceId}
+                    </p>
+                    <p>
+                      账面：实物 {issue.expected.onHand} / 预占 {issue.expected.reserved} / 不可售{' '}
+                      {issue.expected.blocked}
+                    </p>
+                    <p>
+                      核对值：实物 {issue.actual.onHand} / 预占 {issue.actual.reserved} / 不可售{' '}
+                      {issue.actual.blocked}
+                    </p>
+                  </div>
+                ))}
+                {report.issueCount > report.issues.length && (
+                  <p>只展示前100项，请按该规格继续排查。</p>
+                )}
+              </article>
+            ))}
+            {reportCursor && (
+              <button style={button} onClick={() => void work(() => loadReports(reportCursor))}>
+                加载更多核对报告
+              </button>
+            )}
+          </section>
+        </fieldset>
+      )}
+      {mode !== 'locations' && positionCursor && (
+        <button
+          className="secondary-button"
+          disabled={busy}
+          onClick={() => void work(() => loadPositions(positionCursor))}
+        >
+          加载更多可选批次位置
+        </button>
+      )}
+      {mode === 'counts' && (
+        <StockCountWorkbench
+          key={warehouseId}
+          positions={positions}
+          profile={profile}
+          warehouseId={warehouseId}
+          onChanged={async () => {
+            await refresh();
+            await onStockChanged();
+          }}
+        />
+      )}
+      {mode === 'dispositions' && (
+        <StockDispositionWorkbench
+          key={`disposition-${warehouseId}`}
+          profile={profile}
+          warehouseId={warehouseId}
+          positions={positions}
+          onChanged={async () => {
+            await refresh();
+            await onStockChanged();
+          }}
+        />
+      )}
+      {mode === 'reversals' && (
+        <ReceiptReversalWorkbench
+          key={`reversal-${warehouseId}`}
+          profile={profile}
+          warehouseId={warehouseId}
+          positions={positions}
+          onChanged={async () => {
+            await refresh();
+            await onStockChanged();
+          }}
+        />
+      )}
     </section>
   );
 }

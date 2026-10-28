@@ -3,19 +3,20 @@ import Taro, { useLoad } from '@tarojs/taro';
 import { View, Text, Button } from '@tarojs/components';
 import { request } from '../../api';
 import type { SaleSku } from '../../api';
+import { ProductVisual } from '../../components/ProductVisual';
 export default function ProductDetail() {
-  const [product, setProduct] = useState<SaleSku | null>(null);
-  const [id, setId] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(true);
-  async function load(skuId: string) {
+  const [product, setProduct] = useState<SaleSku | null>(null),
+    [id, setId] = useState(''),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(true);
+  async function load(sku: string) {
     setBusy(true);
     setError('');
     try {
-      if (!skuId) throw new Error('商品编号无效');
-      setProduct(await request<SaleSku>(`/products/${encodeURIComponent(skuId)}`));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '加载失败');
+      if (!sku) throw Error('暂未找到这件商品');
+      setProduct(await request<SaleSku>(`/products/${encodeURIComponent(sku)}`));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '商品加载失败');
       setProduct(null);
     } finally {
       setBusy(false);
@@ -25,42 +26,60 @@ export default function ProductDetail() {
     setId(params.id ?? '');
     void load(params.id ?? '');
   });
+  const back = () => void Taro.reLaunch({ url: '/pages/index/index' });
   return (
-    <View style={{ padding: '24px' }}>
-      {busy && <Text>正在加载商品…</Text>}
+    <View className="detail-page">
+      {busy && <View className="store-feedback">正在为你准备好物…</View>}
       {error && (
-        <View>
+        <View className="store-feedback">
           <Text>{error}</Text>
-          <Button disabled={busy} onClick={() => void load(id)}>
-            重试
-          </Button>
+          <Button onClick={() => void load(id)}>重新加载</Button>
+          <Button onClick={back}>返回首页</Button>
         </View>
       )}
       {product && (
-        <View>
-          <Text style={{ fontSize: '24px', fontWeight: 'bold' }}>{product.name}</Text>
-          <View style={{ marginTop: '16px' }}>
-            <Text>
+        <>
+          <View className="detail-visual">
+            <ProductVisual name={product.name} large />
+            <View className="detail-caption">日常好物 / YUMI ESSENTIALS</View>
+          </View>
+          <View className="detail-card">
+            <View className="detail-price">
+              <Text>¥</Text>
+              {(product.priceCents / 100).toFixed(2)}
+              <Text className="detail-unit"> / {product.unit}</Text>
+            </View>
+            <Text className="detail-name">{product.name}</Text>
+            <Text className="detail-spec">{product.spec}</Text>
+            <View className="detail-promises">
+              <Text>✓ 按规格售卖</Text>
+              <Text>✓ 社区配送</Text>
+              <Text>{product.available > 0 ? '✓ 当前有货' : '暂时缺货'}</Text>
+            </View>
+          </View>
+          <View className="detail-card">
+            <Text className="detail-heading">商品规格</Text>
+            <View className="spec-choice">
               {product.spec} / {product.unit}
+            </View>
+            <Text className="detail-heading">商品介绍</Text>
+            <Text className="detail-description">
+              {product.description || '用心挑选日常好物，更多商品信息整理中。'}
             </Text>
+            <View className="detail-tip">
+              包装图为示意，具体以实际商品为准。当前开放商品浏览，在线下单和支付尚未开放。
+            </View>
           </View>
-          <View style={{ marginTop: '16px', color: '#008a42' }}>
-            <Text>¥{(product.priceCents / 100).toFixed(2)}</Text>
+          <View className="detail-footer">
+            <Button className="back-home" onClick={back}>
+              <Text>⌂</Text>首页
+            </Button>
+            <Button className="detail-buy" disabled>
+              {product.available > 0 ? '在线下单待开放' : '商品暂时缺货'}
+            </Button>
           </View>
-          <View style={{ marginTop: '16px' }}>
-            <Text>{product.available > 0 ? `当前可售 ${product.available} 件` : '暂时缺货'}</Text>
-          </View>
-          <View style={{ marginTop: '24px' }}>
-            <Text>{product.description || '暂无更多商品说明'}</Text>
-          </View>
-          <View style={{ marginTop: '24px', color: '#667085' }}>
-            <Text>当前为浏览演示，购物车和支付尚未开放。</Text>
-          </View>
-        </View>
+        </>
       )}
-      <Button style={{ marginTop: '24px' }} onClick={() => void Taro.navigateBack()}>
-        返回商品列表
-      </Button>
     </View>
   );
 }

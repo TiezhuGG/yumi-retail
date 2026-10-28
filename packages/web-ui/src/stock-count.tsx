@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent } from 'react';
-import type { Page, StaffProfile, StockCount } from '@yumi/contracts';
+import type { Page, StaffProfile, StockCount, StockPosition } from '@yumi/contracts';
 import { staffRequest } from './index.js';
 const control: CSSProperties = {
   width: '100%',
@@ -29,10 +29,12 @@ export function StockCountWorkbench({
   profile,
   warehouseId,
   onChanged,
+  positions = [],
 }: {
   profile: StaffProfile;
   warehouseId: string;
   onChanged: () => Promise<void>;
+  positions?: StockPosition[];
 }) {
   const [rows, setRows] = useState<StockCount[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
@@ -142,8 +144,15 @@ export function StockCountWorkbench({
             }}
           >
             <label>
-              盘点规格ID
-              <input name="skuId" style={control} required placeholder="从库存位置复制规格ID" />
+              盘点商品规格
+              <select name="skuId" style={control} required defaultValue="">
+                <option value="">请选择商品与规格</option>
+                {[...new Map(positions.map((p) => [p.skuId, p])).values()].map((p) => (
+                  <option value={p.skuId} key={p.skuId}>
+                    {p.name} · {p.spec} · {p.skuCode}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               发起原因
@@ -171,11 +180,12 @@ export function StockCountWorkbench({
           >
             <strong>{states[row.status]}</strong>
             <p>
-              {row.skuId} · {row.lines.length}个位置
+              {positions.find((p) => p.skuId === row.skuId)?.name ?? '商品未载入'} ·{' '}
+              {row.lines.length}个位置
             </p>
             <p>{row.reason}</p>
             <button style={button} onClick={() => void work(() => open(row.id))}>
-              查看盘点 {row.id}
+              查看盘点详情
             </button>
           </article>
         ))}
@@ -190,9 +200,17 @@ export function StockCountWorkbench({
             style={{ border: '1px solid #98a2b3', padding: 12, marginTop: 16 }}
           >
             <h3>盘点明细 · {states[selected.status]}</h3>
-            <p>单号 {selected.id}</p>
+            <details>
+              <summary>单号 …{selected.id.slice(-8)}</summary>
+              <p>{selected.id}</p>
+            </details>
             <p>
-              发起人 {selected.createdBy} · 审批人 {selected.reviewedBy ?? '未审批'}
+              发起人：{selected.createdBy === profile.id ? '你' : '其他授权员工'} · 审批：
+              {selected.reviewedBy
+                ? selected.reviewedBy === profile.id
+                  ? '你已审批'
+                  : '其他员工已审批'
+                : '待独立审批'}
             </p>
             <p>
               实盘数包含不可售库存；不得低于预占与不可售数量之和。盘盈仅适用于已存在的位置/批次。
@@ -201,7 +219,9 @@ export function StockCountWorkbench({
               {selected.lines.map((l) => (
                 <div key={l.id} style={{ marginTop: 12 }}>
                   <p>
-                    位置 {l.positionId} · 批次ID {l.lotId}
+                    {positions.find((p) => p.id === l.positionId)?.name ?? '库存位置'} ·{' '}
+                    {positions.find((p) => p.id === l.positionId)?.locationCode ?? '未载入库位'} ·
+                    批次 {positions.find((p) => p.id === l.positionId)?.batchNo ?? '未载入'}
                   </p>
                   <p>
                     账面 {l.snapshotOnHand} / 预占 {l.snapshotReserved} / 不可售 {l.snapshotBlocked}
