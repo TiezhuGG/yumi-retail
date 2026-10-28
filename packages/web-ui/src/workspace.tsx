@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
 import { CatalogWorkbench } from './catalog.js';
@@ -95,6 +95,14 @@ export function Workspace({
 }) {
   const allowed = routes.filter((r) => profile.permissions.includes(r.permission));
   const [view, setView] = useState<WorkspaceView>(allowed[0]?.id ?? 'overview');
+  const activeNav = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const reveal = () => activeNav.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    reveal();
+    const mobileWidth = window.matchMedia('(max-width: 680px)');
+    mobileWidth.addEventListener('change', reveal);
+    return () => mobileWidth.removeEventListener('change', reveal);
+  }, [view]);
   const route = allowed.find((r) => r.id === view);
   return (
     <div className={`workspace ${mobile ? 'mobile-workspace' : ''}`}>
@@ -105,6 +113,7 @@ export function Workspace({
           {allowed.map((r) => (
             <button
               key={r.id}
+              ref={view === r.id ? activeNav : undefined}
               className={view === r.id ? 'nav-item active' : 'nav-item'}
               aria-current={view === r.id ? 'page' : undefined}
               onClick={() => setView(r.id)}
