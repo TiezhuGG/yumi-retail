@@ -466,6 +466,7 @@ export class InventoryController {
       inventoryHold: bool,
       checkId: text,
       reason: text,
+      activeCountId: { type: 'string', nullable: true },
     }),
     errors,
   )

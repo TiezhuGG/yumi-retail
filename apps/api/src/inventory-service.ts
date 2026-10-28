@@ -98,6 +98,8 @@ export class InventoryService {
       });
       if (!sourceHint) throw failure(404, 'RESOURCE_NOT_FOUND', '源库存位置不存在');
       const balance = await this.balance(tx, warehouseId, sourceHint.skuId);
+      if (balance.activeCountId)
+        throw failure(409, 'COUNT_FROZEN', '该规格正在盘点，请等待过账或终止');
       if (balance.inventoryHold)
         throw failure(409, 'INVENTORY_HOLD', '该规格有库存核对暂停，请先处理');
       const source = await tx.stockPosition.findUniqueOrThrow({ where: { id: sourceHint.id } });

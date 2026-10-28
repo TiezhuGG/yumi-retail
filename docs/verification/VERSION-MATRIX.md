@@ -33,6 +33,8 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 
 ## 兼容性决策
 
+2026-10-28实物盘点切片沿用同一锁文件和精确版本，未安装或升级依赖；新增14项及原41项集成通过，版本实测见[盘点安装观察](COUNT-INSTALLED-VERSIONS.json)，迁移与限制见[报告](S2-STOCK-COUNT-2026-10-28.md)。
+
 库位/库存核对切片沿用同一锁文件和全部版本，新增13项真实DB测试及原28项回归通过；没有安装依赖。观察见[库存切片安装版本](INVENTORY-INSTALLED-VERSIONS.json)，迁移兼容性见[报告](S2-LOCATIONS-RECONCILIATION-2026-10-27.md)。
 
 商品入库切片未新增/升级依赖；同一锁文件和上述S1版本通过新切片测试。观察快照见[S2安装版本](S2-INSTALLED-VERSIONS.json)，业务结果见[S2报告](S2-CATALOG-INBOUND-2026-10-27.md)。

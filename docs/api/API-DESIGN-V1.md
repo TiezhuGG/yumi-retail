@@ -1,6 +1,6 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位与库存核对，生成[当前OpenAPI](openapi.json)（0.3.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
+本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位、库存核对及实物盘点，生成[当前OpenAPI](openapi.json)（0.4.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
 
 ## 当前已实现的员工切片
 
@@ -38,6 +38,23 @@ Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生�
 列表均按UUID升序游标，默认20、上限50，返回items/hasMore/nextCursor；不按创建时间声称最新。公开查询拒绝warehouseId参数，实际仓来自服务端PUBLIC_WAREHOUSE_ID；未配置/停用503 STORE_UNAVAILABLE。零库存SKU仍返回available=0，客户端显示缺货；详情不暴露成本、批次、员工和供应来源。SKU编码冲突409 DUPLICATE_RESOURCE；生产/到期或SKU状态无效409 INVALID_EXPIRY/SKU_DISABLED；数量/时间格式400。关键交易尚未提供，不以available替代未来下单事务裁决。
 
 ## 1. 通用契约
+
+### 实物盘点增量（已实现，2026-10-28）
+
+以下前缀`/api/v1/warehouse/warehouses/:warehouseId/stock-counts`，同样校验仓库范围、会话；所有POST要求Origin、CSRF、UUID Idempotency-Key，200返回单据与无成本快照lines。
+
+| 方法/路径 | 权限与body | 行为 |
+|---|---|---|
+| GET /；GET /:id | stock.read；列表skuId?/cursor?/limit? | 列表默认20最多50，UUID升序；详情最多200位置，无成本 |
+| POST / | count.write；skuId/version/reason | 余额版本匹配后冻结全部位置，公开可售0 |
+| POST /:id/submit | count.write且为发起人；version/lines[positionId,counted] | 1–200个不重复位置，必须覆盖完整快照，数量0–10亿整数 |
+| POST /:id/approve | count.approve且非发起人；version/reason | 只审批SUBMITTED |
+| POST /:id/post | count.post；version | 只过账APPROVED，数量及两级流水同事务 |
+| POST /:id/cancel | count.write；version/reason | 终止未结束单据，释放冻结，不修改数量 |
+
+三个count写权限授予SUPER_ADMIN/WAREHOUSE_MANAGER。PICKER只读，RIDER拒绝。错误：409 COUNT_FROZEN/COUNT_SIZE_LIMIT/COUNT_SNAPSHOT_CONFLICT/PROTECTED_STOCK/STOCK_RESERVED/INVENTORY_HOLD/INVENTORY_MISMATCH/STOCK_LIMIT/VERSION_CONFLICT/INVALID_TRANSITION；403 COUNT_OWNER_REQUIRED/INDEPENDENT_REVIEW_REQUIRED；严格字段/整数/缺漏或重复位置400。相同键不同内容409 IDEMPOTENCY_CONFLICT；同键重试返回首次结果，不代表单据目前仍在返回的历史状态，应GET刷新。
+
+stock响应新增activeCountId（可空）独立于inventoryHold。移位遇盘点冻结409 COUNT_FROZEN；收货过账冻结时409 STOCK_UNAVAILABLE。盘点按新流水调整账实差异，不能用来直接覆盖已经不一致的账本。未来预占/出库需复用同一余额锁及冻结检查。
 
 ### 库位与核对增量（已实现）
 

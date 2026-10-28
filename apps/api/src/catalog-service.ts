@@ -230,7 +230,7 @@ export class CatalogService {
             });
             await tx.$executeRaw`INSERT INTO stock_balances(warehouse_id,sku_id) VALUES(${warehouseId}::uuid,${line.skuId}::uuid) ON CONFLICT(warehouse_id,sku_id) DO NOTHING`;
             const changed =
-              await tx.$executeRaw`UPDATE stock_balances SET on_hand=on_hand+${line.quantity},version=version+1 WHERE warehouse_id=${warehouseId}::uuid AND sku_id=${line.skuId}::uuid AND NOT inventory_hold AND on_hand<=1000000000-${line.quantity}`;
+              await tx.$executeRaw`UPDATE stock_balances SET on_hand=on_hand+${line.quantity},version=version+1 WHERE warehouse_id=${warehouseId}::uuid AND sku_id=${line.skuId}::uuid AND NOT inventory_hold AND active_count_id IS NULL AND on_hand<=1000000000-${line.quantity}`;
             if (changed !== 1)
               throw failure(409, 'STOCK_UNAVAILABLE', '库存已暂停或超出允许范围，请先核对');
             const lotId = randomUUID();
@@ -333,7 +333,7 @@ export class CatalogService {
       }>
     >`
       SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",s.spec,s.unit,s.price_cents AS "priceCents",
-        CASE WHEN COALESCE(b.inventory_hold,false) THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
+        CASE WHEN COALESCE(b.inventory_hold,false) OR b.active_count_id IS NOT NULL THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
       FROM skus s JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
       JOIN warehouses w ON w.id=${warehouseId}::uuid AND w.enabled
       LEFT JOIN stock_balances b ON b.sku_id=s.id AND b.warehouse_id=${warehouseId}::uuid

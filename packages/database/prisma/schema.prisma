@@ -76,6 +76,8 @@ model Staff {
   businessAudits   BusinessAudit[]
   stockLedger      StockLedger[]
   inventoryChecks  InventoryCheck[]
+  createdCounts    StockCount[]     @relation("countCreator")
+  reviewedCounts   StockCount[]     @relation("countReviewer")
 
   @@map("staff")
 }
@@ -234,6 +236,9 @@ model StockBalance {
   sku             Sku              @relation(fields: [skuId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   lots            StockLot[]
   inventoryChecks InventoryCheck[]
+  activeCountId   String?          @map("active_count_id") @db.Uuid
+  activeCount     StockCount?      @relation("activeCount", fields: [activeCountId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  counts          StockCount[]     @relation("countBalance")
 
   @@id([warehouseId, skuId])
   @@index([skuId])
@@ -343,6 +348,7 @@ model StockPosition {
   entries     PositionLedger[]
   outgoing    StockTransfer[]   @relation("transferSource")
   incoming    StockTransfer[]   @relation("transferTarget")
+  countLines  StockCountLine[]
 
   @@unique([lotId, locationId])
   @@unique([id, warehouseId, skuId, lotId])
@@ -404,4 +410,50 @@ model InventoryCheck {
 
   @@index([warehouseId, skuId, createdAt])
   @@map("inventory_checks")
+}
+
+model StockCount {
+  id             String           @id @db.Uuid
+  warehouseId    String           @map("warehouse_id") @db.Uuid
+  skuId          String           @map("sku_id") @db.Uuid
+  status         String           @default("FROZEN") @db.VarChar(16)
+  version        Int              @default(0)
+  reason         String           @db.VarChar(200)
+  createdBy      String           @map("created_by") @db.Uuid
+  reviewedBy     String?          @map("reviewed_by") @db.Uuid
+  reviewReason   String?          @map("review_reason") @db.VarChar(200)
+  cancelReason   String?          @map("cancel_reason") @db.VarChar(200)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  submittedAt    DateTime?        @map("submitted_at") @db.Timestamptz(3)
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(3)
+  postedAt       DateTime?        @map("posted_at") @db.Timestamptz(3)
+  cancelledAt    DateTime?        @map("cancelled_at") @db.Timestamptz(3)
+  balance        StockBalance     @relation("countBalance", fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  activeBalances StockBalance[]   @relation("activeCount")
+  creator        Staff            @relation("countCreator", fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reviewer       Staff?           @relation("countReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  lines          StockCountLine[]
+
+  @@unique([id, warehouseId, skuId])
+  @@index([warehouseId, skuId, id])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id               String        @id @db.Uuid
+  countId          String        @map("count_id") @db.Uuid
+  warehouseId      String        @map("warehouse_id") @db.Uuid
+  skuId            String        @map("sku_id") @db.Uuid
+  lotId            String        @map("lot_id") @db.Uuid
+  positionId       String        @map("position_id") @db.Uuid
+  snapshotOnHand   Int           @map("snapshot_on_hand")
+  snapshotReserved Int           @map("snapshot_reserved")
+  snapshotBlocked  Int           @map("snapshot_blocked")
+  positionVersion  Int           @map("position_version")
+  counted          Int?
+  count            StockCount    @relation(fields: [countId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  position         StockPosition @relation(fields: [positionId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([countId, positionId])
+  @@map("stock_count_lines")
 }

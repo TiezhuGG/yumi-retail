@@ -1,0 +1,50 @@
+{
+  "finishedAt": "2026-10-28T05:53:40.136Z",
+  "checks": [
+    "freeze/cancel, public zero, receipt/move rejection",
+    "20 repeated intents and independent freeze contention",
+    "complete input, strict integers, unique positions, stale versions",
+    "independent reviewer, 20 post retries, loss ledger, immutable terminal/snapshot",
+    "gain, zero difference, concurrent different post keys",
+    "offsetting multi-position differences preserve total and both ledgers",
+    "late audit failure rolls back all writes and intent, original key retries",
+    "DB guard against old writers, detached freezes, changed snapshots",
+    "reserved rejection, blocked floor, stale position, cancel keeps reconciliation hold",
+    "warehouse/role/anonymous denial, no costs, filtered cursor pagination",
+    "receipt versus freeze, post versus cancel serialize on balance lock",
+    "partial results rollback, approved cancellation, expiry after count",
+    "bounded aggregates, complete 200-position snapshot, rejection at 201",
+    "cancel rechecks ledger, preserves zero sale with durable mismatch evidence"
+  ],
+  "isolation": "local yumi_test disposable schema",
+  "schemaRemoved": true,
+  "result": {
+    "passed": 14,
+    "failed": 0
+  },
+  "regressions": {
+    "s0": 6,
+    "staff": 12,
+    "catalogInbound": 10,
+    "locations": 13,
+    "totalWithCounts": 55
+  },
+  "browser": {
+    "environment": "local yumi_test disposable count_browser schema",
+    "flows": [
+      "admin creates and submits 10 to 8; another warehouse employee approves and posts",
+      "roles reversed for 8 to 9 gain; summary and position automatically update",
+      "cancel another freeze; public stock remains 9",
+      "ops page reads same posted document and 9 units"
+    ],
+    "publicAvailable": [
+      0,
+      8,
+      9
+    ],
+    "screenshot": "S2-STOCK-COUNT-2026-10-28.png",
+    "schemaRemoved": true,
+    "temporaryServersStopped": true,
+    "realDeviceVerified": false
+  }
+}

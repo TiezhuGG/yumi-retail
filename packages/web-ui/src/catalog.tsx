@@ -51,6 +51,8 @@ interface StockRow {
   reserved: number;
   blocked: number;
   safety: number;
+  activeCountId: string | null;
+  inventoryHold: boolean;
 }
 export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -67,6 +69,8 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
   const [productCursor, setProductCursor] = useState<string | null>(null);
   const [receiptCursor, setReceiptCursor] = useState<string | null>(null);
   const intentions = useRef(new Map<string, string>());
+  const currentWarehouse = useRef(warehouseId);
+  currentWarehouse.current = warehouseId;
   const can = (permission: string) => profile.permissions.includes(permission);
   const skus = products.flatMap((p) => p.skus.map((s) => ({ ...s, name: p.name })));
   async function categoriesPage(cursor?: string) {
@@ -99,6 +103,7 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
     const p = await staffRequest<Page<StockRow>>(
       `/warehouse/warehouses/${id}/stock?limit=50${cursor ? `&cursor=${cursor}` : ''}`,
     );
+    if (id !== currentWarehouse.current) return;
     setStock((old) => (cursor ? [...old, ...p.items] : p.items));
     setStockCursor(p.nextCursor);
   }
@@ -518,6 +523,8 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
                   实物 {row.onHand} 件 · 预占 {row.reserved} · 不可售 {row.blocked} · 安全库存{' '}
                   {row.safety}
                 </p>
+                {row.activeCountId && <p>实物盘点冻结中：{row.activeCountId}</p>}
+                {row.inventoryHold && <p>库存核对暂停中，需复核后明确解除。</p>}
               </article>
             ))}
             {stockCursor && (
@@ -528,7 +535,12 @@ export function CatalogWorkbench({ profile }: { profile: StaffProfile }) {
                 加载更多库存
               </button>
             )}
-            <InventoryWorkbench key={warehouseId} profile={profile} warehouseId={warehouseId} />
+            <InventoryWorkbench
+              key={warehouseId}
+              profile={profile}
+              warehouseId={warehouseId}
+              onStockChanged={() => stockPage(warehouseId)}
+            />
           </section>
         )}
       </fieldset>

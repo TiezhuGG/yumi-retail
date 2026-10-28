@@ -9,6 +9,7 @@ import type {
   WarehouseLocation,
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
+import { StockCountWorkbench } from './stock-count.js';
 const box: CSSProperties = {
   borderTop: '1px solid #d0d5dd',
   marginTop: 24,
@@ -52,9 +53,11 @@ interface Balance {
 export function InventoryWorkbench({
   profile,
   warehouseId,
+  onStockChanged,
 }: {
   profile: StaffProfile;
   warehouseId: string;
+  onStockChanged: () => Promise<void>;
 }) {
   const [locations, setLocations] = useState<WarehouseLocation[]>([]),
     [locationCursor, setLocationCursor] = useState<string | null>(null);
@@ -497,6 +500,15 @@ export function InventoryWorkbench({
           )}
         </section>
       </fieldset>
+      <StockCountWorkbench
+        key={warehouseId}
+        profile={profile}
+        warehouseId={warehouseId}
+        onChanged={async () => {
+          await refresh();
+          await onStockChanged();
+        }}
+      />
     </section>
   );
 }

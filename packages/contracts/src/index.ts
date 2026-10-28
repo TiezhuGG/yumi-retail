@@ -138,3 +138,32 @@ export interface InventoryCheck {
   issues: InventoryIssue[];
   createdAt: string;
 }
+
+export interface StockCountLine {
+  id: string;
+  positionId: string;
+  lotId: string;
+  snapshotOnHand: number;
+  snapshotReserved: number;
+  snapshotBlocked: number;
+  positionVersion: number;
+  counted: number | null;
+}
+export interface StockCount {
+  id: string;
+  warehouseId: string;
+  skuId: string;
+  status: 'FROZEN' | 'SUBMITTED' | 'APPROVED' | 'POSTED' | 'CANCELLED';
+  version: number;
+  reason: string;
+  createdBy: string;
+  reviewedBy: string | null;
+  reviewReason: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  postedAt: string | null;
+  cancelledAt: string | null;
+  lines: StockCountLine[];
+}

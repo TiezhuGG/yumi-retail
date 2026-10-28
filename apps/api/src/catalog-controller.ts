@@ -373,6 +373,7 @@ export class InboundController {
         blocked: int,
         safety: int,
         inventoryHold: bool,
+        activeCountId: { type: 'string', nullable: true },
         version: int,
       }),
     ),
