@@ -10,6 +10,7 @@ import type {
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
 import { InventoryWorkbench } from './inventory.js';
+import { ReceiptWorkbench } from './receipts.js';
 import { Modal } from './modal.js';
 import { ProductArt } from './brand.js';
 import type { WorkspaceView } from './workspace.js';
@@ -40,7 +41,7 @@ export function CatalogWorkbench({
   view?: WorkspaceView;
   onNavigate?: (view: WorkspaceView) => void;
 }) {
-  const [modal, setModal] = useState<'product' | 'category' | 'receipt' | null>(null),
+  const [modal, setModal] = useState<'product' | 'category' | null>(null),
     [search, setSearch] = useState(''),
     [categoryFilter, setCategoryFilter] = useState(''),
     [statusFilter, setStatusFilter] = useState('');
@@ -48,10 +49,12 @@ export function CatalogWorkbench({
   const [products, setProducts] = useState<Product[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
+  const [warehouseLoading, setWarehouseLoading] = useState(true),
+    [warehouseError, setWarehouseError] = useState('');
+  const warehouseRequest = useRef(0);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [stock, setStock] = useState<StockRow[]>([]);
   const [stockCursor, setStockCursor] = useState<string | null>(null);
-  const [selectedSku, setSelectedSku] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -78,15 +81,16 @@ export function CatalogWorkbench({
     setProductCursor(p.nextCursor);
   }
   async function receiptsPage(id: string, cursor?: string) {
-    if (!id || !can('stock.read')) return;
+    if (!id) return;
     if (can('receipt.read')) {
       const p = await staffRequest<Page<Receipt>>(
         `/warehouse/warehouses/${id}/receipts?limit=50${cursor ? `&cursor=${cursor}` : ''}`,
       );
+      if (id !== currentWarehouse.current) return;
       setReceipts((old) => (cursor ? [...old, ...p.items] : p.items));
       setReceiptCursor(p.nextCursor);
     }
-    if (!cursor) await stockPage(id);
+    if (!cursor && can('stock.read')) await stockPage(id);
   }
   async function stockPage(id: string, cursor?: string) {
     if (!id) return;
@@ -96,6 +100,22 @@ export function CatalogWorkbench({
     if (id !== currentWarehouse.current) return;
     setStock((old) => (cursor ? [...old, ...p.items] : p.items));
     setStockCursor(p.nextCursor);
+  }
+  async function warehousesPage() {
+    const token = ++warehouseRequest.current;
+    setWarehouseLoading(true);
+    setWarehouseError('');
+    try {
+      const { items } = await staffRequest<{ items: WarehouseSummary[] }>('/warehouse/warehouses');
+      if (token !== warehouseRequest.current) return;
+      setWarehouses(items);
+      setWarehouseId((old) => (items.some((w) => w.id === old) ? old : (items[0]?.id ?? '')));
+    } catch (e) {
+      if (token === warehouseRequest.current)
+        setWarehouseError(e instanceof Error ? e.message : '仓库加载失败');
+    } finally {
+      if (token === warehouseRequest.current) setWarehouseLoading(false);
+    }
   }
   useEffect(() => {
     let active = true;
@@ -108,19 +128,11 @@ export function CatalogWorkbench({
           if (active) setLoading(false);
         });
     else setLoading(false);
-    if (can('stock.read'))
-      staffRequest<{ items: WarehouseSummary[] }>('/warehouse/warehouses')
-        .then(({ items }) => {
-          if (active) {
-            setWarehouses(items);
-            setWarehouseId(items[0]?.id ?? '');
-          }
-        })
-        .catch((err: Error) => {
-          if (active) setMessage(err.message);
-        });
+    if (can('stock.read') || can('receipt.read')) void warehousesPage();
+    else setWarehouseLoading(false);
     return () => {
       active = false;
+      warehouseRequest.current++;
     };
   }, [profile]);
   useEffect(() => {
@@ -162,6 +174,34 @@ export function CatalogWorkbench({
     event.preventDefault();
     return { element: event.currentTarget, data: new FormData(event.currentTarget) };
   }
+  if (view === 'receipts')
+    return (
+      <ReceiptWorkbench
+        key={warehouseId}
+        profile={profile}
+        warehouseId={warehouseId}
+        warehouseLoading={warehouseLoading}
+        warehouseError={warehouseError}
+        retryWarehouses={() => void warehousesPage()}
+        warehouseControl={
+          <select
+            className="warehouse-select"
+            aria-label="作业仓库"
+            disabled={warehouseLoading}
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+          >
+            {!warehouses.length && <option value="">暂无授权仓库</option>}
+            {warehouses.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        }
+        onChanged={() => receiptsPage(warehouseId)}
+      />
+    );
   if (!can('catalog.read') && !can('stock.read')) return null;
   if (loading)
     return (
@@ -546,109 +586,6 @@ export function CatalogWorkbench({
           )}
         </section>
       )}
-      {view === 'receipts' && (
-        <section className="surface">
-          <div className="surface-head">
-            <div>
-              <h2>收货单</h2>
-              <p>先审核，再确认入库</p>
-            </div>
-            <div className="surface-head-actions">
-              {warehouseControl}
-              {can('receipt.write') && (
-                <button
-                  className="primary-button"
-                  disabled={!warehouseId}
-                  onClick={() => {
-                    setMessage('');
-                    setSelectedSku('');
-                    setModal('receipt');
-                  }}
-                >
-                  ＋ 新建收货单
-                </button>
-              )}
-            </div>
-          </div>
-          <button
-            className="secondary-button"
-            disabled={busy}
-            onClick={() => void work(() => receiptsPage(warehouseId))}
-          >
-            ↻ 刷新收货
-          </button>
-          <div className="table-wrap" style={{ marginTop: 20 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>来源 / 收货单</th>
-                  <th>商品与批次</th>
-                  <th>数量</th>
-                  <th>成本</th>
-                  <th>状态</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.flatMap((r) =>
-                  r.lines.map((line, i) => (
-                    <tr key={line.id}>
-                      <td>
-                        <strong>{r.sourceRef}</strong>
-                        <small>…{r.id.slice(-8)}</small>
-                      </td>
-                      <td>
-                        {skus.find((s) => s.id === line.skuId)?.name ?? '未载入商品'}
-                        <small>{line.batchNo}</small>
-                      </td>
-                      <td>{line.quantity} 件</td>
-                      <td>¥{currency(line.unitCostCents)}/件</td>
-                      <td>
-                        <span className={`badge ${r.status === 'POSTED' ? 'green' : 'amber'}`}>
-                          {status[r.status]}
-                        </span>
-                      </td>
-                      <td>
-                        {i === 0 &&
-                          ((r.status === 'DRAFT' && can('receipt.approve')) ||
-                            (r.status === 'APPROVED' && can('receipt.post'))) && (
-                            <button
-                              className="text-button"
-                              disabled={busy}
-                              onClick={() =>
-                                void work(async () => {
-                                  await action(
-                                    `/warehouse/warehouses/${warehouseId}/receipts/${r.id}/${r.status === 'DRAFT' ? 'approve' : 'post'}`,
-                                    { version: r.version },
-                                  );
-                                  await receiptsPage(warehouseId);
-                                })
-                              }
-                            >
-                              {r.status === 'DRAFT' ? '审核收货单' : '确认入库'}
-                            </button>
-                          )}
-                      </td>
-                    </tr>
-                  )),
-                )}
-              </tbody>
-            </table>
-          </div>
-          {!receipts.length && <div className="empty-state">暂无收货单，收货时从右上角新建。</div>}
-          <div className="table-footer">
-            <span>已载入 {receipts.length} 张收货单</span>
-            {receiptCursor && (
-              <button
-                className="secondary-button"
-                onClick={() => void work(() => receiptsPage(warehouseId, receiptCursor))}
-              >
-                加载更多收货单
-              </button>
-            )}
-          </div>
-        </section>
-      )}
       {view === 'stock' && (
         <section className="surface">
           <div className="surface-head">
@@ -706,7 +643,9 @@ export function CatalogWorkbench({
                         </div>
                       </td>
                       <td data-label="SKU编码">{sku?.code ?? '—'}</td>
-                      <td className="money" data-label="实物库存">{s.onHand}</td>
+                      <td className="money" data-label="实物库存">
+                        {s.onHand}
+                      </td>
                       <td data-label="预占">{s.reserved}</td>
                       <td data-label="不可售">{s.blocked}</td>
                       <td>
@@ -763,9 +702,7 @@ export function CatalogWorkbench({
       {modal && (
         <Modal
           busy={busy}
-          title={
-            modal === 'product' ? '新增商品' : modal === 'category' ? '新增分类' : '新建收货单'
-          }
+          title={modal === 'product' ? '新增商品' : '新增分类'}
           onClose={closeModal}
         >
           <form
@@ -795,23 +732,6 @@ export function CatalogWorkbench({
                     ],
                   });
                   await productsPage();
-                } else {
-                  const date = (name: string) =>
-                    data.get(name) ? new Date(String(data.get(name))).toISOString() : null;
-                  await action(`/warehouse/warehouses/${warehouseId}/receipts`, {
-                    sourceRef: data.get('sourceRef'),
-                    lines: [
-                      {
-                        skuId: data.get('skuId'),
-                        batchNo: data.get('batchNo'),
-                        quantity: Number(data.get('quantity')),
-                        unitCostCents: Math.round(Number(data.get('cost')) * 100),
-                        producedAt: date('producedAt'),
-                        expiresAt: date('expiresAt'),
-                      },
-                    ],
-                  });
-                  await receiptsPage(warehouseId);
                 }
                 closeModal();
               });
@@ -837,7 +757,7 @@ export function CatalogWorkbench({
                   </select>
                 </label>
               </>
-            ) : modal === 'product' ? (
+            ) : (
               <>
                 <label className="full">
                   商品名称
@@ -899,63 +819,6 @@ export function CatalogWorkbench({
                   />
                 </label>
               </>
-            ) : (
-              <>
-                <label className="full">
-                  来源单号 / 说明
-                  <input
-                    name="sourceRef"
-                    required
-                    maxLength={100}
-                    placeholder="例如 采购单编号或供应方说明"
-                  />
-                </label>
-                <label className="full">
-                  收货商品
-                  <select
-                    name="skuId"
-                    required
-                    value={selectedSku}
-                    onChange={(e) => setSelectedSku(e.target.value)}
-                  >
-                    <option value="">请选择商品与规格</option>
-                    {skus.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} · {s.spec} · {s.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  供应批次
-                  <input name="batchNo" required maxLength={64} />
-                </label>
-                <label>
-                  收货数量（件）
-                  <input name="quantity" type="number" min={1} max={100000} step={1} required />
-                </label>
-                <label>
-                  单件成本（元）
-                  <input name="cost" type="number" min={0} max={1000000} step="0.01" required />
-                </label>
-                <span />
-                <label>
-                  生产时间
-                  <input
-                    name="producedAt"
-                    type="datetime-local"
-                    required={skus.find((s) => s.id === selectedSku)?.expiryManaged}
-                  />
-                </label>
-                <label>
-                  到期时间
-                  <input
-                    name="expiresAt"
-                    type="datetime-local"
-                    required={skus.find((s) => s.id === selectedSku)?.expiryManaged}
-                  />
-                </label>
-              </>
             )}
             {message && (
               <p role="status" className="notice full">
@@ -972,13 +835,7 @@ export function CatalogWorkbench({
                 取消
               </button>
               <button className="primary-button" disabled={busy}>
-                {busy
-                  ? '正在保存…'
-                  : modal === 'receipt'
-                    ? '保存收货草稿'
-                    : modal === 'product'
-                      ? '保存商品草稿'
-                      : '保存分类'}
+                {busy ? '正在保存…' : modal === 'product' ? '保存商品草稿' : '保存分类'}
               </button>
             </footer>
           </form>

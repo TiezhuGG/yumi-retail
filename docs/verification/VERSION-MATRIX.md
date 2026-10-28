@@ -57,3 +57,5 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 ## 2026-10-28 Linux仓储UI接续观察
 
 本轮实际Node24.22.0、pnpm10.28.2、Docker Engine29.9.1（Ubuntu主机），没有Docker Desktop。使用缓存PostgreSQL17.11 Debian trixie镜像进行本地测试，原bookworm镜像锁定和pnpm-lock.yaml未改；仅本机 `.local/compose.engine.yaml` 覆盖缓存镜像digest。Prisma7.10.1生成、开发/测试两库9条既有迁移、相关23项集成及真实API双员工浏览器闭环通过。Web/H5构建及类型/规范检查通过；此观察不替换原Node24.22.1/Windows/bookworm矩阵，也不代表本轮重验全工作区或Taro/微信。详见[报告](UI-STOCK-TASKS-2026-10-28.md)。
+
+2026-10-29收货UI：沿用当前Linux的Node24.22.0、pnpm10.28.2及Engine/PostgreSQL17.11/trixie环境，不改依赖/镜像锁定。新增只读详情；contracts/database/API/worker/Web构建与类型检查、11项收货真实DB测试和真实移动端多行收货通过；无迁移。此记录不替代原完整版本矩阵或微信验收，见[报告](UI-RECEIPTS-2026-10-29.md)。

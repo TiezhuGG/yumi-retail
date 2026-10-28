@@ -4148,6 +4148,387 @@
         ]
       }
     },
+    "/api/v1/warehouse/warehouses/{warehouseId}/receipts/{id}": {
+      "get": {
+        "operationId": "InboundController_receiptDetail",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "warehouseId",
+                        "sourceRef",
+                        "status",
+                        "version",
+                        "createdBy",
+                        "reviewedBy",
+                        "createdAt",
+                        "reviewedAt",
+                        "postedAt",
+                        "lines"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "warehouseId": {
+                          "type": "string"
+                        },
+                        "sourceRef": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "createdBy": {
+                          "type": "string"
+                        },
+                        "reviewedBy": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "reviewedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "postedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "lines": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "receiptId",
+                              "warehouseId",
+                              "skuId",
+                              "batchNo",
+                              "quantity",
+                              "unitCostCents",
+                              "producedAt",
+                              "expiresAt",
+                              "sku"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "receiptId": {
+                                "type": "string"
+                              },
+                              "warehouseId": {
+                                "type": "string"
+                              },
+                              "skuId": {
+                                "type": "string"
+                              },
+                              "batchNo": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "unitCostCents": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "producedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "sku": {
+                                "type": "object",
+                                "required": [
+                                  "name",
+                                  "code",
+                                  "spec",
+                                  "unit",
+                                  "expiryManaged",
+                                  "enabled"
+                                ],
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "code": {
+                                    "type": "string"
+                                  },
+                                  "spec": {
+                                    "type": "string"
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "expiryManaged": {
+                                    "type": "boolean"
+                                  },
+                                  "enabled": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "summary": "本仓收货详情，附当前商品目录资料；成本仅收货授权人员可读",
+        "tags": [
+          "收货入库"
+        ]
+      }
+    },
     "/api/v1/warehouse/warehouses/{warehouseId}/receipts/{id}/approve": {
       "post": {
         "operationId": "InboundController_approve",

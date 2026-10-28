@@ -30,6 +30,7 @@ Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生�
 | GET/POST /admin/products | catalog.read / catalog.write | SPU含SKU；创建categoryId/name/description?/skus[] |
 | POST /admin/products/:id/publish；.../unpublish | catalog.write，version | 专用上下架，不开放任意status赋值 |
 | GET/POST /warehouse/warehouses/:warehouseId/receipts | receipt.read / receipt.write + 范围 | 创建sourceRef、lines[skuId,batchNo,quantity,unitCostCents,producedAt?,expiresAt?]；拣货员无receipt.read，不能读取采购成本 |
+| GET /warehouse/warehouses/:warehouseId/receipts/:id | receipt.read + 本仓范围 | 完整单据及lines[].sku当前名称/规格/编码/单位/启用与效期标志；无权限拒绝，不向拣货员开放成本 |
 | POST .../receipts/:id/approve；.../post | receipt.approve / receipt.post + 范围 | 独立审核与过账动作，version必填 |
 | GET /warehouse/warehouses/:warehouseId/stock | stock.read + 范围 | onHand/reserved/blocked/safety/version；id是SKU ID的分页别名，不含成本 |
 | GET /products | 匿名 | limit/cursor/keyword/categoryId；仅可展示销售规格，priceCents/available |
@@ -275,3 +276,9 @@ OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错
 | POST receipt-reversals/:id/cancel | reversal.write；version/reason | 前两态取消，不改数 |
 
 数量整数1..100000，原因/核验说明1..200字符；列表UUID升序默认20最多50，字段白名单。GET来源用RepeatableRead返回同一快照提示，POST仍按最新锁内事实裁决；不接受客户端仓库/SKU/原数量或成本。原批次剩余额度不足409 REVERSAL_LIMIT，自由数不足409 INSUFFICIENT_STOCK，旧快照409 VERSION_CONFLICT；COUNT_FROZEN/INVENTORY_HOLD/INVENTORY_MISMATCH拒绝申请、审批及过账。取消不清除冻结/暂停。稳定键重放原结果，同键不同输入409。全字段及状态见实际0.6.0契约。
+
+## 2026-10-29 收货详情与UI读取补充
+
+新增GET收货详情，路径仓库与单据ID同时限定；未登录401、无receipt.read/仓库范围403、本仓找不到单据404、非法UUID400。lines[].sku为当前目录联查资料，包含name/code/spec/unit/enabled/expiryManaged，不是历史名称快照；批次、数量、unitCostCents及效期仍来自原收货行。金额经现有jsonValue规范转换为JSON整数分，时间为ISO日期字符串。GET不写库存或变更单据状态。
+
+创建/审核/过账接口和状态机未改；UI多行表单沿用1–50行、每SKU一批次的现有开发约束。前端核验勾选只用于提醒与防误触，不新增服务端body字段或独立员工要求。前端同窗口内对响应丢失保留原意图重试；完整跨重载恢复尚未验收。OpenAPI已从实际实现导出。

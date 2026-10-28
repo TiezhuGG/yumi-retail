@@ -269,6 +269,75 @@ export class InboundController {
       ),
     );
   }
+  @Get('receipts/:id')
+  @Permissions('receipt.read')
+  @ApiOperation({ summary: '本仓收货详情，附当前商品目录资料；成本仅收货授权人员可读' })
+  @ApiResult(
+    object({
+      ...receiptSchema.properties,
+      lines: {
+        type: 'array',
+        items: object({
+          ...lineSchema.properties,
+          sku: object({
+            name: text,
+            code: text,
+            spec: text,
+            unit: text,
+            expiryManaged: bool,
+            enabled: bool,
+          }),
+        }),
+      },
+    }),
+    [400, 401, 403, 404, 500],
+  )
+  async receiptDetail(
+    @Param('warehouseId') warehouseId: string,
+    @Param('id') id: string,
+    @Req() request: ApiRequest,
+  ) {
+    warehouseId = uuid(warehouseId);
+    await this.service.warehouse(this.service.db, request, warehouseId);
+    const row = await this.service.db.inboundReceipt.findFirst({
+      where: { id: uuid(id), warehouseId },
+      include: {
+        lines: {
+          orderBy: { skuId: 'asc' },
+          include: {
+            sku: {
+              select: {
+                code: true,
+                spec: true,
+                unit: true,
+                expiryManaged: true,
+                enabled: true,
+                product: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!row) throw failure(404, 'RESOURCE_NOT_FOUND', '收货单不存在');
+    return success(
+      request,
+      jsonValue({
+        ...row,
+        lines: row.lines.map(({ sku, ...line }) => ({
+          ...line,
+          sku: {
+            name: sku.product.name,
+            code: sku.code,
+            spec: sku.spec,
+            unit: sku.unit,
+            expiryManaged: sku.expiryManaged,
+            enabled: sku.enabled,
+          },
+        })),
+      }),
+    );
+  }
   @Post('receipts')
   @HttpCode(200)
   @Permissions('receipt.write')

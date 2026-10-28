@@ -522,3 +522,87 @@ test('database checks, composite foreign keys and append-only facts resist inval
   await assert.rejects(db.businessAudit.delete({ where: { id: audit.id } }));
   checks.push('database quantities composite keys and append only facts');
 });
+
+test('receipt detail is warehouse-scoped, cost-protected and reflects current status with unchanged receipt facts', async () => {
+  const a = await product(),
+    b = await product();
+  const input = [line(a.skus[0]!.id, 2), { ...line(b.skus[0]!.id, 3), unitCostCents: 719 }];
+  const receipt = await draft(input);
+  const route = `/warehouse/warehouses/${receipt.warehouseId}/receipts/${receipt.id}`;
+  const read = await ok<import('../packages/contracts/src/index.ts').ReceiptDetail>(
+    route,
+    undefined,
+    1,
+  );
+  assert.equal(read.status, 'DRAFT');
+  assert.equal(read.lines.length, 2);
+  assert.equal(read.lines.find((l) => l.skuId === b.skus[0]!.id)!.unitCostCents, 719);
+  assert.equal(read.lines.find((l) => l.skuId === a.skus[0]!.id)!.sku.name, a.name);
+  assert.equal(read.lines.find((l) => l.skuId === b.skus[0]!.id)!.sku.spec, b.skus[0]!.spec);
+  const facts = read.lines.map(({ sku: _sku, ...l }) => l);
+  await db.product.update({ where: { id: a.id }, data: { name: '当前目录名称，仅测试资料' } });
+  const renamed = await ok<import('../packages/contracts/src/index.ts').ReceiptDetail>(
+    route,
+    undefined,
+    1,
+  );
+  assert.equal(
+    renamed.lines.find((l) => l.skuId === a.skus[0]!.id)!.sku.name,
+    '当前目录名称，仅测试资料',
+  );
+  assert.deepEqual(
+    renamed.lines.map(({ sku: _sku, ...l }) => l),
+    facts,
+  );
+  const ledgerCount = await db.stockLedger.count();
+  assert.equal((await call(route)).status, 401);
+  for (const actor of [2, 3]) {
+    const denied = await call(route, { actor });
+    assert.equal(denied.status, 403);
+    assert.equal(denied.data, undefined);
+  }
+  assert.equal(
+    (await call(`/warehouse/warehouses/${warehouses[1]}/receipts/${receipt.id}`, { actor: 1 }))
+      .status,
+    403,
+  );
+  assert.equal(
+    (
+      await call(`/warehouse/warehouses/${receipt.warehouseId}/receipts/${randomUUID()}`, {
+        actor: 1,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (await call(`/warehouse/warehouses/${receipt.warehouseId}/receipts/not-a-uuid`, { actor: 1 }))
+      .status,
+    400,
+  );
+  await db.staffWarehouse.create({ data: { staffId: staffIds[0]!, warehouseId: warehouses[1]! } });
+  try {
+    assert.equal(
+      (await call(`/warehouse/warehouses/${warehouses[1]}/receipts/${receipt.id}`, { actor: 0 }))
+        .status,
+      404,
+    );
+  } finally {
+    await db.staffWarehouse.delete({
+      where: { staffId_warehouseId: { staffId: staffIds[0]!, warehouseId: warehouses[1]! } },
+    });
+  }
+  assert.equal(await db.stockLedger.count(), ledgerCount);
+  const reviewed = await approve(receipt);
+  assert.equal((await ok<Receipt>(route, undefined, 1)).status, 'APPROVED');
+  assert.equal((await post(reviewed)).status, 200);
+  const posted = await ok<Receipt>(route, undefined, 1);
+  assert.equal(posted.status, 'POSTED');
+  assert.equal(posted.version, reviewed.version + 1);
+  assert.equal(
+    posted.lines.reduce((n, l) => n + l.quantity, 0),
+    5,
+  );
+  checks.push(
+    'receipt detail scopes current metadata and state without changing receipt facts or leaking costs',
+  );
+});

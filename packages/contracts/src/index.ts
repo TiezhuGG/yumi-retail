@@ -68,6 +68,23 @@ export interface Receipt {
   version: number;
   lines: ReceiptLine[];
 }
+export interface ReceiptDetailLine extends ReceiptLine {
+  sku: {
+    name: string;
+    code: string;
+    spec: string;
+    unit: string;
+    expiryManaged: boolean;
+    enabled: boolean;
+  };
+}
+export interface ReceiptDetail extends Receipt {
+  createdAt: string;
+  reviewedAt: string | null;
+  postedAt: string | null;
+  lines: ReceiptDetailLine[];
+}
+
 export interface SaleSku {
   id: string;
   productId: string;
