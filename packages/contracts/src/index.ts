@@ -164,6 +164,19 @@ export interface StockIsolation {
   createdAt: string;
   stockLedgerId: string;
 }
+export type ReceiptReversal = Omit<StockDisposition, 'isolationId' | 'kind' | 'isolationVersion'>;
+export interface ReceiptReversalSource {
+  receiptId: string;
+  receiptLineId: string;
+  sourceRef: string;
+  batchNo: string;
+  originalQuantity: number;
+  reversedQuantity: number;
+  remaining: number;
+  positionId: string;
+  positionVersion: number;
+  freeQuantity: number;
+}
 export interface StockDisposition {
   id: string;
   warehouseId: string;

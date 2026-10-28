@@ -40,6 +40,8 @@
     "test:counts": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/stock-count.integration.test.ts",
     "pretest:dispositions": "npm run build:server",
     "test:dispositions": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/stock-disposition.integration.test.ts",
+    "pretest:reversals": "npm run build:server",
+    "test:reversals": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/receipt-reversal.integration.test.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

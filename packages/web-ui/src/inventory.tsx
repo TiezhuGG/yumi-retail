@@ -11,6 +11,7 @@ import type {
 import { staffRequest } from './index.js';
 import { StockCountWorkbench } from './stock-count.js';
 import { StockDispositionWorkbench } from './stock-disposition.js';
+import { ReceiptReversalWorkbench } from './receipt-reversal.js';
 const box: CSSProperties = {
   borderTop: '1px solid #d0d5dd',
   marginTop: 24,
@@ -512,6 +513,16 @@ export function InventoryWorkbench({
       />
       <StockDispositionWorkbench
         key={`disposition-${warehouseId}`}
+        profile={profile}
+        warehouseId={warehouseId}
+        positions={positions}
+        onChanged={async () => {
+          await refresh();
+          await onStockChanged();
+        }}
+      />
+      <ReceiptReversalWorkbench
+        key={`reversal-${warehouseId}`}
         profile={profile}
         warehouseId={warehouseId}
         positions={positions}

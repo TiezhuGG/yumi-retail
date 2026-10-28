@@ -21,6 +21,8 @@ import { StockCountController } from './stock-count-controller.js';
 import { StockCountService } from './stock-count-service.js';
 import { StockDispositionService } from './stock-disposition-service.js';
 import { StockDispositionController } from './stock-disposition-controller.js';
+import { ReceiptReversalService } from './receipt-reversal-service.js';
+import { ReceiptReversalController } from './receipt-reversal-controller.js';
 import { CatalogService } from './catalog-service.js';
 import {
   CatalogAdminController,
@@ -83,6 +85,7 @@ export async function createApplication(
       InventoryController,
       StockCountController,
       StockDispositionController,
+      ReceiptReversalController,
     ],
     providers: [
       { provide: StaffAuthService, useValue: auth },
@@ -93,6 +96,10 @@ export async function createApplication(
         useValue: new StockCountService(new InventoryService(catalog)),
       },
       { provide: APP_GUARD, useValue: new StaffGuard(auth) },
+      {
+        provide: ReceiptReversalService,
+        useValue: new ReceiptReversalService(new InventoryService(catalog)),
+      },
       {
         provide: StockDispositionService,
         useValue: new StockDispositionService(new InventoryService(catalog)),
@@ -128,9 +135,9 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、商品收货、库位移位、库存核对、实物盘点、隔离及报损；交易接口尚未实现。',
+        '员工认证、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；交易接口尚未实现。',
       )
-      .setVersion('0.5.0')
+      .setVersion('0.6.0')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
   );

@@ -51,3 +51,5 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 本机生成的完整安装观察可用`node scripts/record-versions.mjs`重建；不输出环境凭据。Docker/数据库观察需独立核对，不能只看package.json。
 
 2026-10-28隔离/报损切片：新增11项与原55项通过，共66项；未新增或升级依赖，锁文件SHA256不变。精确安装观察见[本轮快照](DISPOSITION-INSTALLED-VERSIONS.json)，检查与边界见[报告](S2-STOCK-DISPOSITION-2026-10-28.md)。
+
+2026-10-28收货逆向纠错切片：新增12项与原66项通过，共78项；全工作区/Taro编译通过。依赖与锁文件未变，见[精确安装观察](REVERSAL-INSTALLED-VERSIONS.json)及[本轮报告](S2-RECEIPT-REVERSAL-2026-10-28.md)。

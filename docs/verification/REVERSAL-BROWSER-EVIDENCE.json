@@ -1,0 +1,31 @@
+{
+  "onHand": 7,
+  "reserved": 0,
+  "blocked": 0,
+  "inventoryHold": false,
+  "activeCountId": null,
+  "originalStatus": "POSTED",
+  "originalQuantity": 10,
+  "originalCostCents": 200,
+  "documents": [
+    {
+      "quantity": 3,
+      "status": "POSTED"
+    },
+    {
+      "quantity": 1,
+      "status": "CANCELLED"
+    }
+  ],
+  "issueCount": 0,
+  "publicAvailable": 7,
+  "postgres": "17.11 (Debian 17.11-1.pgdg12+2)",
+  "fixture": "synthetic local yumi_test",
+  "schemaRemoved": true,
+  "browser": "Chrome desktop admin and ops H5",
+  "testPorts": [
+    3101,
+    5273,
+    5274
+  ]
+}

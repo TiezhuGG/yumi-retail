@@ -331,6 +331,7 @@ export class InventoryController {
             transfer: { select: { reason: true } },
             isolation: { select: { reason: true } },
             disposition: { select: { reason: true } },
+            reversal: { select: { reason: true } },
           },
         },
       },
@@ -346,6 +347,7 @@ export class InventoryController {
             stockLedger.transfer?.reason ??
             stockLedger.isolation?.reason ??
             stockLedger.disposition?.reason ??
+            stockLedger.reversal?.reason ??
             null,
         })),
         limit,

@@ -81,6 +81,8 @@ model Staff {
   isolations           StockIsolation[]
   createdDispositions  StockDisposition[] @relation("dispositionCreator")
   reviewedDispositions StockDisposition[] @relation("dispositionReviewer")
+  createdReversals     ReceiptReversal[]  @relation("reversalCreator")
+  reviewedReversals    ReceiptReversal[]  @relation("reversalReviewer")
 
   @@map("staff")
 }
@@ -249,23 +251,24 @@ model StockBalance {
 }
 
 model StockLot {
-  id            String          @id @db.Uuid
-  warehouseId   String          @map("warehouse_id") @db.Uuid
-  skuId         String          @map("sku_id") @db.Uuid
-  receiptLineId String          @unique @map("receipt_line_id") @db.Uuid
-  batchNo       String          @map("batch_no") @db.VarChar(64)
-  locationCode  String          @default("DEFAULT") @map("location_code") @db.VarChar(32)
-  onHand        Int             @map("on_hand")
-  reserved      Int             @default(0)
-  blocked       Int             @default(0)
-  unitCostCents BigInt          @map("unit_cost_cents")
-  producedAt    DateTime?       @map("produced_at") @db.Timestamptz(3)
-  expiresAt     DateTime?       @map("expires_at") @db.Timestamptz(3)
-  receivedAt    DateTime        @default(now()) @map("received_at") @db.Timestamptz(3)
-  balance       StockBalance    @relation(fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
-  receiptLine   InboundLine     @relation(fields: [receiptLineId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  id            String            @id @db.Uuid
+  warehouseId   String            @map("warehouse_id") @db.Uuid
+  skuId         String            @map("sku_id") @db.Uuid
+  receiptLineId String            @unique @map("receipt_line_id") @db.Uuid
+  batchNo       String            @map("batch_no") @db.VarChar(64)
+  locationCode  String            @default("DEFAULT") @map("location_code") @db.VarChar(32)
+  onHand        Int               @map("on_hand")
+  reserved      Int               @default(0)
+  blocked       Int               @default(0)
+  unitCostCents BigInt            @map("unit_cost_cents")
+  producedAt    DateTime?         @map("produced_at") @db.Timestamptz(3)
+  expiresAt     DateTime?         @map("expires_at") @db.Timestamptz(3)
+  receivedAt    DateTime          @default(now()) @map("received_at") @db.Timestamptz(3)
+  balance       StockBalance      @relation(fields: [warehouseId, skuId], references: [warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  receiptLine   InboundLine       @relation(fields: [receiptLineId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
   ledger        StockLedger[]
   positions     StockPosition[]
+  reversals     ReceiptReversal[]
 
   @@unique([receiptLineId, warehouseId, skuId])
   @@unique([id, warehouseId, skuId])
@@ -291,6 +294,7 @@ model StockLedger {
   transfer        StockTransfer?
   isolation       StockIsolation?
   disposition     StockDisposition?
+  reversal        ReceiptReversal?
 
   @@unique([id, warehouseId, skuId, lotId])
   @@index([warehouseId, skuId, createdAt])
@@ -355,6 +359,7 @@ model StockPosition {
   incoming    StockTransfer[]   @relation("transferTarget")
   countLines  StockCountLine[]
   isolations  StockIsolation[]
+  reversals   ReceiptReversal[]
 
   @@unique([lotId, locationId])
   @@unique([id, warehouseId, skuId, lotId])
@@ -521,4 +526,37 @@ model StockDisposition {
   @@index([warehouseId, skuId, id])
   @@index([isolationId], map: "stock_dispositions_isolation_lookup")
   @@map("stock_dispositions")
+}
+
+model ReceiptReversal {
+  id               String        @id @db.Uuid
+  warehouseId      String        @map("warehouse_id") @db.Uuid
+  skuId            String        @map("sku_id") @db.Uuid
+  lotId            String        @map("lot_id") @db.Uuid
+  positionId       String        @map("position_id") @db.Uuid
+  quantity         Int
+  positionVersion  Int           @map("position_version")
+  status           String        @default("DRAFT") @db.VarChar(16)
+  version          Int           @default(0)
+  reason           String        @db.VarChar(200)
+  reviewReason     String?       @map("review_reason") @db.VarChar(200)
+  cancelReason     String?       @map("cancel_reason") @db.VarChar(200)
+  physicalEvidence String?       @map("physical_evidence") @db.VarChar(200)
+  createdBy        String        @map("created_by") @db.Uuid
+  reviewedBy       String?       @map("reviewed_by") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  reviewedAt       DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  postedAt         DateTime?     @map("posted_at") @db.Timestamptz(3)
+  cancelledAt      DateTime?     @map("cancelled_at") @db.Timestamptz(3)
+  stockLedgerId    String?       @unique @map("stock_ledger_id") @db.Uuid
+  lot              StockLot      @relation(fields: [lotId, warehouseId, skuId], references: [id, warehouseId, skuId], onDelete: Restrict, onUpdate: NoAction)
+  position         StockPosition @relation(fields: [positionId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+  creator          Staff         @relation("reversalCreator", fields: [createdBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  reviewer         Staff?        @relation("reversalReviewer", fields: [reviewedBy], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  stockLedger      StockLedger?  @relation(fields: [stockLedgerId, warehouseId, skuId, lotId], references: [id, warehouseId, skuId, lotId], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([stockLedgerId, warehouseId, skuId, lotId])
+  @@index([warehouseId, skuId, id])
+  @@index([lotId])
+  @@map("receipt_reversals")
 }

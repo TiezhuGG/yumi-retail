@@ -1,0 +1,19 @@
+{
+  "finishedAt": "2026-10-28T07:01:59.250Z",
+  "checks": [
+    "partial reversal, untouched original, three stock levels/two ledgers/public availability",
+    "independent reviewer, evidence, terminal and both cancellation paths",
+    "20 create/post retries, payload mismatch and independent-key last unit",
+    "original batch provenance through transfers and two positions",
+    "original cap independent of count gain",
+    "reserved/blocked/isolation protection and stale position",
+    "freeze/hold/mismatch protection and independent cancellation",
+    "late audit rollback and stable retry intent",
+    "source immutability, document transitions and posted fact constraints",
+    "deferred original cap and lot provenance resist bypass",
+    "expiry remains excluded after correction",
+    "authorization, CSRF, strict input, paging and public privacy"
+  ],
+  "isolation": "local yumi_test disposable schema",
+  "schemaRemoved": true
+}

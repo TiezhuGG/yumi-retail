@@ -1,6 +1,6 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位、库存核对、实物盘点、数量隔离/解除/报损，生成[当前OpenAPI](openapi.json)（0.5.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
+本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位、库存核对、实物盘点、数量隔离/解除/报损、收货逆向纠错，生成[当前OpenAPI](openapi.json)（0.6.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
 
 ## 当前已实现的员工切片
 
@@ -260,3 +260,18 @@ OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错
 | POST stock-dispositions/:id/cancel | disposition.write；version/reason | DRAFT/APPROVED取消，不改库存 |
 
 列表UUID升序、默认20最多50。数量整数1..100000；原因/核验说明最多200字符。隔离/申请/审批/过账拒绝盘点冻结、核对暂停和账本差异。所有数量写先锁balance，再复核位置及隔离版本；快照变化409，取消旧单重建，不覆盖。解除在过账再次检查效期及启用库位；报损只消费自己隔离记录remaining，不消费预占或旧blocked。终态不可修改，原幂等键重试重放初次结果。详细错误与字段见0.5.0生成契约；取消可在冻结/暂停时执行但不解除任何暂停。
+
+## 2026-10-28 已实现：收货逆向纠错
+
+路径前缀`/api/v1/warehouse/warehouses/:warehouseId`；每次校验stock.read或动作权限及实际仓库范围。admin/manager拥有reversal.write/approve/post，picker只读，rider拒绝。POST均需允许Origin、CSRF和UUID Idempotency-Key。
+
+| 方法/路径 | 输入及权限 | 结果 |
+|---|---|---|
+| GET receipt-reversal-sources/:positionId | stock.read | 原收货ID/行ID/来源、批次、原数量/已冲回/剩余额度、位置版本/自由数，不含成本 |
+| GET receipt-reversals；GET receipt-reversals/:id | stock.read；列表skuId/lotId/cursor/limit | 分页逆向单或详情 |
+| POST receipt-reversals | reversal.write；positionId/quantity/positionVersion/reason | DRAFT，不预扣 |
+| POST receipt-reversals/:id/approve | reversal.approve；version/reason | 非申请人独立审批 |
+| POST receipt-reversals/:id/post | reversal.post；version/physicalConfirmed=true/physicalEvidence | 幂等冲回自由库存，新两级流水 |
+| POST receipt-reversals/:id/cancel | reversal.write；version/reason | 前两态取消，不改数 |
+
+数量整数1..100000，原因/核验说明1..200字符；列表UUID升序默认20最多50，字段白名单。GET来源用RepeatableRead返回同一快照提示，POST仍按最新锁内事实裁决；不接受客户端仓库/SKU/原数量或成本。原批次剩余额度不足409 REVERSAL_LIMIT，自由数不足409 INSUFFICIENT_STOCK，旧快照409 VERSION_CONFLICT；COUNT_FROZEN/INVENTORY_HOLD/INVENTORY_MISMATCH拒绝申请、审批及过账。取消不清除冻结/暂停。稳定键重放原结果，同键不同输入409。全字段及状态见实际0.6.0契约。
