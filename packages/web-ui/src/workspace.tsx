@@ -120,7 +120,11 @@ export function Workspace({
     mobileWidth.addEventListener('change', reveal);
     return () => mobileWidth.removeEventListener('change', reveal);
   }, [view]);
-  const route = allowed.find((r) => r.id === view);
+  const activeView = allowed.some((r) => r.id === view) ? view : (allowed[0]?.id ?? 'overview');
+  const navigate = (next: WorkspaceView) => {
+    if (allowed.some((r) => r.id === next)) setView(next);
+  };
+  const route = allowed.find((r) => r.id === activeView);
   return (
     <div className={`workspace ${mobile ? 'mobile-workspace' : ''}`}>
       <aside className="sidebar">
@@ -132,14 +136,14 @@ export function Workspace({
           {allowed.map((r) => (
             <button
               key={r.id}
-              ref={view === r.id ? activeNav : undefined}
-              className={view === r.id ? 'nav-item active' : 'nav-item'}
-              aria-current={view === r.id ? 'page' : undefined}
+              ref={activeView === r.id ? activeNav : undefined}
+              className={activeView === r.id ? 'nav-item active' : 'nav-item'}
+              aria-current={activeView === r.id ? 'page' : undefined}
               onClick={() => setView(r.id)}
             >
               <span aria-hidden="true">{r.glyph}</span>
               {r.name}
-              {view === r.id && <i />}
+              {activeView === r.id && <i />}
             </button>
           ))}
         </nav>
@@ -181,7 +185,12 @@ export function Workspace({
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
           ) : (
-            <CatalogWorkbench profile={profile} view={view} onNavigate={setView} />
+            <CatalogWorkbench
+              profile={profile}
+              view={activeView}
+              allowedViews={allowed.map((r) => r.id)}
+              onNavigate={navigate}
+            />
           )}
           <footer className="workspace-footer">
             玉米百货 <span>用心经营每一天</span>

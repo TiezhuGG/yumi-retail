@@ -1823,3 +1823,13 @@ small {
 .receipt-workbench .receipt-submit button {
   align-self: flex-end;
 }
+
+.notice.error {
+  border-color: #edb8b3;
+  background: #fff3f1;
+  color: #a3352c;
+  overflow-wrap: anywhere;
+}
+.notice.error .secondary-button {
+  margin: 6px 8px;
+}

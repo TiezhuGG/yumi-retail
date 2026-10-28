@@ -11,3 +11,5 @@ output/
 apps/consumer-mini/project.private.config.json
 packages/database/src/generated/
 
+# Taro/SWC platform compiler cache
+apps/consumer-mini/.swc/

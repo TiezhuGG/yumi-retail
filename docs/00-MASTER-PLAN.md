@@ -2,7 +2,7 @@
 
 更新：2026-10-28。商品收货、库位/移位/核对、实物盘点、数量隔离/解除/报损及收货逆向纠错已落地，见[最新报告](verification/S2-RECEIPT-REVERSAL-2026-10-28.md)。78项集成通过，小程序工具/真机未验收。PostgreSQL与本机Docker Desktop选型不变，完整仓储、交易与生产部署尚未完成。
 
-最新运行约定（负责人2026-10-28）：本机有Docker Desktop则优先使用，否则使用Docker Engine。当前主机无Desktop，Engine/PostgreSQL17.11已完成仓储UI相关验证，见[本轮报告](verification/UI-STOCK-TASKS-2026-10-28.md)。当前优先完成仓储UI，库位/核对页及仓管/拣货查询已完成本地验证，收货入库UI也已完成本轮本地验证，下一项为首页/商品/分类/库存列表的状态及权限一致性收尾，暂缓新增商品维护业务。
+最新运行约定（负责人2026-10-28）：本机有Docker Desktop则优先使用，否则使用Docker Engine。当前主机无Desktop，Engine/PostgreSQL17.11已完成仓储UI相关验证，见[本轮报告](verification/UI-STOCK-TASKS-2026-10-28.md)。当前优先完成仓储UI，库位/核对页及仓管/拣货查询已完成本地验证，收货入库UI也已完成本轮本地验证，首页/商品/分类/库存状态与角色入口已完成本地验证，微信weapp编译与入口检查通过，下一项为微信工具/真机和整体UI审阅，见[最新报告](verification/UI-LIST-STATES-MINI-2026-10-29.md)，暂缓新增商品维护业务。
 
 ## 1. 项目目标与已经确认的边界
 

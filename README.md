@@ -8,7 +8,7 @@
 
 ## 从这里开始
 
-本轮：[收货入库UI与真实多行收货报告](docs/verification/UI-RECEIPTS-2026-10-29.md)。此前：[库位/核对UI与仓管/拣货查询报告](docs/verification/UI-LOCATIONS-2026-10-28.md)，含13项真实DB测试、移动作业真实流程及截图。
+本轮：[列表状态与微信编译报告](docs/verification/UI-LIST-STATES-MINI-2026-10-29.md)。此前：[收货入库UI与真实多行收货报告](docs/verification/UI-RECEIPTS-2026-10-29.md)。此前：[库位/核对UI与仓管/拣货查询报告](docs/verification/UI-LOCATIONS-2026-10-28.md)，含13项真实DB测试、移动作业真实流程及截图。
 
 | 文档 | 用途 |
 |---|---|
