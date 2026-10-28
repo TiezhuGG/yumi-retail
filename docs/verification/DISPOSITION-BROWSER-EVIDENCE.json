@@ -1,0 +1,30 @@
+{
+  "onHand": 8,
+  "reserved": 0,
+  "blocked": 1,
+  "inventoryHold": false,
+  "activeCountId": null,
+  "isolations": [
+    {
+      "quantity": 4,
+      "remaining": 1
+    }
+  ],
+  "dispositions": [
+    {
+      "kind": "RELEASE",
+      "quantity": 1,
+      "status": "POSTED"
+    },
+    {
+      "kind": "DAMAGE",
+      "quantity": 2,
+      "status": "POSTED"
+    }
+  ],
+  "issueCount": 0,
+  "publicAvailable": 7,
+  "schemaRemoved": true,
+  "fixture": "synthetic local yumi_test",
+  "browser": "Chrome desktop; admin and ops H5"
+}

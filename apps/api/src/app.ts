@@ -19,6 +19,8 @@ import { InventoryController } from './inventory-controller.js';
 import { InventoryService } from './inventory-service.js';
 import { StockCountController } from './stock-count-controller.js';
 import { StockCountService } from './stock-count-service.js';
+import { StockDispositionService } from './stock-disposition-service.js';
+import { StockDispositionController } from './stock-disposition-controller.js';
 import { CatalogService } from './catalog-service.js';
 import {
   CatalogAdminController,
@@ -80,6 +82,7 @@ export async function createApplication(
       PublicCatalogController,
       InventoryController,
       StockCountController,
+      StockDispositionController,
     ],
     providers: [
       { provide: StaffAuthService, useValue: auth },
@@ -90,6 +93,10 @@ export async function createApplication(
         useValue: new StockCountService(new InventoryService(catalog)),
       },
       { provide: APP_GUARD, useValue: new StaffGuard(auth) },
+      {
+        provide: StockDispositionService,
+        useValue: new StockDispositionService(new InventoryService(catalog)),
+      },
     ],
   })
   class ApplicationModule {}
@@ -120,8 +127,10 @@ export async function createApplication(
     app,
     new DocumentBuilder()
       .setTitle('玉米百货 API')
-      .setDescription('员工认证、商品收货、库位移位、库存核对及实物盘点；交易接口尚未实现。')
-      .setVersion('0.4.0')
+      .setDescription(
+        '员工认证、商品收货、库位移位、库存核对、实物盘点、隔离及报损；交易接口尚未实现。',
+      )
+      .setVersion('0.5.0')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
   );

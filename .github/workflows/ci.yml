@@ -34,6 +34,7 @@ jobs:
       - run: npm run test:s2
       - run: npm run test:inventory
       - run: npm run test:counts
+      - run: npm run test:dispositions
       - run: npm run db:seed
       - run: npm run db:seed:catalog
       - run: npm run verify:mini

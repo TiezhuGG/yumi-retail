@@ -1,0 +1,18 @@
+{
+  "finishedAt": "2026-10-28T06:10:27.803Z",
+  "checks": [
+    "isolate/release/damage, availability, both ledgers",
+    "independent reviewer, physical evidence, terminal protection",
+    "draft/cancel leave isolation intact",
+    "same-key retries and distinct-key last-unit race",
+    "last remainder race and 20 post retries",
+    "late expiry/location check, damage still allowed",
+    "freeze/hold, cancel and stale snapshot",
+    "late audit failure atomic rollback and retry",
+    "DB immutability, deferred quota/position constraints",
+    "reserved/legacy blocked protection, owned quota and mismatch rejection",
+    "server authorization, CSRF, validation, pagination and privacy"
+  ],
+  "isolation": "local yumi_test disposable schema",
+  "schemaRemoved": true
+}

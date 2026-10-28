@@ -10,6 +10,7 @@ import type {
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
 import { StockCountWorkbench } from './stock-count.js';
+import { StockDispositionWorkbench } from './stock-disposition.js';
 const box: CSSProperties = {
   borderTop: '1px solid #d0d5dd',
   marginTop: 24,
@@ -504,6 +505,16 @@ export function InventoryWorkbench({
         key={warehouseId}
         profile={profile}
         warehouseId={warehouseId}
+        onChanged={async () => {
+          await refresh();
+          await onStockChanged();
+        }}
+      />
+      <StockDispositionWorkbench
+        key={`disposition-${warehouseId}`}
+        profile={profile}
+        warehouseId={warehouseId}
+        positions={positions}
         onChanged={async () => {
           await refresh();
           await onStockChanged();

@@ -325,7 +325,13 @@ export class InventoryController {
         deltaBlocked: true,
         createdAt: true,
         stockLedger: {
-          select: { actionKey: true, requestId: true, transfer: { select: { reason: true } } },
+          select: {
+            actionKey: true,
+            requestId: true,
+            transfer: { select: { reason: true } },
+            isolation: { select: { reason: true } },
+            disposition: { select: { reason: true } },
+          },
         },
       },
     });
@@ -336,7 +342,11 @@ export class InventoryController {
           ...row,
           actionKey: stockLedger.actionKey,
           requestId: stockLedger.requestId,
-          reason: stockLedger.transfer?.reason ?? null,
+          reason:
+            stockLedger.transfer?.reason ??
+            stockLedger.isolation?.reason ??
+            stockLedger.disposition?.reason ??
+            null,
         })),
         limit,
       ),

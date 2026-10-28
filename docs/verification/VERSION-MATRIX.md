@@ -49,3 +49,5 @@ postgres:17.11-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8
 - 部分旧工具链传递包仍有deprecated提示；本次只证明所列兼容性与业务探针通过，不代表完成依赖漏洞审查或生产发布审查。此项在后续工程治理与发布安全检查中跟进。
 
 本机生成的完整安装观察可用`node scripts/record-versions.mjs`重建；不输出环境凭据。Docker/数据库观察需独立核对，不能只看package.json。
+
+2026-10-28隔离/报损切片：新增11项与原55项通过，共66项；未新增或升级依赖，锁文件SHA256不变。精确安装观察见[本轮快照](DISPOSITION-INSTALLED-VERSIONS.json)，检查与边界见[报告](S2-STOCK-DISPOSITION-2026-10-28.md)。

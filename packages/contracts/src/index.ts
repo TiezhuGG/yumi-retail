@@ -149,6 +149,46 @@ export interface StockCountLine {
   positionVersion: number;
   counted: number | null;
 }
+
+export interface StockIsolation {
+  id: string;
+  warehouseId: string;
+  skuId: string;
+  lotId: string;
+  positionId: string;
+  quantity: number;
+  remaining: number;
+  version: number;
+  reason: string;
+  createdBy: string;
+  createdAt: string;
+  stockLedgerId: string;
+}
+export interface StockDisposition {
+  id: string;
+  warehouseId: string;
+  skuId: string;
+  lotId: string;
+  positionId: string;
+  isolationId: string;
+  kind: 'RELEASE' | 'DAMAGE';
+  quantity: number;
+  positionVersion: number;
+  isolationVersion: number;
+  status: 'DRAFT' | 'APPROVED' | 'POSTED' | 'CANCELLED';
+  version: number;
+  reason: string;
+  reviewReason: string | null;
+  cancelReason: string | null;
+  physicalEvidence: string | null;
+  createdBy: string;
+  reviewedBy: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  postedAt: string | null;
+  cancelledAt: string | null;
+  stockLedgerId: string | null;
+}
 export interface StockCount {
   id: string;
   warehouseId: string;

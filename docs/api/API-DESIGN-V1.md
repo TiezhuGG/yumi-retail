@@ -1,6 +1,6 @@
 # API 设计基线 V1.1
 
-本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位、库存核对及实物盘点，生成[当前OpenAPI](openapi.json)（0.4.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
+本文件是业务接口设计，尚非完整实现。已实现员工基础、商品收货、库位/同仓移位、库存核对、实物盘点、数量隔离/解除/报损，生成[当前OpenAPI](openapi.json)（0.5.0）；其余交易清单仍为设计。开发入口`/api/v1/docs`、JSON`/api/v1/openapi.json`；生产关闭。`npm run openapi:export`从当前代码重建契约。
 
 ## 当前已实现的员工切片
 
@@ -199,7 +199,7 @@ stock响应新增activeCountId（可空）独立于inventoryHold。移位遇盘�
 | GET/POST /warehouse/stock-counts | count.write | 确定范围、冻结、记录账面快照 |
 | PUT /warehouse/stock-counts/:id/lines/:lineId | count.write | 实盘数量、备注、版本 |
 | POST /warehouse/stock-counts/:id/post；POST /warehouse/stock-counts/:id/abort | count.post | 审核差异/释放冻结；不可吞并预占冲突 |
-| GET/POST /warehouse/write-offs；POST /warehouse/write-offs/:id/post | loss.write/post | 报损审批与过账，不减已被预占部分 |
+| 报损接口 | 以文末stock-isolations/stock-dispositions实际接口及权限为准 | 原write-offs路径由0.5.0单据动作替代，不再并行实现 |
 | POST /warehouse/returns；POST /warehouse/returns/:id/post | return.receive | 实物验收与可售/隔离入库，独立于退款 |
 | GET /warehouse/pick-tasks；GET /warehouse/pick-tasks/:id | picking.read | 本仓队列与明细 |
 | POST /warehouse/pick-tasks/:id/claim | picking.claim | 领取到当前员工，防重复领取 |
@@ -244,3 +244,19 @@ Webhook 的应答结构与HTTP码遵循接入时官方渠道规范，不套普�
 `GET /health/live` 仅检查进程，`GET /health/ready` 检查数据库与必要配置，公网上不返回秘密或完整依赖连接串。版本前缀下也可代理健康检查；具体部署探针与应用保持一致。
 
 OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错误码、幂等与版本头说明；渠道回调单独描述。契约测试验证金额/枚举/权限/错误，与前端生成类型一致；接口文档存在不等于实现通过。
+
+## 2026-10-28 已实现：隔离与报损
+
+下列路径前缀为`/api/v1/warehouse/warehouses/:warehouseId`，逐次校验员工权限及仓库范围。GET用stock.read；admin/manager拥有新写权限，picker只读、rider拒绝。POST均需Origin、CSRF和UUID Idempotency-Key，严格字段白名单。
+
+| 方法/路径 | 输入及权限 | 结果 |
+|---|---|---|
+| GET stock-isolations；GET stock-isolations/:id | stock.read；列表skuId/cursor/limit | 隔离原数量与剩余、版本、原因、关联流水 |
+| POST stock-isolations | stock.isolate；positionId/quantity/version/reason | 立即增加blocked，不减少onHand |
+| GET stock-dispositions；GET stock-dispositions/:id | stock.read；列表可按skuId/isolationId筛选 | 不含成本的处置及审批事实 |
+| POST stock-dispositions | disposition.write；isolationId/kind/quantity/positionVersion/isolationVersion/reason | DRAFT；kind=RELEASE或DAMAGE，不预扣额度 |
+| POST stock-dispositions/:id/approve | disposition.approve；version/reason | 须非申请人，APPROVED |
+| POST stock-dispositions/:id/post | disposition.post；version | RELEASE只减blocked；DAMAGE另需physicalConfirmed=true和physicalEvidence，同减onHand与blocked |
+| POST stock-dispositions/:id/cancel | disposition.write；version/reason | DRAFT/APPROVED取消，不改库存 |
+
+列表UUID升序、默认20最多50。数量整数1..100000；原因/核验说明最多200字符。隔离/申请/审批/过账拒绝盘点冻结、核对暂停和账本差异。所有数量写先锁balance，再复核位置及隔离版本；快照变化409，取消旧单重建，不覆盖。解除在过账再次检查效期及启用库位；报损只消费自己隔离记录remaining，不消费预占或旧blocked。终态不可修改，原幂等键重试重放初次结果。详细错误与字段见0.5.0生成契约；取消可在冻结/暂停时执行但不解除任何暂停。
