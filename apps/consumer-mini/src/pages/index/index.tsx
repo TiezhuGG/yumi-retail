@@ -2,7 +2,8 @@ import { View, Text, Button, Input } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import { useState, useRef, useEffect } from 'react';
 import { request } from '../../api';
-import type { ProductPage, SaleSku } from '../../api';
+import type { ProductPage } from '../../api';
+import { createBrowseLoader, initialBrowseState } from '../../browse-loader';
 import { ProductVisual } from '../../components/ProductVisual';
 const themes = [
   { name: '全部好物', icon: '▦', keyword: '', tone: 'cream' },
@@ -11,40 +12,15 @@ const themes = [
   { name: '家居收纳', icon: '▣', keyword: '袋', tone: 'blue' },
 ];
 export default function Index() {
-  const [rows, setRows] = useState<SaleSku[]>([]),
-    [keyword, setKeyword] = useState(''),
-    [activeKeyword, setActiveKeyword] = useState(''),
-    [cursor, setCursor] = useState<string | null>(null),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [tab, setTab] = useState('home');
-  const sequence = useRef(0);
-  useEffect(
-    () => () => {
-      sequence.current++;
-    },
-    [],
-  );
-  async function load(search = activeKeyword, more = false) {
-    const token = ++sequence.current;
-    setBusy(true);
-    setError('');
-    if (!more) setRows([]);
-    try {
-      const result = await request<ProductPage>(
-        `/products?limit=20${search ? `&keyword=${encodeURIComponent(search)}` : ''}${more && cursor ? `&cursor=${cursor}` : ''}`,
-      );
-      if (token !== sequence.current) return;
-      setRows((old) => (more ? [...old, ...result.items] : result.items));
-      setCursor(result.nextCursor);
-      setActiveKeyword(search);
-    } catch (e) {
-      if (token === sequence.current)
-        setError(e instanceof Error ? e.message : '网络有点忙，请稍后再试');
-    } finally {
-      if (token === sequence.current) setBusy(false);
-    }
-  }
+  const [browse, setBrowse] = useState(initialBrowseState);
+  const [keyword, setKeyword] = useState('');
+  const [tab, setTab] = useState('home');
+  const loader = useRef<ReturnType<typeof createBrowseLoader> | null>(null);
+  if (!loader.current)
+    loader.current = createBrowseLoader((path) => request<ProductPage>(path), setBrowse);
+  const { rows, keyword: activeKeyword, cursor, busy, error } = browse;
+  const load = (search?: string, more = false) => loader.current!.load(search, more);
+  useEffect(() => () => loader.current?.cancel(), []);
   useDidShow(() => {
     void load();
   });
@@ -88,6 +64,7 @@ export default function Index() {
         </View>
       </View>
       <View className="store-content">
+        <Text className="browse-note">快捷找好物 · 按关键词查找，完整商品分类待开放</Text>
         <View className="theme-grid">
           {themes.map((t) => (
             <Button
@@ -152,7 +129,7 @@ export default function Index() {
           <View className="store-feedback">
             <Text>暂时没能加载商品</Text>
             <Text className="feedback-copy">{error}</Text>
-            <Button onClick={() => void load(keyword.trim())}>重新加载</Button>
+            <Button onClick={() => void loader.current!.retry()}>重新加载</Button>
           </View>
         )}
         {busy && !rows.length && (
@@ -233,7 +210,7 @@ export default function Index() {
           }}
         >
           <Text>▦</Text>
-          <Text>分类</Text>
+          <Text>找好物</Text>
         </Button>
         <Button onClick={() => upcoming('购物车')}>
           <Text>♧</Text>
