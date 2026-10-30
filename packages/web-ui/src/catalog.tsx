@@ -6,6 +6,7 @@ import { InventoryWorkbench } from './inventory.js';
 import { ReceiptWorkbench } from './receipts.js';
 import { usePage } from './use-page.js';
 import { Modal } from './modal.js';
+import { ProductEditor } from './product-editor.js';
 import { ProductArt } from './brand.js';
 import type { WorkspaceView } from './workspace.js';
 
@@ -37,6 +38,7 @@ export function CatalogWorkbench({
   allowedViews?: WorkspaceView[];
   onNavigate?: (view: WorkspaceView) => void;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [modal, setModal] = useState<'product' | 'category' | null>(null),
     [search, setSearch] = useState(''),
     [categoryFilter, setCategoryFilter] = useState(''),
@@ -104,6 +106,7 @@ export function CatalogWorkbench({
     setStatusFilter('');
     setMessage('');
     setModal(null);
+    setEditingId(null);
   }, [view]);
   async function action(path: string, body: unknown) {
     const signature = path + JSON.stringify(body);
@@ -478,21 +481,33 @@ export function CatalogWorkbench({
                       </td>
                       <td>
                         {i === 0 && can('catalog.write') ? (
-                          <button
-                            className="text-button"
-                            disabled={busy}
-                            onClick={() =>
-                              void work(async () => {
-                                await action(
-                                  `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
-                                  { version: p.version },
-                                );
-                                await productsPage();
-                              })
-                            }
-                          >
-                            {p.status === 'PUBLISHED' ? '下架' : '上架'}
-                          </button>
+                          <div className="surface-head-actions">
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() => {
+                                setMessage('');
+                                setEditingId(p.id);
+                              }}
+                            >
+                              编辑资料
+                            </button>
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() =>
+                                void work(async () => {
+                                  await action(
+                                    `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
+                                    { version: p.version },
+                                  );
+                                  await productsPage();
+                                })
+                              }
+                            >
+                              {p.status === 'PUBLISHED' ? '下架' : '上架'}
+                            </button>
+                          </div>
                         ) : (
                           <span>—</span>
                         )}
@@ -741,6 +756,28 @@ export function CatalogWorkbench({
             </div>
           )}
         </>
+      )}
+      {editingId && (
+        <ProductEditor
+          key={editingId}
+          id={editingId}
+          profile={profile}
+          onClose={() => setEditingId(null)}
+          onSaved={async () => {
+            setEditingId(null);
+            setFailed(false);
+            setMessage('该次商品修改已确认，正在读取当前列表…');
+            try {
+              await productsPage();
+              setMessage(
+                '该次商品修改已确认，列表已读取当前资料；当前筛选可能不包含改名后的商品。',
+              );
+            } catch {
+              setFailed(true);
+              setMessage('商品修改已确认，但列表刷新失败，请刷新列表核对当前资料。');
+            }
+          }}
+        />
       )}
       {modal && (
         <Modal

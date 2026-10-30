@@ -3,7 +3,7 @@ import { Prisma } from '@yumi/database';
 import type { createDatabase } from '@yumi/database';
 import { failure } from './http.js';
 import type { ApiRequest } from './http.js';
-import type { ProductInput, ReceiptInput } from './catalog-input.js';
+import type { ProductInput, ProductDetailsInput, ReceiptInput } from './catalog-input.js';
 
 type Database = ReturnType<typeof createDatabase>;
 type Tx = Prisma.TransactionClient;
@@ -116,6 +116,53 @@ export class CatalogService {
       });
       await this.audit(tx, request, 'PRODUCT_CREATE', row.id);
       return row;
+    });
+  }
+  updateProductDetails(request: ApiRequest, key: string, id: string, input: ProductDetailsInput) {
+    return this.write(request, 'PRODUCT_UPDATE_DETAILS', id, key, input, async (tx) => {
+      // The same product lock serializes edits with publish/unpublish.
+      await tx.$queryRaw`SELECT id FROM products WHERE id=${id}::uuid FOR UPDATE`;
+      const current = await tx.product.findUnique({ where: { id } });
+      if (!current) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不存在');
+      if (current.version !== input.version)
+        throw failure(409, 'VERSION_CONFLICT', '商品已被更新，请重新载入最新资料后编辑');
+      const category = await tx.category.findUnique({ where: { id: input.categoryId } });
+      if (category) {
+        const ids = [category.id, ...(category.parentId ? [category.parentId] : [])].sort();
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM categories WHERE id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`,
+        );
+      }
+      const target = await tx.category.findUnique({
+        where: { id: input.categoryId },
+        include: { parent: true },
+      });
+      if (!target?.enabled || target.parent?.enabled === false)
+        throw failure(400, 'VALIDATION_ERROR', '所选分类或父分类不可用，请选择启用的分类');
+      const result = await tx.product.update({
+        where: { id },
+        data: {
+          categoryId: input.categoryId,
+          name: input.name,
+          description: input.description,
+          version: { increment: 1 },
+        },
+        include: { skus: true },
+      });
+      const changed = ['name', 'categoryId', 'description'].filter(
+        (field) =>
+          current[field as 'name' | 'categoryId' | 'description'] !==
+          input[field as 'name' | 'categoryId' | 'description'],
+      );
+      await this.audit(
+        tx,
+        request,
+        'PRODUCT_UPDATE_DETAILS',
+        id,
+        null,
+        `version ${current.version}->${result.version}; fields ${changed.join(',') || 'none'}`,
+      );
+      return result;
     });
   }
   productAction(request: ApiRequest, key: string, id: string, version: number, publish: boolean) {

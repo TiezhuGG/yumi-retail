@@ -245,3 +245,7 @@ CHECK和触发器约束初始/迁移/终态、独立审批、非空核验、不�
 ## 2026-10-29 收货详情读模型说明
 
 本轮无表、列、索引或迁移变化。收货详情按warehouse_id和单据id查询inbound_receipts，联查inbound_lines及当前SKU/商品目录，仅供receipt.read员工；现有单据行数量、成本、批次、效期与历史流水不改。接口展示的商品名称/规格为当前目录资料，未新增名称快照字段，不将其声称为入库时历史名称。BigInt成本在既有金额边界内转换为JSON整数分；合计只在UI用整数分乘整数件计算。
+
+## 商品基本资料编辑（2026-10-30，无迁移）
+
+复用Product.name/category_id/description/version，UPDATE不包含status或SKU/库存字段。先锁Product并比对version，与上下架共享串行点；目标分类/父分类按ID共享锁后重读启用状态。成功版本+1，现有BusinessAudit action=PRODUCT_UPDATE_DETAILS，reason记录旧/新版本及字段名（现有varchar200）；不新增历史前后值表。现有幂等scope按员工/动作/商品，审计、商品版本/资料、首次结果同事务提交，晚期失败全回滚；旧键返回历史结果，最新资料另GET。表、列、索引和约束未变，无数据迁移；既有收货/库存事实不改。18项相关真实DB检查见[报告](../verification/S2-PRODUCT-DETAILS-2026-10-30.md)。

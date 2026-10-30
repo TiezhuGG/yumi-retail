@@ -81,6 +81,23 @@ export function productInput(value: unknown): ProductInput {
     skus,
   };
 }
+export interface ProductDetailsInput {
+  version: number;
+  categoryId: string;
+  name: string;
+  description: string;
+}
+export function productDetailsInput(value: unknown): ProductDetailsInput {
+  const b = fields(value, ['version', 'categoryId', 'name', 'description']);
+  if (typeof b.description !== 'string' || b.description.trim().length > 2000)
+    throw failure(400, 'VALIDATION_ERROR', '商品说明须为不超过2000字的文本');
+  return {
+    version: integer(b.version, 0, 2147483646),
+    categoryId: uuid(b.categoryId),
+    name: str(b.name, 120),
+    description: b.description.trim(),
+  };
+}
 export function receiptInput(value: unknown) {
   const b = fields(value, ['sourceRef', 'lines']);
   if (!Array.isArray(b.lines) || b.lines.length < 1 || b.lines.length > 50)

@@ -15,6 +15,7 @@ import {
   key,
   page,
   productInput,
+  productDetailsInput,
   receiptInput,
   str,
   uuid,
@@ -177,6 +178,36 @@ export class CatalogAdminController {
           include: { skus: true },
         }),
         limit,
+      ),
+    );
+  }
+  @Get('products/:id')
+  @Permissions('catalog.read')
+  @ApiOperation({ summary: '读取当前商品资料和版本，供编辑与刷新使用' })
+  @ApiResult(productSchema, [400, 401, 403, 404, 500])
+  async product(@Param('id') id: string, @Req() request: ApiRequest) {
+    const row = await this.service.db.product.findUnique({
+      where: { id: uuid(id) },
+      include: { skus: true },
+    });
+    if (!row) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不存在');
+    return success(request, jsonValue(row));
+  }
+  @Post('products/:id/update-details')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '编辑商品名称、分类和说明；保留状态与全部SKU/库存字段' })
+  @ApiBody({ schema: object({ version: int, categoryId: text, name: text, description: text }) })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async updateDetails(@Param('id') id: string, @Req() request: ApiRequest, @Body() body: unknown) {
+    return success(
+      request,
+      await this.service.updateProductDetails(
+        request,
+        key(request),
+        uuid(id),
+        productDetailsInput(body),
       ),
     );
   }

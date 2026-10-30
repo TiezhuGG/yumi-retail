@@ -28,6 +28,8 @@ Cookie名`yumi_staff_session`，Path=/api/v1，SameSite=Strict，HttpOnly；生�
 |---|---|---|
 | GET/POST /admin/categories | catalog.read / catalog.write | 最多两级分类，创建name/parentId |
 | GET/POST /admin/products | catalog.read / catalog.write | SPU含SKU；创建categoryId/name/description?/skus[] |
+| GET /admin/products/:id | catalog.read | 当前资料/SKU及version，供编辑加载与冲突恢复 |
+| POST /admin/products/:id/update-details | catalog.write；version/categoryId/name/description | 固定字段动作，同Product锁/版本/事务幂等；不接受status或SKU字段 |
 | POST /admin/products/:id/publish；.../unpublish | catalog.write，version | 专用上下架，不开放任意status赋值 |
 | GET/POST /warehouse/warehouses/:warehouseId/receipts | receipt.read / receipt.write + 范围 | 创建sourceRef、lines[skuId,batchNo,quantity,unitCostCents,producedAt?,expiresAt?]；拣货员无receipt.read，不能读取采购成本 |
 | GET /warehouse/warehouses/:warehouseId/receipts/:id | receipt.read + 本仓范围 | 完整单据及lines[].sku当前名称/规格/编码/单位/启用与效期标志；无权限拒绝，不向拣货员开放成本 |
@@ -174,7 +176,7 @@ stock响应新增activeCountId（可空）独立于inventoryHold。移位遇盘�
 |---|---|---|
 | POST /staff/auth/session；POST /staff/auth/logout | 员工身份 | Cookie会话；登录限流与审计 |
 | GET /staff/me | 员工 | 角色、仓库范围、权限点 |
-| GET/POST /admin/products；GET/PATCH /admin/products/:id | catalog.read/write | 商品与SKU、版本校验 |
+| GET/POST /admin/products；GET /admin/products/:id；POST /admin/products/:id/update-details | catalog.read/write | 商品与SKU、版本校验 |
 | POST /admin/products/:id/publish；POST /admin/products/:id/unpublish | catalog.publish | 检查资料与状态，保留历史订单 |
 | GET/POST /admin/categories；PATCH /admin/categories/:id | category.read/write | 两级限制、循环/引用保护 |
 | GET /admin/orders；GET /admin/orders/:id | order.read | 只查询授权仓库订单；脱敏策略 |
@@ -282,3 +284,7 @@ OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错
 新增GET收货详情，路径仓库与单据ID同时限定；未登录401、无receipt.read/仓库范围403、本仓找不到单据404、非法UUID400。lines[].sku为当前目录联查资料，包含name/code/spec/unit/enabled/expiryManaged，不是历史名称快照；批次、数量、unitCostCents及效期仍来自原收货行。金额经现有jsonValue规范转换为JSON整数分，时间为ISO日期字符串。GET不写库存或变更单据状态。
 
 创建/审核/过账接口和状态机未改；UI多行表单沿用1–50行、每SKU一批次的现有开发约束。前端核验勾选只用于提醒与防误触，不新增服务端body字段或独立员工要求。前端同窗口内对响应丢失保留原意图重试；完整跨重载恢复尚未验收。OpenAPI已从实际实现导出。
+
+## 商品基本资料编辑（已实现，2026-10-30）
+
+GET详情返回当前Product/SKU及version；POST update-details完整接受version、categoryId、name、description，名称trim后1–120、说明trim后0–2000且允许清空，严格拒绝status/skus/price等额外字段。catalog.write、Origin/CSRF/UUID幂等键必需；商品行锁与上下架串行，旧version为409 VERSION_CONFLICT；目标分类及父分类须启用，不可用400。成功保持原状态/SKU/库存，推进Product.version，事务内写PRODUCT_UPDATE_DETAILS审计及幂等结果。重复原键返回首次结果，界面再读列表/详情取得当前资料，不能把历史重放当作最新数据。审计reason仅记录版本和变化字段，不是完整历史快照。无迁移，见[交付报告](../verification/S2-PRODUCT-DETAILS-2026-10-30.md)。

@@ -51,6 +51,12 @@ export interface Product {
   version: number;
   skus: Sku[];
 }
+export interface ProductDetailsUpdate {
+  version: number;
+  categoryId: string;
+  name: string;
+  description: string;
+}
 export interface ReceiptLine {
   id: string;
   skuId: string;

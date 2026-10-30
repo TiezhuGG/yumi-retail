@@ -26,10 +26,24 @@ const input: CSSProperties = {
   marginTop: 6,
 };
 
+export class StaffRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 export async function staffRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api/v1${path}`, { ...init, credentials: 'same-origin' });
-  const body = (await response.json()) as { data: T; error?: { message?: string } };
-  if (!response.ok) throw new Error(body.error?.message ?? '请求未能完成，请稍后再试');
+  const body = (await response.json()) as { data: T; error?: { message?: string; code?: string } };
+  if (!response.ok)
+    throw new StaffRequestError(
+      body.error?.message ?? '请求未能完成，请稍后再试',
+      response.status,
+      body.error?.code,
+    );
   return body.data;
 }
 

@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-30",
+  "source": "local real API; synthetic development data",
+  "businessWrites": false,
+  "results": [
+    {
+      "role": "ADMIN",
+      "views": [
+        "◫工作台",
+        "▣商品管理",
+        "▤商品分类",
+        "▦库存总览",
+        "↓收货入库",
+        "⌘库位与核对",
+        "☑实物盘点",
+        "◇隔离与报损",
+        "↶收货纠错"
+      ],
+      "errors": 0,
+      "failedResponses": 0
+    },
+    {
+      "role": "WAREHOUSE",
+      "views": [
+        "◫工作台",
+        "▦库存总览",
+        "↓收货入库",
+        "⌘库位与核对",
+        "☑实物盘点",
+        "◇隔离与报损",
+        "↶收货纠错"
+      ],
+      "errors": 0,
+      "failedResponses": 0
+    },
+    {
+      "role": "RIDER",
+      "views": [],
+      "errors": 0,
+      "failedResponses": 0
+    }
+  ]
+}
