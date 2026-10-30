@@ -27,10 +27,18 @@ export interface Page<T> {
   nextCursor: string | null;
 }
 export interface Category {
+  version: number;
   id: string;
   name: string;
   parentId: string | null;
   enabled: boolean;
+}
+export interface CategoryDetail extends Category {
+  parent: Category | null;
+}
+export interface SkuSpecUpdate {
+  version: number;
+  spec: string;
 }
 export interface Sku {
   id: string;

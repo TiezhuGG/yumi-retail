@@ -147,6 +147,7 @@ model Category {
   name     String     @db.VarChar(80)
   parentId String?    @map("parent_id") @db.Uuid
   enabled  Boolean    @default(true)
+  version  Int        @default(0)
   parent   Category?  @relation("categoryTree", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   children Category[] @relation("categoryTree")
   products Product[]

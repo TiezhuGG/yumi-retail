@@ -6,6 +6,8 @@ import { InventoryWorkbench } from './inventory.js';
 import { ReceiptWorkbench } from './receipts.js';
 import { usePage } from './use-page.js';
 import { Modal } from './modal.js';
+import { CategoryEditor } from './category-editor.js';
+import { SkuSpecEditor } from './sku-spec-editor.js';
 import { SkuEditor } from './sku-editor.js';
 import { ProductEditor } from './product-editor.js';
 import { ProductArt } from './brand.js';
@@ -39,7 +41,9 @@ export function CatalogWorkbench({
   allowedViews?: WorkspaceView[];
   onNavigate?: (view: WorkspaceView) => void;
 }) {
+  const [editingSpec, setEditingSpec] = useState<{ id: string; skuId: string } | null>(null);
   const [editingSku, setEditingSku] = useState<{ id: string; skuId: string } | null>(null);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modal, setModal] = useState<'product' | 'category' | null>(null),
     [search, setSearch] = useState(''),
@@ -78,6 +82,16 @@ export function CatalogWorkbench({
     cursor ? stockData.next() : stockData.reload();
   const receiptsPage = (_id: string) =>
     Promise.all([receiptData.reload(), stockData.reload()]).then(() => {});
+  const categoryUsable = (category: Category) =>
+    category.enabled &&
+    (!category.parentId ||
+      categories.some((parent) => parent.id === category.parentId && parent.enabled));
+  const categoryHint = (id: string) => {
+    const category = categories.find((c) => c.id === id);
+    if (!category || (category.parentId && !categories.some((c) => c.id === category.parentId)))
+      return '分类资料未全部载入';
+    return categoryUsable(category) ? '' : '分类停用，顾客不可见';
+  };
   const skus = products.flatMap((p) => p.skus.map((s) => ({ ...s, name: p.name })));
   async function warehousesPage() {
     const token = ++warehouseRequest.current;
@@ -481,6 +495,7 @@ export function CatalogWorkbench({
                         <span className={`badge ${p.status === 'PUBLISHED' ? 'green' : 'amber'}`}>
                           {status[p.status]}
                         </span>
+                        {p.status === 'PUBLISHED' && <small>{categoryHint(p.categoryId)}</small>}
                       </td>
                       <td>
                         {can('catalog.write') ? (
@@ -494,6 +509,16 @@ export function CatalogWorkbench({
                               }}
                             >
                               售价与启停
+                            </button>
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() => {
+                                setMessage('');
+                                setEditingSpec({ id: p.id, skuId: s.id });
+                              }}
+                            >
+                              规格说明
                             </button>
                             {i === 0 && (
                               <>
@@ -594,6 +619,7 @@ export function CatalogWorkbench({
                   <th>所属分类</th>
                   <th>层级</th>
                   <th>状态</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -613,8 +639,33 @@ export function CatalogWorkbench({
                     <td>{c.parentId ? '二级分类' : '一级分类'}</td>
                     <td>
                       <span className={`badge ${c.enabled ? 'green' : ''}`}>
-                        {c.enabled ? '启用' : '停用'}
+                        {c.enabled ? '自身启用' : '自身停用'}
                       </span>
+                      {c.parentId && (
+                        <small>
+                          {!categories.some((p) => p.id === c.parentId)
+                            ? '父分类未载入，请继续加载分类'
+                            : categories.some((p) => p.id === c.parentId && !p.enabled)
+                              ? '父分类停用，顾客不可见'
+                              : '父分类已启用'}
+                        </small>
+                      )}
+                    </td>
+                    <td>
+                      {can('catalog.write') ? (
+                        <button
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() => {
+                            setMessage('');
+                            setEditingCategory(c.id);
+                          }}
+                        >
+                          维护分类
+                        </button>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -774,6 +825,45 @@ export function CatalogWorkbench({
           )}
         </>
       )}
+      {editingCategory && (
+        <CategoryEditor
+          id={editingCategory}
+          profile={profile}
+          onClose={() => setEditingCategory(null)}
+          onSaved={async () => {
+            setEditingCategory(null);
+            setFailed(false);
+            setMessage('分类操作已确认，正在读取当前列表…');
+            try {
+              await categoriesPage();
+              setMessage('分类操作已确认，列表已读取当前资料。');
+            } catch {
+              setFailed(true);
+              setMessage('分类操作已确认，但列表刷新失败，请刷新分类核对当前资料。');
+            }
+          }}
+        />
+      )}
+      {editingSpec && (
+        <SkuSpecEditor
+          id={editingSpec.id}
+          skuId={editingSpec.skuId}
+          profile={profile}
+          onClose={() => setEditingSpec(null)}
+          onSaved={async () => {
+            setEditingSpec(null);
+            setFailed(false);
+            setMessage('规格说明修改已确认，正在读取当前列表…');
+            try {
+              await productsPage();
+              setMessage('规格说明修改已确认，列表已读取当前资料。');
+            } catch {
+              setFailed(true);
+              setMessage('规格说明修改已确认，但列表刷新失败，请刷新列表核对当前资料。');
+            }
+          }}
+        />
+      )}
       {editingSku && (
         <SkuEditor
           id={editingSku.id}
@@ -901,13 +991,12 @@ export function CatalogWorkbench({
                     商品分类
                     <select name="categoryId" required>
                       <option value="">请选择分类</option>
-                      {categories
-                        .filter((c) => c.enabled)
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id} disabled={!categoryUsable(c)}>
+                          {c.name}
+                          {!categoryUsable(c) ? '（不可用或父分类未载入）' : ''}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <label>

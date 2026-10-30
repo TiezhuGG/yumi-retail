@@ -1079,3 +1079,440 @@ test('receipt posting versus SKU disabling serializes: posted stock is complete 
     }
   }
 });
+
+const categoryRoute = (c: Category, action: string) => `/admin/categories/${c.id}/${action}`;
+
+test('category maintenance validates version/fields/auth/CSRF and reads parent without changing hierarchy', async () => {
+  const parent = await ok<Category>('/admin/categories', { name: '分类父项' });
+  const c = await ok<Category>('/admin/categories', { name: '分类子项', parentId: parent.id });
+  assert.equal(c.version, 0);
+  await assert.rejects(db.category.update({ where: { id: c.id }, data: { version: -1 } }));
+  const route = categoryRoute(c, 'rename'),
+    body = { version: c.version, name: ' 新分类名 ' };
+  assert.equal((await call(route, { body })).status, 401);
+  assert.equal((await call(`/admin/categories/${c.id}`)).status, 401);
+  for (const actor of [1, 2, 3]) assert.equal((await call(route, { actor, body })).status, 403);
+  const detail = await ok<Category & { parent: Category }>(
+    `/admin/categories/${c.id}`,
+    undefined,
+    1,
+  );
+  assert.equal(detail.parent.id, parent.id);
+  assert.equal(detail.parent.version, 0);
+  assert.equal((await call(`/admin/categories/${randomUUID()}`, { actor: 0 })).status, 404);
+  assert.equal((await call('/admin/categories/bad-id', { actor: 0 })).status, 400);
+  for (const invalid of [
+    { ...body, name: ' ' },
+    { ...body, name: '长'.repeat(81) },
+    { ...body, version: -1 },
+    { ...body, version: 0.2 },
+    { ...body, parentId: null },
+    { ...body, enabled: false },
+  ])
+    assert.equal((await call(route, { actor: 0, body: invalid })).status, 400);
+  const response = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: {
+      Origin: 'http://127.0.0.1:5173',
+      Cookie: identities[0]!.cookie,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  assert.equal(response.status, 403);
+  const updated = await ok<Category>(route, body);
+  assert.equal(updated.name, '新分类名');
+  assert.equal(updated.parentId, parent.id);
+  assert.equal(updated.enabled, true);
+  assert.equal(updated.version, 1);
+  assert.equal((await call(route, { actor: 0, body })).error?.code, 'VERSION_CONFLICT');
+});
+
+test('category idempotency concurrent replay, later rename and disable retain current authority', async () => {
+  let c = await ok<Category>('/admin/categories', { name: '分类幂等' });
+  const route = categoryRoute(c, 'rename'),
+    key = randomUUID(),
+    body = { version: c.version, name: '首次分类名' };
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () => call<Category>(route, { actor: 0, body, key })),
+  );
+  assert(results.every((r) => r.status === 200 && r.data.version === 1));
+  assert.equal(
+    await db.businessAudit.count({ where: { resourceId: c.id, action: 'CATEGORY_RENAME' } }),
+    1,
+  );
+  c = await ok<Category>(route, { version: 1, name: '当前分类名' });
+  c = await ok<Category>(categoryRoute(c, 'disable'), { version: c.version });
+  assert.equal((await ok<Category>(route, body, 0, key)).name, '首次分类名');
+  const now = await ok<Category>(`/admin/categories/${c.id}`);
+  assert.equal(now.name, '当前分类名');
+  assert.equal(now.enabled, false);
+  assert.equal(
+    (await call(route, { actor: 0, body: { ...body, name: '同键改名' }, key })).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+  assert.equal(
+    (await call(categoryRoute(c, 'disable'), { actor: 0, body: { version: c.version } })).error
+      ?.code,
+    'INVALID_TRANSITION',
+  );
+});
+
+test('parent disable hides descendant products without rewriting children, products, SKUs, receipt or inventory', async () => {
+  let parent = await ok<Category>('/admin/categories', { name: '可见父分类' });
+  let child = await ok<Category>('/admin/categories', { name: '可见子分类', parentId: parent.id });
+  let p = await product();
+  p = await ok<Product>(
+    `/admin/products/${p.id}/update-details`,
+    detailsBody(p, { categoryId: child.id }),
+  );
+  const skuId = p.skus[0]!.id;
+  const receipt = await approve(await draft([line(skuId)]));
+  assert.equal((await post(receipt)).status, 200);
+  p = await publish(p);
+  const facts = async () => ({
+    product: await db.product.findUnique({ where: { id: p.id }, include: { skus: true } }),
+    child: await db.category.findUnique({ where: { id: child.id } }),
+    balances: await db.stockBalance.findMany({ where: { skuId } }),
+    lots: await db.stockLot.findMany({ where: { skuId } }),
+    positions: await db.stockPosition.findMany({ where: { skuId } }),
+    lines: await db.inboundLine.findMany({ where: { skuId } }),
+    ledgers: await db.stockLedger.findMany({ where: { skuId } }),
+  });
+  const before = await facts();
+  parent = await ok<Category>(categoryRoute(parent, 'disable'), { version: parent.version });
+  assert.equal((await visible(skuId)).status, 404);
+  assert.deepEqual(await facts(), before);
+  const listing = await call<Page<SaleSku>>(`/products?categoryId=${child.id}&limit=50`);
+  assert(!listing.data.items.some((s) => s.id === skuId));
+  assert.equal(
+    (
+      await call('/admin/categories', {
+        actor: 0,
+        body: { name: '被禁父级下新建', parentId: parent.id },
+      })
+    ).status,
+    400,
+  );
+  const newInput = {
+    categoryId: child.id,
+    name: '禁分类新商品',
+    skus: [
+      { code: `BLOCK-${run}`, spec: '1包', unit: '包', priceCents: 100, expiryManaged: false },
+    ],
+  };
+  assert.equal((await call('/admin/products', { actor: 0, body: newInput })).status, 400);
+  assert.equal(
+    (await call(`/admin/products/${p.id}/update-details`, { actor: 0, body: detailsBody(p) }))
+      .status,
+    400,
+  );
+  // Warehouse receipt operations depend on SKU, not catalog visibility.
+  assert.equal((await post(await approve(await draft([line(skuId)])))).status, 200);
+  child = await ok<Category>(categoryRoute(child, 'disable'), { version: child.version });
+  assert.equal(
+    (await call(categoryRoute(child, 'enable'), { actor: 0, body: { version: child.version } }))
+      .error?.code,
+    'PARENT_DISABLED',
+  );
+  parent = await ok<Category>(categoryRoute(parent, 'enable'), { version: parent.version });
+  assert.equal((await visible(skuId)).status, 404);
+  child = await ok<Category>(categoryRoute(child, 'enable'), { version: child.version });
+  assert.equal((await visible(skuId)).status, 200);
+  const renamed = await ok<Category>(categoryRoute(child, 'rename'), {
+    version: child.version,
+    name: '新子分类名',
+  });
+  assert.equal(renamed.parentId, parent.id);
+  assert.equal((await db.product.findUniqueOrThrow({ where: { id: p.id } })).version, p.version);
+  checks.push(
+    'category ancestor visibility, own child state, stock/cost preservation and warehouse independence',
+  );
+});
+
+test('category competing actions share version; parent disable and child enable serialize safely', async () => {
+  const c = await ok<Category>('/admin/categories', { name: '分类竞争' });
+  const result = await Promise.all([
+    call(categoryRoute(c, 'rename'), { actor: 0, body: { version: c.version, name: '竞争名' } }),
+    call(categoryRoute(c, 'disable'), { actor: 0, body: { version: c.version } }),
+  ]);
+  assert.deepEqual(result.map((r) => r.status).sort(), [200, 409]);
+  assert.equal(result.find((r) => r.status === 409)?.error?.code, 'VERSION_CONFLICT');
+  for (let i = 0; i < 4; i++) {
+    const parent = await ok<Category>('/admin/categories', { name: '父级竞争' });
+    let child = await ok<Category>('/admin/categories', { name: '子级竞争', parentId: parent.id });
+    child = await ok<Category>(categoryRoute(child, 'disable'), { version: 0 });
+    const [disabled, enabled] = await Promise.all([
+      call<Category>(categoryRoute(parent, 'disable'), { actor: 0, body: { version: 0 } }),
+      call<Category>(categoryRoute(child, 'enable'), {
+        actor: 0,
+        body: { version: child.version },
+      }),
+    ]);
+    assert.equal(disabled.status, 200);
+    assert([200, 409].includes(enabled.status));
+    if (enabled.status === 409) assert.equal(enabled.error?.code, 'PARENT_DISABLED');
+    assert.equal((await ok<Category>(`/admin/categories/${parent.id}`)).enabled, false);
+  }
+});
+
+test('category disable races with product creation/publication without deadlocks or invalid visibility', async () => {
+  for (let i = 0; i < 3; i++) {
+    const c = await ok<Category>('/admin/categories', { name: '商品分类竞争' });
+    let p = await product();
+    p = await ok<Product>(
+      `/admin/products/${p.id}/update-details`,
+      detailsBody(p, { categoryId: c.id }),
+    );
+    const [disabled, published, created] = await Promise.all([
+      call(categoryRoute(c, 'disable'), { actor: 0, body: { version: c.version } }),
+      call(`/admin/products/${p.id}/publish`, { actor: 0, body: { version: p.version } }),
+      call('/admin/products', {
+        actor: 0,
+        body: {
+          categoryId: c.id,
+          name: '并发新商品',
+          skus: [
+            {
+              code: `RACE-CAT-${run}-${i}`,
+              spec: '1包',
+              unit: '包',
+              priceCents: 100,
+              expiryManaged: false,
+            },
+          ],
+        },
+      }),
+    ]);
+    assert.equal(disabled.status, 200);
+    assert([200, 409].includes(published.status));
+    assert([200, 400].includes(created.status));
+    assert.equal((await visible(p.skus[0]!.id)).status, 404);
+  }
+});
+
+test('category late audit failure rolls back version/state and original key retries', async () => {
+  const c = await ok<Category>('/admin/categories', { name: '分类回滚' }),
+    key = randomUUID(),
+    route = categoryRoute(c, 'disable'),
+    body = { version: c.version };
+  await admin.query(
+    "CREATE FUNCTION fail_category_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='CATEGORY_DISABLE' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_category_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_category_audit()',
+  );
+  try {
+    assert.equal((await call(route, { actor: 0, body, key })).status, 500);
+    const now = await ok<Category>(`/admin/categories/${c.id}`);
+    assert.equal(now.enabled, true);
+    assert.equal(now.version, 0);
+    assert.equal(
+      await db.idempotencyRecord.count({
+        where: { scope: { endsWith: `:CATEGORY_DISABLE:${c.id}` } },
+      }),
+      0,
+    );
+  } finally {
+    await admin.query('DROP TRIGGER fail_category_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_category_audit()');
+  }
+  assert.equal((await ok<Category>(route, body, 0, key)).enabled, false);
+});
+
+test('SKU spec update validates auth, CSRF, ownership, strict text and immutable fields', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'update-spec'),
+    body = { version: p.version, spec: ' 1包装（说明更正） ' };
+  assert.equal((await call(route, { body })).status, 401);
+  for (const actor of [1, 2, 3]) assert.equal((await call(route, { actor, body })).status, 403);
+  for (const invalid of [
+    { ...body, spec: ' ' },
+    { ...body, spec: '长'.repeat(101) },
+    { ...body, spec: null },
+    { ...body, version: -1 },
+    { ...body, version: 1.2 },
+    { ...body, code: 'OTHER' },
+    { ...body, unit: '箱' },
+    { ...body, priceCents: 1 },
+    { ...body, enabled: false },
+    { ...body, expiryManaged: true },
+  ])
+    assert.equal((await call(route, { actor: 0, body: invalid })).status, 400);
+  const other = await product();
+  assert.equal(
+    (await call(skuRoute(p, 'update-spec', other.skus[0]!.id), { actor: 0, body })).status,
+    404,
+  );
+  assert.equal(
+    (await call(skuRoute(p, 'update-spec', randomUUID()), { actor: 0, body })).status,
+    404,
+  );
+  assert.equal(
+    (
+      await call(`/admin/products/${randomUUID()}/skus/${p.skus[0]!.id}/update-spec`, {
+        actor: 0,
+        body,
+      })
+    ).status,
+    404,
+  );
+  const response = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: {
+      Origin: 'http://127.0.0.1:5173',
+      Cookie: identities[0]!.cookie,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  assert.equal(response.status, 403);
+  const changed = await ok<Product>(route, body);
+  assert.equal(changed.skus[0]!.spec, '1包装（说明更正）');
+  assert.equal(changed.version, p.version + 1);
+  assert.equal((await call(route, { actor: 0, body })).error?.code, 'VERSION_CONFLICT');
+  const max = '长'.repeat(100);
+  assert.equal(
+    (await ok<Product>(route, { version: changed.version, spec: max })).skus[0]!.spec,
+    max,
+  );
+});
+
+test('published SKU spec display changes while stock, costs, units, other SKUs and status remain unchanged', async () => {
+  let p = await product();
+  const skuId = p.skus[0]!.id;
+  await db.sku.create({
+    data: {
+      id: randomUUID(),
+      productId: p.id,
+      code: `SPEC-SECOND-${run}`,
+      spec: '单件装',
+      unit: '件',
+      priceCents: 800,
+      expiryManaged: false,
+    },
+  });
+  const receipt = await approve(await draft([line(skuId)]));
+  assert.equal((await post(receipt)).status, 200);
+  p = await publish(await ok<Product>(`/admin/products/${p.id}`));
+  const facts = async () => ({
+    balances: await db.stockBalance.findMany({ where: { skuId } }),
+    lots: await db.stockLot.findMany({ where: { skuId } }),
+    positions: await db.stockPosition.findMany({ where: { skuId } }),
+    lines: await db.inboundLine.findMany({ where: { skuId } }),
+    ledgers: await db.stockLedger.findMany({ where: { skuId } }),
+    positionLedgers: await db.positionLedger.findMany({ where: { skuId } }),
+  });
+  const before = await facts(),
+    spec = '1包装（原包装，文字更正）';
+  const updated = await ok<Product>(skuRoute(p, 'update-spec', skuId), {
+    version: p.version,
+    spec,
+  });
+  assert.equal(updated.status, 'PUBLISHED');
+  assert.equal(updated.version, p.version + 1);
+  const expected = structuredClone(p);
+  expected.version++;
+  expected.skus.find((s) => s.id === skuId)!.spec = spec;
+  assert.deepEqual(updated, expected);
+  assert.deepEqual(await facts(), before);
+  const sale = await visible(skuId);
+  assert.equal(sale.data.spec, spec);
+  assert.equal(sale.data.priceCents, 450);
+  assert.equal(sale.data.available, 3);
+  const detail = await ok<
+    Receipt & { lines: Array<{ sku: { spec: string }; quantity: number; unitCostCents: number }> }
+  >(`/warehouse/warehouses/${receipt.warehouseId}/receipts/${receipt.id}`, undefined, 1);
+  assert.equal(detail.lines[0]!.sku.spec, spec);
+  assert.equal(detail.lines[0]!.quantity, 3);
+  assert.equal(detail.lines[0]!.unitCostCents, 200);
+  checks.push(
+    'SKU description changes current public/warehouse display only; identifiers, units, inventory and costs unchanged',
+  );
+});
+
+test('SKU spec idempotent replay, historical response, disabled editing and current authority', async () => {
+  let p = await product();
+  const key = randomUUID(),
+    route = skuRoute(p, 'update-spec'),
+    body = { version: p.version, spec: '1包装（说明一）' };
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () => call<Product>(route, { actor: 0, body, key })),
+  );
+  assert(results.every((r) => r.status === 200 && r.data.version === p.version + 1));
+  assert.equal(
+    await db.businessAudit.count({
+      where: { resourceId: p.skus[0]!.id, action: 'SKU_UPDATE_SPEC' },
+    }),
+    1,
+  );
+  p = await ok<Product>(route, { version: p.version + 1, spec: '1包装（说明二）' });
+  assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.spec, body.spec);
+  assert.equal((await ok<Product>(`/admin/products/${p.id}`)).skus[0]!.spec, '1包装（说明二）');
+  assert.equal(
+    (await call(route, { actor: 0, body: { ...body, spec: '同键改文' }, key })).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+  p = await ok<Product>(skuRoute(p, 'disable'), { version: p.version });
+  p = await ok<Product>(route, { version: p.version, spec: '1包装（停用时更正）' });
+  assert.equal(p.skus[0]!.enabled, false);
+  assert.equal(p.status, 'DRAFT');
+  assert.equal((await visible(p.skus[0]!.id)).status, 404);
+});
+
+test('SKU spec competes with price, enable state, product metadata and publishing on one version', async () => {
+  for (const competitor of ['price', 'disable', 'metadata', 'publish']) {
+    const p = await product();
+    const route =
+      competitor === 'price'
+        ? skuRoute(p, 'set-price')
+        : competitor === 'disable'
+          ? skuRoute(p, 'disable')
+          : `/admin/products/${p.id}/${competitor === 'metadata' ? 'update-details' : 'publish'}`;
+    const body =
+      competitor === 'price'
+        ? { version: p.version, priceCents: 99 }
+        : competitor === 'metadata'
+          ? detailsBody(p)
+          : { version: p.version };
+    const result = await Promise.all([
+      call(skuRoute(p, 'update-spec'), {
+        actor: 0,
+        body: { version: p.version, spec: '1包装（并发更正）' },
+      }),
+      call(route, { actor: 0, body }),
+    ]);
+    assert.deepEqual(result.map((r) => r.status).sort(), [200, 409]);
+    assert.equal(result.find((r) => r.status === 409)?.error?.code, 'VERSION_CONFLICT');
+    assert.equal((await ok<Product>(`/admin/products/${p.id}`)).version, p.version + 1);
+  }
+});
+
+test('late SKU spec audit failure rolls back text and version and original key retries', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'update-spec'),
+    key = randomUUID(),
+    body = { version: p.version, spec: '1包装（回滚验证）' };
+  await admin.query(
+    "CREATE FUNCTION fail_sku_spec_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='SKU_UPDATE_SPEC' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_sku_spec_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_sku_spec_audit()',
+  );
+  try {
+    assert.equal((await call(route, { actor: 0, body, key })).status, 500);
+    assert.deepEqual(await ok<Product>(`/admin/products/${p.id}`), p);
+    assert.equal(
+      await db.idempotencyRecord.count({
+        where: { scope: { endsWith: `:SKU_UPDATE_SPEC:${p.skus[0]!.id}` } },
+      }),
+      0,
+    );
+  } finally {
+    await admin.query('DROP TRIGGER fail_sku_spec_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_sku_spec_audit()');
+  }
+  assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.spec, body.spec);
+});

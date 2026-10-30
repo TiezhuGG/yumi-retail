@@ -80,6 +80,68 @@ export class CatalogService {
       throw error;
     }
   }
+  async lockCategoryTree(tx: Tx, id: string) {
+    const category = await tx.category.findUnique({ where: { id } });
+    if (category) {
+      const ids = [id, ...(category.parentId ? [category.parentId] : [])].sort();
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM categories WHERE id IN (${Prisma.join(ids.map((value) => Prisma.sql`${value}::uuid`))}) ORDER BY id FOR SHARE`,
+      );
+    }
+    return tx.category.findUnique({ where: { id }, include: { parent: true } });
+  }
+  categoryAction(
+    request: ApiRequest,
+    key: string,
+    id: string,
+    version: number,
+    action: 'RENAME' | 'ENABLE' | 'DISABLE',
+    name?: string,
+  ) {
+    return this.write(
+      request,
+      `CATEGORY_${action}`,
+      id,
+      key,
+      { version, ...(name === undefined ? {} : { name }) },
+      async (tx) => {
+        // Parent links are immutable in this slice. Stable lock order also matches
+        // product create/edit/publish, which hold shared category locks.
+        const initial = await tx.category.findUnique({ where: { id } });
+        if (!initial) throw failure(404, 'RESOURCE_NOT_FOUND', '分类不存在');
+        const ids = [id, ...(initial.parentId ? [initial.parentId] : [])].sort();
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM categories WHERE id IN (${Prisma.join(ids.map((value) => Prisma.sql`${value}::uuid`))}) ORDER BY id FOR UPDATE`,
+        );
+        const current = await tx.category.findUniqueOrThrow({
+          where: { id },
+          include: { parent: true },
+        });
+        if (current.version !== version)
+          throw failure(409, 'VERSION_CONFLICT', '分类已更新，请载入最新资料后重试');
+        if (action !== 'RENAME' && current.enabled === (action === 'ENABLE'))
+          throw failure(409, 'INVALID_TRANSITION', '分类已处于目标状态，请刷新核对');
+        if (action === 'ENABLE' && current.parent?.enabled === false)
+          throw failure(409, 'PARENT_DISABLED', '请先启用父分类');
+        const result = await tx.category.update({
+          where: { id },
+          data: {
+            ...(action === 'RENAME' ? { name } : { enabled: action === 'ENABLE' }),
+            version: { increment: 1 },
+          },
+        });
+        await this.audit(
+          tx,
+          request,
+          `CATEGORY_${action}`,
+          id,
+          null,
+          `version ${version}->${result.version}; ${action === 'RENAME' ? 'fields name' : `enabled ${current.enabled}->${result.enabled}`}`,
+        );
+        return result;
+      },
+    );
+  }
   createCategory(
     request: ApiRequest,
     key: string,
@@ -87,6 +149,7 @@ export class CatalogService {
   ) {
     return this.write(request, 'CATEGORY_CREATE', 'catalog', key, input, async (tx) => {
       if (input.parentId) {
+        await tx.$queryRaw`SELECT id FROM categories WHERE id=${input.parentId}::uuid FOR SHARE`;
         const parent = await tx.category.findUnique({ where: { id: input.parentId } });
         if (!parent?.enabled || parent.parentId)
           throw failure(400, 'VALIDATION_ERROR', '分类最多两级且父分类须启用');
@@ -98,10 +161,7 @@ export class CatalogService {
   }
   createProduct(request: ApiRequest, key: string, input: ProductInput) {
     return this.write(request, 'PRODUCT_CREATE', 'catalog', key, input, async (tx) => {
-      const category = await tx.category.findUnique({
-        where: { id: input.categoryId },
-        include: { parent: true },
-      });
+      const category = await this.lockCategoryTree(tx, input.categoryId);
       if (!category?.enabled || category.parent?.enabled === false)
         throw failure(400, 'VALIDATION_ERROR', '分类不可用');
       const row = await tx.product.create({
@@ -126,17 +186,7 @@ export class CatalogService {
       if (!current) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不存在');
       if (current.version !== input.version)
         throw failure(409, 'VERSION_CONFLICT', '商品已被更新，请重新载入最新资料后编辑');
-      const category = await tx.category.findUnique({ where: { id: input.categoryId } });
-      if (category) {
-        const ids = [category.id, ...(category.parentId ? [category.parentId] : [])].sort();
-        await tx.$queryRaw(
-          Prisma.sql`SELECT id FROM categories WHERE id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`,
-        );
-      }
-      const target = await tx.category.findUnique({
-        where: { id: input.categoryId },
-        include: { parent: true },
-      });
+      const target = await this.lockCategoryTree(tx, input.categoryId);
       if (!target?.enabled || target.parent?.enabled === false)
         throw failure(400, 'VALIDATION_ERROR', '所选分类或父分类不可用，请选择启用的分类');
       const result = await tx.product.update({
@@ -164,6 +214,46 @@ export class CatalogService {
       );
       return result;
     });
+  }
+  updateSkuSpec(
+    request: ApiRequest,
+    key: string,
+    id: string,
+    skuId: string,
+    input: { version: number; spec: string },
+  ) {
+    return this.write(
+      request,
+      'SKU_UPDATE_SPEC',
+      skuId,
+      key,
+      { productId: id, ...input },
+      async (tx) => {
+        // Same aggregate lock as other catalog mutations; no inventory writes.
+        await tx.$queryRaw`SELECT id FROM products WHERE id=${id}::uuid FOR UPDATE`;
+        const product = await tx.product.findUnique({ where: { id }, include: { skus: true } });
+        if (!product || !product.skus.some((s) => s.id === skuId))
+          throw failure(404, 'RESOURCE_NOT_FOUND', '商品或规格不存在');
+        if (product.version !== input.version)
+          throw failure(409, 'VERSION_CONFLICT', '商品已更新，请载入最新资料后重试');
+        await tx.$queryRaw`SELECT id FROM skus WHERE id=${skuId}::uuid FOR UPDATE`;
+        await tx.sku.update({ where: { id: skuId }, data: { spec: input.spec } });
+        const result = await tx.product.update({
+          where: { id },
+          data: { version: { increment: 1 } },
+          include: { skus: true },
+        });
+        await this.audit(
+          tx,
+          request,
+          'SKU_UPDATE_SPEC',
+          skuId,
+          null,
+          `product ${id}; version ${input.version}->${result.version}; fields spec`,
+        );
+        return result;
+      },
+    );
   }
   skuAction(
     request: ApiRequest,
@@ -235,11 +325,12 @@ export class CatalogService {
           include: { category: { include: { parent: true } }, skus: true },
         });
         if (!row) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不存在');
+        const category = publish ? await this.lockCategoryTree(tx, row.categoryId) : row.category;
         if (row.version !== version) throw failure(409, 'VERSION_CONFLICT', '商品已更新，请刷新');
         if (
           publish &&
-          (!row.category.enabled ||
-            row.category.parent?.enabled === false ||
+          (!category?.enabled ||
+            category.parent?.enabled === false ||
             !row.skus.some((s) => s.enabled))
         )
           throw failure(409, 'INVALID_TRANSITION', '分类或规格不可用');

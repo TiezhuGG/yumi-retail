@@ -51,6 +51,7 @@ const productSchema = object({
   skus: { type: 'array', items: skuSchema },
 });
 const categorySchema = object({
+  version: int,
   id: text,
   name: text,
   parentId: { type: 'string', nullable: true },
@@ -142,6 +143,72 @@ export class CatalogAdminController {
       ),
     );
   }
+  @Get('categories/:id')
+  @Permissions('catalog.read')
+  @ApiOperation({ summary: '读取当前分类、版本和父分类状态' })
+  @ApiResult(
+    object({ ...categorySchema.properties, parent: { ...categorySchema, nullable: true } }),
+    [400, 401, 403, 404, 500],
+  )
+  async category(@Param('id') id: string, @Req() request: ApiRequest) {
+    const row = await this.service.db.category.findUnique({
+      where: { id: uuid(id) },
+      include: { parent: true },
+    });
+    if (!row) throw failure(404, 'RESOURCE_NOT_FOUND', '分类不存在');
+    return success(request, row);
+  }
+  @Post('categories/:id/rename')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '修改分类名称，保持层级及启用状态' })
+  @ApiBody({ schema: object({ version: int, name: text }) })
+  @ApiResult(categorySchema, [400, 401, 403, 404, 409, 503, 500])
+  async renameCategory(@Param('id') id: string, @Req() request: ApiRequest, @Body() body: unknown) {
+    const b = fields(body, ['version', 'name']);
+    return success(
+      request,
+      await this.service.categoryAction(
+        request,
+        key(request),
+        uuid(id),
+        integer(b.version, 0, 2147483646),
+        'RENAME',
+        str(b.name, 80),
+      ),
+    );
+  }
+  @Post('categories/:id/enable')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '启用分类，父分类须已启用' })
+  @ApiBody({ schema: versionSchema })
+  @ApiResult(categorySchema, [400, 401, 403, 404, 409, 503, 500])
+  async enableCategory(@Param('id') id: string, @Req() request: ApiRequest, @Body() body: unknown) {
+    return success(
+      request,
+      await this.service.categoryAction(request, key(request), uuid(id), version(body), 'ENABLE'),
+    );
+  }
+  @Post('categories/:id/disable')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '停用分类，保留子分类自身状态、商品及库存' })
+  @ApiBody({ schema: versionSchema })
+  @ApiResult(categorySchema, [400, 401, 403, 404, 409, 503, 500])
+  async disableCategory(
+    @Param('id') id: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    return success(
+      request,
+      await this.service.categoryAction(request, key(request), uuid(id), version(body), 'DISABLE'),
+    );
+  }
   @Post('categories')
   @HttpCode(200)
   @Permissions('catalog.write')
@@ -210,6 +277,30 @@ export class CatalogAdminController {
         uuid(id),
         productDetailsInput(body),
       ),
+    );
+  }
+  @Post('products/:id/skus/:skuId/update-spec')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '更正规格展示文字，保留编码、单位、价格和库存' })
+  @ApiBody({
+    schema: object({ version: int, spec: { type: 'string', minLength: 1, maxLength: 100 } }),
+  })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async updateSkuSpec(
+    @Param('id') id: string,
+    @Param('skuId') skuId: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    const b = fields(body, ['version', 'spec']);
+    return success(
+      request,
+      await this.service.updateSkuSpec(request, key(request), uuid(id), uuid(skuId), {
+        version: integer(b.version, 0, 2147483646),
+        spec: str(b.spec, 100),
+      }),
     );
   }
   @Post('products/:id/skus/:skuId/set-price')

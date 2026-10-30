@@ -300,3 +300,22 @@ GET详情返回当前Product/SKU及version；POST update-details完整接受vers
 均需catalog.write、员工会话、可信Origin、X-CSRF-Token及UUID Idempotency-Key。严格拒绝多余字段；version为0–2147483646整数，priceCents为1–100000000整数分。id/skuId须UUID，规格必须属于路径商品，否则404。旧版本409 VERSION_CONFLICT；重复目标状态409 INVALID_TRANSITION；已上架最后一个启用规格停用409 LAST_ENABLED_SKU。停用后的公开详情404，目录排除；收货创建/过账409 SKU_DISABLED。新价不改变已记账成本。
 
 幂等范围员工/动作/SKU，请求摘要包括商品ID、版本和新售价；相同键不同内容409 IDEMPOTENCY_CONFLICT。成功重放返回首次结果（可能是历史版本），当前状态需GET /admin/products/:id。确认成功后UI关闭并重读列表；响应未知冻结原操作和键重试；冲突保留输入并提供明确覆盖载入。关闭窗口后未提供持久化提交意图恢复。API是增量兼容，无新权限/迁移，见实际openapi.json及[验证报告](../verification/S2-SKU-MAINTENANCE-2026-10-30.md)。
+
+## 分类维护增量（2026-10-30）
+
+| 方法/路径（/api/v1前缀） | 请求 | 结果 |
+|---|---|---|
+| GET /admin/categories/:id | catalog.read | 当前Category及parent（Category或null） |
+| POST /admin/categories/:id/rename | `{version,name}` | 当前Category，version+1 |
+| POST /admin/categories/:id/enable | `{version}` | 当前Category，version+1 |
+| POST /admin/categories/:id/disable | `{version}` | 当前Category，version+1 |
+
+新增Category.version（默认0）；列表/创建/详情均返回该字段，父分类不依赖列表分页载入。写接口需catalog.write、员工会话、可信Origin、CSRF及UUID Idempotency-Key，拒绝额外字段。version为0–2147483646整数；名称trim后1–80字。错误UUID400、不存在404、旧版本409 VERSION_CONFLICT、重复启停409 INVALID_TRANSITION、启用但父分类停用409 PARENT_DISABLED。同键不同内容409 IDEMPOTENCY_CONFLICT，503事务竞争可用原键原内容重试。只读角色不能维护；前端不要求用户填写内部ID/版本/键。
+
+幂等范围为员工/动作/分类，摘要含版本及新名称；重放返回首次结果，当前状态由GET核对。详情parent表示读取时父分类状态，父级停用不会推进子级version；服务端每次启用子级仍重新锁定/校验父级。停用不改写子级或Product，公开目录始终重新校验祖先enabled。响应未知时UI冻结原意图重试，版本/状态/父级冲突需显式载入；确认后列表刷新失败只提示核对，不继续提交。关闭窗口后没有持久化未知意图恢复。见[报告](../verification/S2-CATEGORY-MAINTENANCE-2026-10-30.md)及实际OpenAPI。
+
+## SKU规格说明接口（2026-10-30）
+
+POST `/api/v1/admin/products/:id/skus/:skuId/update-spec`，严格请求体 `{version,spec}`；version为0–2147483646整数，spec为trim后1–100字非空字符串。需要catalog.write、员工会话、可信Origin、X-CSRF-Token及UUID Idempotency-Key。编码、单位、售价、enabled、expiryManaged等多余字段拒绝400；UUID格式400、SKU不属于商品或商品/SKU不存在404、旧版本409 VERSION_CONFLICT。
+
+成功返回完整Product及SKUs、Product.version+1；其他属性保持原值。使用员工/SKU_UPDATE_SPEC/SKU幂等范围，摘要包括商品ID、version、spec；同键不同内容409 IDEMPOTENCY_CONFLICT，原键重放返回首次结果，当前值需GET /admin/products/:id。事务竞争503可原键原内容重试。响应未知冻结原内容重试，冲突显式载入；确认后重读列表，刷新失败不开放重复提交。关闭窗口后没有持久化未知意图恢复。现有公开和仓储读接口结构不变，仅spec值随更正更新。见[验证报告](../verification/S2-SKU-SPEC-2026-10-30.md)及实际OpenAPI。

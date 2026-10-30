@@ -255,3 +255,17 @@ CHECK和触发器约束初始/迁移/终态、独立审批、非空核验、不�
 本切片没有DDL/迁移。复用Sku.priceCents（整数分BigInt）/enabled及Product.version，不新增SKU版本。规格动作事务先Product FOR UPDATE，校验归属/版本，再Sku FOR UPDATE；商品资料和上下架也先取同一Product锁，保证最后启用规格规则和聚合版本串行。收货新建按已排序skuId加FOR SHARE再校验启用；过账沿用Sku FOR SHARE后校验启用，因此与停用串行。停用先提交则过账拒绝且库存不变，过账先完成则保留已入库事实，后续停用不追溯扣库。未引入Product/库存反向加锁依赖。
 
 SKU_SET_PRICE / SKU_ENABLE / SKU_DISABLE审计resourceId为SKU，reason包含商品ID、旧→新Product.version和旧→新整数售价/启用值（现有200字内），与目录变化、幂等结果同事务提交。库存汇总/批次/位置/账本、收货行成本不写；停用不是报损。历史审计及幂等不可变约束保留，没有补建完整字段历史表。既有客户端仍可读取原Product/SKU结构；旧页面动作可能因共享商品版本推进收到409，须刷新。
+
+## 分类版本与层级锁（2026-10-30）
+
+新增迁移202610300001_category_version：categories.version INTEGER NOT NULL DEFAULT 0，CHECK version>=0。已有分类以0起步，不重写名称、层级、enabled、商品或库存事实。Category接口增加version，CategoryDetail增加parent。发布顺序：停止旧API/Worker写入→应用迁移→生成Prisma并构建→启动新版；未迁移库不能先运行新Prisma客户端，HTTP旧读客户端可忽略额外字段。应用回退可保留该增量列，不应删除数据/审计作为回退。
+
+父分类关系本切片不可变。分类维护先读取父ID，再按UUID排序对自身和父分类FOR UPDATE，重读version/状态；只推进自身版本。商品创建、编辑目标分类及上架持Product锁（已有商品）后按相同UUID顺序FOR SHARE锁分类/父分类，重读enabled。分类动作不加Product锁，不引入类别→商品反向锁顺序；新建子分类也共享锁父分类后校验。父级停用与子级启用、商品创建/编辑/上架按事务次序串行，父级停用不自动更新子/商品状态。
+
+CATEGORY_RENAME / CATEGORY_ENABLE / CATEGORY_DISABLE审计以分类为resourceId；reason记录旧→新版本和字段名或旧→新启用值，不记录完整名称前后值历史。目录变化、版本、审计、幂等结果原子提交；库存和收货表不写入。名称仍非唯一，层级及外键约束保留。真实测试验证非负版本、幂等/竞争及晚期审计失败回滚。
+
+## SKU规格说明更正一致性（2026-10-30）
+
+沿用现有Sku.spec VARCHAR(100)，本轮无新模型、列、索引或迁移。已有分类version迁移仍为运行前置，不能运行新客户端到未迁移库。规格说明更正先Product FOR UPDATE，检查SKU归属及聚合version，再Sku FOR UPDATE，只写spec及Product.version+1；与售价/启停、商品资料/上下架共享锁顺序，其他SKU不写。库存、收货行、批次、位置、两级流水和成本均不更新；仓储读接口继续联查当前目录，不新增历史规格文字快照。
+
+审计SKU_UPDATE_SPEC的resourceId是SKU，reason含商品ID、旧→新版本及fields spec；不是完整文字前后值历史。目录变更、版本、审计及首次幂等结果同事务提交，晚期失败全回滚，原键可再试。没有单位换算/包装身份变更模型，接口只提供说明文字更正，不能自动判别自然语言中的实物差异。
