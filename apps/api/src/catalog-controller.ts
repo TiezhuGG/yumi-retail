@@ -12,6 +12,7 @@ import type { SchemaObject } from '@nestjs/swagger';
 import { CatalogService, jsonValue } from './catalog-service.js';
 import {
   fields,
+  skuBarcodeInput,
   integer,
   key,
   page,
@@ -31,6 +32,7 @@ const int: SchemaObject = { type: 'integer', minimum: 0 };
 const bool: SchemaObject = { type: 'boolean' };
 const nullableDate: SchemaObject = { type: 'string', format: 'date-time', nullable: true };
 const skuSchema = object({
+  barcode: { type: 'string', nullable: true },
   id: text,
   productId: text,
   code: text,
@@ -276,6 +278,40 @@ export class CatalogAdminController {
         key(request),
         uuid(id),
         productDetailsInput(body),
+      ),
+    );
+  }
+  @Post('products/:id/skus/:skuId/set-barcode')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '设置或清空SKU条码；全目录唯一，保留库存' })
+  @ApiBody({
+    schema: object({
+      version: int,
+      barcode: {
+        type: 'string',
+        nullable: true,
+        maxLength: 64,
+        description: '1–64位数字文本，空白或null清空；保留前导零',
+      },
+    }),
+  })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async setSkuBarcode(
+    @Param('id') id: string,
+    @Param('skuId') skuId: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    return success(
+      request,
+      await this.service.setSkuBarcode(
+        request,
+        key(request),
+        uuid(id),
+        uuid(skuId),
+        skuBarcodeInput(body),
       ),
     );
   }

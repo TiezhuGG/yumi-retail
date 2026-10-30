@@ -175,6 +175,7 @@ model Sku {
   id            String         @id @db.Uuid
   productId     String         @map("product_id") @db.Uuid
   code          String         @unique @db.VarChar(64)
+  barcode       String?        @unique @db.VarChar(64)
   spec          String         @db.VarChar(100)
   unit          String         @db.VarChar(16)
   priceCents    BigInt         @map("price_cents")

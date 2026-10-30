@@ -215,6 +215,53 @@ export class CatalogService {
       return result;
     });
   }
+  setSkuBarcode(
+    request: ApiRequest,
+    key: string,
+    id: string,
+    skuId: string,
+    input: { version: number; barcode: string | null },
+  ) {
+    return this.write(
+      request,
+      'SKU_SET_BARCODE',
+      skuId,
+      key,
+      { productId: id, ...input },
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM products WHERE id=${id}::uuid FOR UPDATE`;
+        const product = await tx.product.findUnique({ where: { id }, include: { skus: true } });
+        if (!product || !product.skus.some((s) => s.id === skuId))
+          throw failure(404, 'RESOURCE_NOT_FOUND', '商品或规格不存在');
+        if (product.version !== input.version)
+          throw failure(409, 'VERSION_CONFLICT', '商品已更新，请载入最新资料后重试');
+        await tx.$queryRaw`SELECT id FROM skus WHERE id=${skuId}::uuid FOR UPDATE`;
+        const old = product.skus.find((s) => s.id === skuId)!.barcode;
+        try {
+          await tx.sku.update({ where: { id: skuId }, data: { barcode: input.barcode } });
+        } catch (e) {
+          // The unique index resolves races across different product locks.
+          if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')
+            throw failure(409, 'BARCODE_IN_USE', '条码已绑定其他规格，请核对；停用规格也保留绑定');
+          throw e;
+        }
+        const result = await tx.product.update({
+          where: { id },
+          data: { version: { increment: 1 } },
+          include: { skus: true },
+        });
+        await this.audit(
+          tx,
+          request,
+          'SKU_SET_BARCODE',
+          skuId,
+          null,
+          `version ${input.version}->${result.version}; barcode ${old ?? 'null'}->${input.barcode ?? 'null'}`,
+        );
+        return result;
+      },
+    );
+  }
   updateSkuSpec(
     request: ApiRequest,
     key: string,

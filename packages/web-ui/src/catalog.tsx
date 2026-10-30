@@ -7,6 +7,7 @@ import { ReceiptWorkbench } from './receipts.js';
 import { usePage } from './use-page.js';
 import { Modal } from './modal.js';
 import { CategoryEditor } from './category-editor.js';
+import { SkuBarcodeEditor } from './sku-barcode-editor.js';
 import { SkuSpecEditor } from './sku-spec-editor.js';
 import { SkuEditor } from './sku-editor.js';
 import { ProductEditor } from './product-editor.js';
@@ -41,6 +42,7 @@ export function CatalogWorkbench({
   allowedViews?: WorkspaceView[];
   onNavigate?: (view: WorkspaceView) => void;
 }) {
+  const [editingBarcode, setEditingBarcode] = useState<{ id: string; skuId: string } | null>(null);
   const [editingSpec, setEditingSpec] = useState<{ id: string; skuId: string } | null>(null);
   const [editingSku, setEditingSku] = useState<{ id: string; skuId: string } | null>(null);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -191,7 +193,7 @@ export function CatalogWorkbench({
   const filteredProducts = products.filter(
     (p) =>
       (!search ||
-        [p.name, ...p.skus.map((s) => s.code)].some((s) =>
+        [p.name, ...p.skus.flatMap((s) => [s.code, s.barcode ?? ''])].some((s) =>
           s.toLowerCase().includes(search.toLowerCase()),
         )) &&
       (!categoryFilter || p.categoryId === categoryFilter) &&
@@ -420,7 +422,7 @@ export function CatalogWorkbench({
           <div className="toolbar">
             <input
               aria-label="搜索商品"
-              placeholder="搜索已载入商品名称、SKU编码…"
+              placeholder="搜索已载入商品名称、SKU编码、条码…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -489,6 +491,7 @@ export function CatalogWorkbench({
                         {s.spec}
                         {!s.enabled && <span className="badge amber">规格已停用</span>}
                         <small>{s.code}</small>
+                        <small>条码：{s.barcode ?? '未设置'}</small>
                       </td>
                       <td className="money">¥{currency(s.priceCents)}</td>
                       <td>
@@ -519,6 +522,16 @@ export function CatalogWorkbench({
                               }}
                             >
                               规格说明
+                            </button>
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() => {
+                                setMessage('');
+                                setEditingBarcode({ id: p.id, skuId: s.id });
+                              }}
+                            >
+                              条码
                             </button>
                             {i === 0 && (
                               <>
@@ -840,6 +853,26 @@ export function CatalogWorkbench({
             } catch {
               setFailed(true);
               setMessage('分类操作已确认，但列表刷新失败，请刷新分类核对当前资料。');
+            }
+          }}
+        />
+      )}
+      {editingBarcode && (
+        <SkuBarcodeEditor
+          id={editingBarcode.id}
+          skuId={editingBarcode.skuId}
+          profile={profile}
+          onClose={() => setEditingBarcode(null)}
+          onSaved={async () => {
+            setEditingBarcode(null);
+            setFailed(false);
+            setMessage('条码修改已确认，正在读取当前列表…');
+            try {
+              await productsPage();
+              setMessage('条码修改已确认，列表已读取当前资料；当前筛选可能不包含改码后的商品。');
+            } catch {
+              setFailed(true);
+              setMessage('条码修改已确认，但列表刷新失败，请刷新列表核对当前资料。');
             }
           }}
         />

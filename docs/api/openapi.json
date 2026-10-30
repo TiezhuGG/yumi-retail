@@ -3507,6 +3507,7 @@
                                 "items": {
                                   "type": "object",
                                   "required": [
+                                    "barcode",
                                     "id",
                                     "productId",
                                     "code",
@@ -3517,6 +3518,10 @@
                                     "enabled"
                                   ],
                                   "properties": {
+                                    "barcode": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
                                     "id": {
                                       "type": "string"
                                     },
@@ -3834,6 +3839,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -3844,6 +3850,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -4147,6 +4157,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -4157,6 +4168,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -4518,6 +4533,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -4528,6 +4544,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -4841,6 +4861,459 @@
         ]
       }
     },
+    "/api/v1/admin/products/{id}/skus/{skuId}/set-barcode": {
+      "post": {
+        "operationId": "CatalogAdminController_setSkuBarcode",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "skuId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "version",
+                  "barcode"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "barcode": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 64,
+                    "description": "1–64位数字文本，空白或null清空；保留前导零"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "categoryId",
+                        "name",
+                        "description",
+                        "status",
+                        "version",
+                        "createdAt",
+                        "skus"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "categoryId": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "skus": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "barcode",
+                              "id",
+                              "productId",
+                              "code",
+                              "spec",
+                              "unit",
+                              "priceCents",
+                              "expiryManaged",
+                              "enabled"
+                            ],
+                            "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "productId": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "spec": {
+                                "type": "string"
+                              },
+                              "unit": {
+                                "type": "string"
+                              },
+                              "priceCents": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "expiryManaged": {
+                                "type": "boolean"
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "summary": "设置或清空SKU条码；全目录唯一，保留库存",
+        "tags": [
+          "商品管理"
+        ]
+      }
+    },
     "/api/v1/admin/products/{id}/skus/{skuId}/update-spec": {
       "post": {
         "operationId": "CatalogAdminController_updateSkuSpec",
@@ -4965,6 +5438,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -4975,6 +5449,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -5412,6 +5890,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -5422,6 +5901,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -5853,6 +6336,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -5863,6 +6347,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -6294,6 +6782,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -6304,6 +6793,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -6727,6 +7220,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -6737,6 +7231,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -7122,6 +7620,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "barcode",
                               "id",
                               "productId",
                               "code",
@@ -7132,6 +7631,10 @@
                               "enabled"
                             ],
                             "properties": {
+                              "barcode": {
+                                "type": "string",
+                                "nullable": true
+                              },
                               "id": {
                                 "type": "string"
                               },

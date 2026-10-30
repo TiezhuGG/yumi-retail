@@ -269,3 +269,11 @@ CATEGORY_RENAME / CATEGORY_ENABLE / CATEGORY_DISABLE审计以分类为resourceId
 沿用现有Sku.spec VARCHAR(100)，本轮无新模型、列、索引或迁移。已有分类version迁移仍为运行前置，不能运行新客户端到未迁移库。规格说明更正先Product FOR UPDATE，检查SKU归属及聚合version，再Sku FOR UPDATE，只写spec及Product.version+1；与售价/启停、商品资料/上下架共享锁顺序，其他SKU不写。库存、收货行、批次、位置、两级流水和成本均不更新；仓储读接口继续联查当前目录，不新增历史规格文字快照。
 
 审计SKU_UPDATE_SPEC的resourceId是SKU，reason含商品ID、旧→新版本及fields spec；不是完整文字前后值历史。目录变更、版本、审计及首次幂等结果同事务提交，晚期失败全回滚，原键可再试。没有单位换算/包装身份变更模型，接口只提供说明文字更正，不能自动判别自然语言中的实物差异。
+
+## SKU条码列、唯一性与迁移（2026-10-30）
+
+新增迁移202610300002_sku_barcode：skus.barcode VARCHAR(64)可空，CHECK为null或1–64位ASCII数字，唯一索引skus_barcode_key。Prisma Sku.barcode String? @unique；不回填现有商品码，已有SKU均null，多行null允许。一个SKU一条码，停用行仍参与唯一索引；清空释放该绑定，但保留审计。当前不设跨时间永久不可复用规则、不设校验位算法或多码映射表。
+
+先停止旧API/Worker写入，应用增量迁移、生成Prisma并构建后启动新服务；未迁移库不能使用新客户端。额外可空字段对旧HTTP读客户端增量兼容；应用回退可保留列/索引，不通过删除绑定/审计回退。本机开发库已应用，其他环境仍需按序迁移。
+
+写事务顺序Product FOR UPDATE→SKU归属/版本校验→Sku FOR UPDATE，只写barcode及Product.version；唯一索引处理不同商品同时绑定同码，P2002映射BARCODE_IN_USE并全部回滚，不推进失败商品版本。已有售价/规格/启停等共享商品版本，旧表单409。SKU_SET_BARCODE审计resourceId为SKU，reason含旧→新版本及旧→新条码/null（64+64位及版本文案在200字内）；条码/版本/审计/幂等结果原子提交。幂等成功后即使绑定已清空/转给其他SKU，历史重放不再次执行更新。库存、收货、成本和两级流水不写。

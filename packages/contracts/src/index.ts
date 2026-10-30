@@ -40,7 +40,12 @@ export interface SkuSpecUpdate {
   version: number;
   spec: string;
 }
+export interface SkuBarcodeUpdate {
+  version: number;
+  barcode: string | null;
+}
 export interface Sku {
+  barcode: string | null;
   id: string;
   productId: string;
   code: string;

@@ -134,3 +134,13 @@ export function page(query: Record<string, unknown>) {
   integer(limit, 1, 50);
   return { limit, cursor: query.cursor === undefined ? undefined : uuid(query.cursor) };
 }
+
+export function skuBarcodeInput(value: unknown) {
+  const b = fields(value, ['version', 'barcode']);
+  if (b.barcode !== null && typeof b.barcode !== 'string')
+    throw failure(400, 'VALIDATION_ERROR', '条码须为文本或null');
+  const barcode = typeof b.barcode === 'string' ? b.barcode.trim() || null : null;
+  if (barcode !== null && !/^[0-9]{1,64}$/.test(barcode))
+    throw failure(400, 'VALIDATION_ERROR', '条码须为1–64位数字，空白表示清空');
+  return { version: integer(b.version, 0, 2147483646), barcode };
+}

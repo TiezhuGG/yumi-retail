@@ -319,3 +319,11 @@ GET详情返回当前Product/SKU及version；POST update-details完整接受vers
 POST `/api/v1/admin/products/:id/skus/:skuId/update-spec`，严格请求体 `{version,spec}`；version为0–2147483646整数，spec为trim后1–100字非空字符串。需要catalog.write、员工会话、可信Origin、X-CSRF-Token及UUID Idempotency-Key。编码、单位、售价、enabled、expiryManaged等多余字段拒绝400；UUID格式400、SKU不属于商品或商品/SKU不存在404、旧版本409 VERSION_CONFLICT。
 
 成功返回完整Product及SKUs、Product.version+1；其他属性保持原值。使用员工/SKU_UPDATE_SPEC/SKU幂等范围，摘要包括商品ID、version、spec；同键不同内容409 IDEMPOTENCY_CONFLICT，原键重放返回首次结果，当前值需GET /admin/products/:id。事务竞争503可原键原内容重试。响应未知冻结原内容重试，冲突显式载入；确认后重读列表，刷新失败不开放重复提交。关闭窗口后没有持久化未知意图恢复。现有公开和仓储读接口结构不变，仅spec值随更正更新。见[验证报告](../verification/S2-SKU-SPEC-2026-10-30.md)及实际OpenAPI。
+
+## SKU条码接口（2026-10-30）
+
+POST `/api/v1/admin/products/:id/skus/:skuId/set-barcode`，严格body `{version,barcode}`。version为0–2147483646整数；barcode必须为字符串或null且不能缺省，字符串trim后1–64位ASCII数字，空白规范化为null。数字JSON、内部空格、全角数字及其他字符拒绝400；保留字符串前导零。SKU必须属于路径商品，格式错误400，不存在/归属不符404。需要catalog.write、员工会话、可信Origin、X-CSRF-Token及UUID Idempotency-Key。
+
+成功返回完整Product及SKUs、Product.version+1，后台SKU增加可空barcode字段；公开SaleSku及收货详情读结构保持原样，不对顾客暴露新条码字段。旧版本409 VERSION_CONFLICT，其他SKU已绑定409 BARCODE_IN_USE（停用SKU仍占用），同键异内容409 IDEMPOTENCY_CONFLICT，事务竞争503可原键原内容重试。重复绑定竞争由数据库唯一索引保证，不以事先查询替代约束。
+
+幂等范围员工/SKU_SET_BARCODE/SKU，请求摘要包括商品ID、版本及规范化条码。清空后另一SKU复用时，重放旧成功请求只返回首次历史结果，不能重新绑定条码；当前状态由GET /admin/products/:id核对。UI确认后GET当前列表，响应未知冻结原内容及键重试，冲突明确载入；重复条码错误保留可编辑输入。关闭窗口不持久化未知意图。见[记录](../verification/S2-SKU-BARCODE-2026-10-30.md)及实际OpenAPI。

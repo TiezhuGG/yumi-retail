@@ -1516,3 +1516,242 @@ test('late SKU spec audit failure rolls back text and version and original key r
   }
   assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.spec, body.spec);
 });
+
+test('barcode validates auth/CSRF, ownership, strict string format, length and leading zeros', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-barcode'),
+    body = { version: p.version, barcode: ' 0012345678901 ' };
+  assert.equal(p.skus[0]!.barcode, null);
+  assert.equal((await call(route, { body })).status, 401);
+  for (const actor of [1, 2, 3]) assert.equal((await call(route, { actor, body })).status, 403);
+  for (const invalid of [
+    { ...body, barcode: 123456789 },
+    { ...body, barcode: '123 456' },
+    { ...body, barcode: 'abc' },
+    { ...body, barcode: '１２３' },
+    { ...body, barcode: '1'.repeat(65) },
+    { version: p.version },
+    { ...body, version: -1 },
+    { ...body, unit: '箱' },
+    { ...body, enabled: false },
+  ])
+    assert.equal((await call(route, { actor: 0, body: invalid })).status, 400);
+  const other = await product();
+  assert.equal(
+    (await call(skuRoute(p, 'set-barcode', other.skus[0]!.id), { actor: 0, body })).status,
+    404,
+  );
+  assert.equal(
+    (await call(skuRoute(p, 'set-barcode', randomUUID()), { actor: 0, body })).status,
+    404,
+  );
+  const response = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: {
+      Origin: 'http://127.0.0.1:5173',
+      Cookie: identities[0]!.cookie,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  assert.equal(response.status, 403);
+  let changed = await ok<Product>(route, body);
+  assert.equal(changed.skus[0]!.barcode, '0012345678901');
+  assert.equal(changed.version, 1);
+  changed = await ok<Product>(route, { version: changed.version, barcode: '9'.repeat(64) });
+  assert.equal(changed.skus[0]!.barcode!.length, 64);
+  changed = await ok<Product>(route, { version: changed.version, barcode: ' ' });
+  assert.equal(changed.skus[0]!.barcode, null);
+});
+
+test('barcode uniqueness races across products, disabled binding persists, clearing permits safe reuse', async () => {
+  const products = [await product(), await product()],
+    barcode = '0000000000042',
+    keys = [randomUUID(), randomUUID()];
+  const results = await Promise.all(
+    products.map((p, i) =>
+      call<Product>(skuRoute(p, 'set-barcode'), {
+        actor: 0,
+        key: keys[i]!,
+        body: { version: p.version, barcode },
+      }),
+    ),
+  );
+  assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+  const winner = results.findIndex((r) => r.status === 200),
+    loser = 1 - winner;
+  assert.equal(results[loser]!.error?.code, 'BARCODE_IN_USE');
+  const losing = products[loser]!,
+    winning = products[winner]!;
+  assert.equal((await ok<Product>(`/admin/products/${losing.id}`)).version, 0);
+  assert.equal(
+    await db.businessAudit.count({
+      where: { resourceId: losing.skus[0]!.id, action: 'SKU_SET_BARCODE' },
+    }),
+    0,
+  );
+  assert.equal(
+    await db.idempotencyRecord.count({
+      where: { scope: { endsWith: `:SKU_SET_BARCODE:${losing.skus[0]!.id}` } },
+    }),
+    0,
+  );
+  let current = results[winner]!.data;
+  current = await ok<Product>(skuRoute(current, 'disable'), { version: current.version });
+  assert.equal(
+    (
+      await call(skuRoute(losing, 'set-barcode'), {
+        actor: 0,
+        key: keys[loser]!,
+        body: { version: 0, barcode },
+      })
+    ).error?.code,
+    'BARCODE_IN_USE',
+  );
+  await ok<Product>(skuRoute(current, 'set-barcode'), {
+    version: current.version,
+    barcode: null,
+  });
+  const reused = await ok<Product>(
+    skuRoute(losing, 'set-barcode'),
+    { version: 0, barcode },
+    0,
+    keys[loser],
+  );
+  assert.equal(reused.skus[0]!.barcode, barcode);
+  // Historical replay must not steal a barcode since rebound to another SKU.
+  assert.equal(
+    (await ok<Product>(skuRoute(winning, 'set-barcode'), { version: 0, barcode }, 0, keys[winner]))
+      .skus[0]!.barcode,
+    barcode,
+  );
+  assert.equal((await ok<Product>(`/admin/products/${winning.id}`)).skus[0]!.barcode, null);
+  assert.equal((await ok<Product>(`/admin/products/${losing.id}`)).skus[0]!.barcode, barcode);
+});
+
+test('barcode changes leave product status, public data, SKU identity and all inventory/cost facts unchanged', async () => {
+  let p = await product();
+  const skuId = p.skus[0]!.id;
+  const receipt = await approve(await draft([line(skuId)]));
+  assert.equal((await post(receipt)).status, 200);
+  p = await publish(p);
+  const facts = async () => ({
+    balances: await db.stockBalance.findMany({ where: { skuId } }),
+    lots: await db.stockLot.findMany({ where: { skuId } }),
+    positions: await db.stockPosition.findMany({ where: { skuId } }),
+    lines: await db.inboundLine.findMany({ where: { skuId } }),
+    ledgers: await db.stockLedger.findMany({ where: { skuId } }),
+    positionLedgers: await db.positionLedger.findMany({ where: { skuId } }),
+  });
+  const before = await facts(),
+    publicBefore = await visible(skuId);
+  const updated = await ok<Product>(skuRoute(p, 'set-barcode'), {
+    version: p.version,
+    barcode: '0000000123456',
+  });
+  const expected = structuredClone(p);
+  expected.version++;
+  expected.skus[0]!.barcode = '0000000123456';
+  assert.deepEqual(updated, expected);
+  assert.deepEqual(await facts(), before);
+  assert.deepEqual((await visible(skuId)).data, publicBefore.data);
+  const cleared = await ok<Product>(skuRoute(updated, 'set-barcode'), {
+    version: updated.version,
+    barcode: null,
+  });
+  assert.equal(cleared.skus[0]!.barcode, null);
+  assert.equal(cleared.status, 'PUBLISHED');
+  assert.deepEqual(await facts(), before);
+  checks.push(
+    'barcode binding/clearing preserve public data, units, inventory and historical costs',
+  );
+});
+
+test('barcode idempotent concurrency replays once and differing content is rejected', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-barcode'),
+    key = randomUUID(),
+    body = { version: 0, barcode: '0000000000099' };
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () => call<Product>(route, { actor: 0, key, body })),
+  );
+  assert(results.every((r) => r.status === 200 && r.data.version === 1));
+  assert.equal(
+    await db.businessAudit.count({
+      where: { resourceId: p.skus[0]!.id, action: 'SKU_SET_BARCODE' },
+    }),
+    1,
+  );
+  assert.equal(
+    (await call(route, { actor: 0, key, body: { ...body, barcode: null } })).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+  assert.equal((await call(route, { actor: 0, body })).error?.code, 'VERSION_CONFLICT');
+});
+
+test('barcode and SKU spec/price/disable/product publication share product version', async () => {
+  for (const competitor of ['spec', 'price', 'disable', 'publish']) {
+    const p = await product(),
+      route =
+        competitor === 'publish'
+          ? `/admin/products/${p.id}/publish`
+          : skuRoute(
+              p,
+              competitor === 'spec'
+                ? 'update-spec'
+                : competitor === 'price'
+                  ? 'set-price'
+                  : 'disable',
+            );
+    const body =
+      competitor === 'spec'
+        ? { version: 0, spec: '1包装（同规格）' }
+        : competitor === 'price'
+          ? { version: 0, priceCents: 101 }
+          : { version: 0 };
+    const result = await Promise.all([
+      call(skuRoute(p, 'set-barcode'), {
+        actor: 0,
+        body: {
+          version: 0,
+          barcode: `99999${['spec', 'price', 'disable', 'publish'].indexOf(competitor)}`,
+        },
+      }),
+      call(route, { actor: 0, body }),
+    ]);
+    assert.deepEqual(result.map((r) => r.status).sort(), [200, 409]);
+    assert.equal(result.find((r) => r.status === 409)?.error?.code, 'VERSION_CONFLICT');
+  }
+});
+
+test('barcode database constraints and late audit failure roll back binding/version before original-key retry', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-barcode'),
+    key = randomUUID(),
+    body = { version: 0, barcode: '0000000011111' };
+  await assert.rejects(db.sku.update({ where: { id: p.skus[0]!.id }, data: { barcode: '' } }));
+  await assert.rejects(
+    db.sku.update({ where: { id: p.skus[0]!.id }, data: { barcode: 'not-digits' } }),
+  );
+  await admin.query(
+    "CREATE FUNCTION fail_barcode_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='SKU_SET_BARCODE' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_barcode_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_barcode_audit()',
+  );
+  try {
+    assert.equal((await call(route, { actor: 0, key, body })).status, 500);
+    assert.deepEqual(await ok<Product>(`/admin/products/${p.id}`), p);
+    assert.equal(
+      await db.idempotencyRecord.count({
+        where: { scope: { endsWith: `:SKU_SET_BARCODE:${p.skus[0]!.id}` } },
+      }),
+      0,
+    );
+  } finally {
+    await admin.query('DROP TRIGGER fail_barcode_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_barcode_audit()');
+  }
+  assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.barcode, body.barcode);
+});
