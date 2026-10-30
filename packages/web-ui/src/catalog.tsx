@@ -6,6 +6,7 @@ import { InventoryWorkbench } from './inventory.js';
 import { ReceiptWorkbench } from './receipts.js';
 import { usePage } from './use-page.js';
 import { Modal } from './modal.js';
+import { SkuEditor } from './sku-editor.js';
 import { ProductEditor } from './product-editor.js';
 import { ProductArt } from './brand.js';
 import type { WorkspaceView } from './workspace.js';
@@ -38,6 +39,7 @@ export function CatalogWorkbench({
   allowedViews?: WorkspaceView[];
   onNavigate?: (view: WorkspaceView) => void;
 }) {
+  const [editingSku, setEditingSku] = useState<{ id: string; skuId: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modal, setModal] = useState<'product' | 'category' | null>(null),
     [search, setSearch] = useState(''),
@@ -471,6 +473,7 @@ export function CatalogWorkbench({
                       <td>{categories.find((c) => c.id === p.categoryId)?.name ?? '未载入分类'}</td>
                       <td>
                         {s.spec}
+                        {!s.enabled && <span className="badge amber">规格已停用</span>}
                         <small>{s.code}</small>
                       </td>
                       <td className="money">¥{currency(s.priceCents)}</td>
@@ -480,33 +483,47 @@ export function CatalogWorkbench({
                         </span>
                       </td>
                       <td>
-                        {i === 0 && can('catalog.write') ? (
+                        {can('catalog.write') ? (
                           <div className="surface-head-actions">
                             <button
                               className="text-button"
                               disabled={busy}
                               onClick={() => {
                                 setMessage('');
-                                setEditingId(p.id);
+                                setEditingSku({ id: p.id, skuId: s.id });
                               }}
                             >
-                              编辑资料
+                              售价与启停
                             </button>
-                            <button
-                              className="text-button"
-                              disabled={busy}
-                              onClick={() =>
-                                void work(async () => {
-                                  await action(
-                                    `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
-                                    { version: p.version },
-                                  );
-                                  await productsPage();
-                                })
-                              }
-                            >
-                              {p.status === 'PUBLISHED' ? '下架' : '上架'}
-                            </button>
+                            {i === 0 && (
+                              <>
+                                <button
+                                  className="text-button"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setMessage('');
+                                    setEditingId(p.id);
+                                  }}
+                                >
+                                  编辑资料
+                                </button>
+                                <button
+                                  className="text-button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void work(async () => {
+                                      await action(
+                                        `/admin/products/${p.id}/${p.status === 'PUBLISHED' ? 'unpublish' : 'publish'}`,
+                                        { version: p.version },
+                                      );
+                                      await productsPage();
+                                    })
+                                  }
+                                >
+                                  {p.status === 'PUBLISHED' ? '下架' : '上架'}
+                                </button>
+                              </>
+                            )}
                           </div>
                         ) : (
                           <span>—</span>
@@ -756,6 +773,26 @@ export function CatalogWorkbench({
             </div>
           )}
         </>
+      )}
+      {editingSku && (
+        <SkuEditor
+          id={editingSku.id}
+          skuId={editingSku.skuId}
+          profile={profile}
+          onClose={() => setEditingSku(null)}
+          onSaved={async () => {
+            setEditingSku(null);
+            setFailed(false);
+            setMessage('该次规格操作已确认，正在读取当前列表…');
+            try {
+              await productsPage();
+              setMessage('规格操作已确认，列表已读取当前资料。');
+            } catch {
+              setFailed(true);
+              setMessage('规格操作已确认，但列表刷新失败，请刷新列表核对当前资料。');
+            }
+          }}
+        />
       )}
       {editingId && (
         <ProductEditor

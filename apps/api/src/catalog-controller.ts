@@ -12,6 +12,7 @@ import type { SchemaObject } from '@nestjs/swagger';
 import { CatalogService, jsonValue } from './catalog-service.js';
 import {
   fields,
+  integer,
   key,
   page,
   productInput,
@@ -208,6 +209,88 @@ export class CatalogAdminController {
         key(request),
         uuid(id),
         productDetailsInput(body),
+      ),
+    );
+  }
+  @Post('products/:id/skus/:skuId/set-price')
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiOperation({ summary: '设置规格售价（整数分），使用商品聚合版本' })
+  @ApiBody({
+    schema: object({
+      version: int,
+      priceCents: { type: 'integer', minimum: 1, maximum: 100000000 },
+    }),
+  })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async setSkuPrice(
+    @Param('id') id: string,
+    @Param('skuId') skuId: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    const b = fields(body, ['version', 'priceCents']);
+    return success(
+      request,
+      await this.service.skuAction(
+        request,
+        key(request),
+        uuid(id),
+        uuid(skuId),
+        integer(b.version, 0, 2147483646),
+        'SET_PRICE',
+        integer(b.priceCents, 1, 100000000),
+      ),
+    );
+  }
+  @Post('products/:id/skus/:skuId/enable')
+  @ApiOperation({ summary: '启用规格，保持商品上架状态不变' })
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiBody({ schema: versionSchema })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async enableSku(
+    @Param('id') id: string,
+    @Param('skuId') skuId: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    return success(
+      request,
+      await this.service.skuAction(
+        request,
+        key(request),
+        uuid(id),
+        uuid(skuId),
+        version(body),
+        'ENABLE',
+      ),
+    );
+  }
+  @Post('products/:id/skus/:skuId/disable')
+  @ApiOperation({ summary: '停用规格；已上架商品须保留至少一个启用规格' })
+  @HttpCode(200)
+  @Permissions('catalog.write')
+  @actionHeaders()
+  @ApiBody({ schema: versionSchema })
+  @ApiResult(productSchema, [400, 401, 403, 404, 409, 503, 500])
+  async disableSku(
+    @Param('id') id: string,
+    @Param('skuId') skuId: string,
+    @Req() request: ApiRequest,
+    @Body() body: unknown,
+  ) {
+    return success(
+      request,
+      await this.service.skuAction(
+        request,
+        key(request),
+        uuid(id),
+        uuid(skuId),
+        version(body),
+        'DISABLE',
       ),
     );
   }

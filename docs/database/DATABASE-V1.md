@@ -249,3 +249,9 @@ CHECK和触发器约束初始/迁移/终态、独立审批、非空核验、不�
 ## 商品基本资料编辑（2026-10-30，无迁移）
 
 复用Product.name/category_id/description/version，UPDATE不包含status或SKU/库存字段。先锁Product并比对version，与上下架共享串行点；目标分类/父分类按ID共享锁后重读启用状态。成功版本+1，现有BusinessAudit action=PRODUCT_UPDATE_DETAILS，reason记录旧/新版本及字段名（现有varchar200）；不新增历史前后值表。现有幂等scope按员工/动作/商品，审计、商品版本/资料、首次结果同事务提交，晚期失败全回滚；旧键返回历史结果，最新资料另GET。表、列、索引和约束未变，无数据迁移；既有收货/库存事实不改。18项相关真实DB检查见[报告](../verification/S2-PRODUCT-DETAILS-2026-10-30.md)。
+
+## SKU维护并发与兼容性（2026-10-30）
+
+本切片没有DDL/迁移。复用Sku.priceCents（整数分BigInt）/enabled及Product.version，不新增SKU版本。规格动作事务先Product FOR UPDATE，校验归属/版本，再Sku FOR UPDATE；商品资料和上下架也先取同一Product锁，保证最后启用规格规则和聚合版本串行。收货新建按已排序skuId加FOR SHARE再校验启用；过账沿用Sku FOR SHARE后校验启用，因此与停用串行。停用先提交则过账拒绝且库存不变，过账先完成则保留已入库事实，后续停用不追溯扣库。未引入Product/库存反向加锁依赖。
+
+SKU_SET_PRICE / SKU_ENABLE / SKU_DISABLE审计resourceId为SKU，reason包含商品ID、旧→新Product.version和旧→新整数售价/启用值（现有200字内），与目录变化、幂等结果同事务提交。库存汇总/批次/位置/账本、收货行成本不写；停用不是报损。历史审计及幂等不可变约束保留，没有补建完整字段历史表。既有客户端仍可读取原Product/SKU结构；旧页面动作可能因共享商品版本推进收到409，须刷新。

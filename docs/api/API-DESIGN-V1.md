@@ -288,3 +288,15 @@ OpenAPI 需包含所有业务接口、权限要求、DTO、枚举、分页、错
 ## 商品基本资料编辑（已实现，2026-10-30）
 
 GET详情返回当前Product/SKU及version；POST update-details完整接受version、categoryId、name、description，名称trim后1–120、说明trim后0–2000且允许清空，严格拒绝status/skus/price等额外字段。catalog.write、Origin/CSRF/UUID幂等键必需；商品行锁与上下架串行，旧version为409 VERSION_CONFLICT；目标分类及父分类须启用，不可用400。成功保持原状态/SKU/库存，推进Product.version，事务内写PRODUCT_UPDATE_DETAILS审计及幂等结果。重复原键返回首次结果，界面再读列表/详情取得当前资料，不能把历史重放当作最新数据。审计reason仅记录版本和变化字段，不是完整历史快照。无迁移，见[交付报告](../verification/S2-PRODUCT-DETAILS-2026-10-30.md)。
+
+## SKU售价及启停增量（2026-10-30）
+
+| 方法/路径（/api/v1前缀） | 请求体 | 结果 |
+|---|---|---|
+| POST /admin/products/:id/skus/:skuId/set-price | `{version,priceCents}` | 完整Product及SKU，version+1 |
+| POST /admin/products/:id/skus/:skuId/enable | `{version}` | 同上，保持商品状态 |
+| POST /admin/products/:id/skus/:skuId/disable | `{version}` | 同上，保持商品状态 |
+
+均需catalog.write、员工会话、可信Origin、X-CSRF-Token及UUID Idempotency-Key。严格拒绝多余字段；version为0–2147483646整数，priceCents为1–100000000整数分。id/skuId须UUID，规格必须属于路径商品，否则404。旧版本409 VERSION_CONFLICT；重复目标状态409 INVALID_TRANSITION；已上架最后一个启用规格停用409 LAST_ENABLED_SKU。停用后的公开详情404，目录排除；收货创建/过账409 SKU_DISABLED。新价不改变已记账成本。
+
+幂等范围员工/动作/SKU，请求摘要包括商品ID、版本和新售价；相同键不同内容409 IDEMPOTENCY_CONFLICT。成功重放返回首次结果（可能是历史版本），当前状态需GET /admin/products/:id。确认成功后UI关闭并重读列表；响应未知冻结原操作和键重试；冲突保留输入并提供明确覆盖载入。关闭窗口后未提供持久化提交意图恢复。API是增量兼容，无新权限/迁移，见实际openapi.json及[验证报告](../verification/S2-SKU-MAINTENANCE-2026-10-30.md)。

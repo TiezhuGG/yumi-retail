@@ -837,3 +837,245 @@ test('late edit audit failure rolls back metadata/version and retrying the origi
     'product edit audit and idempotency commit atomically, including late-failure rollback',
   );
 });
+
+const skuRoute = (p: Product, action: string, skuId = p.skus[0]!.id) =>
+  `/admin/products/${p.id}/skus/${skuId}/${action}`;
+
+test('SKU price strict cents, authorization, scope and aggregate version', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-price'),
+    body = { version: p.version, priceCents: 29 };
+  assert.equal((await call(route, { body })).status, 401);
+  for (const actor of [1, 2, 3]) assert.equal((await call(route, { actor, body })).status, 403);
+  for (const priceCents of [0, -1, 0.29, 100000001, '29', null])
+    assert.equal((await call(route, { actor: 0, body: { ...body, priceCents } })).status, 400);
+  for (const invalid of [
+    { ...body, enabled: false },
+    { ...body, version: -1 },
+    { ...body, version: 0.1 },
+    { ...body, code: 'OTHER' },
+  ])
+    assert.equal((await call(route, { actor: 0, body: invalid })).status, 400);
+  const other = await product();
+  assert.equal(
+    (await call(skuRoute(p, 'set-price', other.skus[0]!.id), { actor: 0, body })).status,
+    404,
+  );
+  assert.equal(
+    (await call(skuRoute(p, 'set-price', randomUUID()), { actor: 0, body })).status,
+    404,
+  );
+  const response = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: {
+      Origin: 'http://127.0.0.1:5173',
+      Cookie: identities[0]!.cookie,
+      'Content-Type': 'application/json',
+      'Idempotency-Key': randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  assert.equal(response.status, 403);
+  const saved = await ok<Product>(route, body);
+  assert.equal(saved.skus[0]!.priceCents, 29);
+  assert.equal(saved.version, p.version + 1);
+  assert.equal(saved.status, 'DRAFT');
+  assert.equal((await call(route, { actor: 0, body })).error?.code, 'VERSION_CONFLICT');
+  assert.equal(
+    (await ok<Product>(route, { version: saved.version, priceCents: 100000000 })).skus[0]!
+      .priceCents,
+    100000000,
+  );
+});
+
+test('SKU idempotent replay does not overwrite later price and audit is once', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-price'),
+    key = randomUUID(),
+    body = { version: p.version, priceCents: 719 };
+  const responses = await Promise.all(
+    Array.from({ length: 8 }, () => call<Product>(route, { actor: 0, body, key })),
+  );
+  assert(responses.every((r) => r.status === 200 && r.data.version === p.version + 1));
+  assert.equal(
+    await db.businessAudit.count({ where: { resourceId: p.skus[0]!.id, action: 'SKU_SET_PRICE' } }),
+    1,
+  );
+  const newer = await ok<Product>(route, { version: p.version + 1, priceCents: 299 });
+  assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.priceCents, 719);
+  assert.equal(
+    (await ok<Product>(`/admin/products/${p.id}`)).skus[0]!.priceCents,
+    newer.skus[0]!.priceCents,
+  );
+  assert.equal(
+    (await call(route, { actor: 0, body: { ...body, priceCents: 720 }, key })).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+});
+
+test('SKU disable hides public SKU, prevents receipt create/post, retains all stock and cost facts', async () => {
+  let p = await product();
+  const skuId = p.skus[0]!.id;
+  const receipt = await approve(await draft([line(skuId)]));
+  assert.equal((await post(receipt)).status, 200);
+  const pending = await approve(await draft([line(skuId)]));
+  const facts = async () => ({
+    balances: await db.stockBalance.findMany({ where: { skuId } }),
+    lots: await db.stockLot.findMany({ where: { skuId } }),
+    positions: await db.stockPosition.findMany({ where: { skuId } }),
+    lines: await db.inboundLine.findMany({ where: { skuId } }),
+    ledgers: await db.stockLedger.findMany({ where: { skuId } }),
+  });
+  const before = await facts();
+  p = await publish(p);
+  p = await ok<Product>(skuRoute(p, 'set-price'), { version: p.version, priceCents: 29 });
+  assert.equal((await visible(skuId)).data.priceCents, 29);
+  assert.equal((await visible(skuId)).data.available, 3);
+  assert.equal(
+    (await call(skuRoute(p, 'disable'), { actor: 0, body: { version: p.version } })).error?.code,
+    'LAST_ENABLED_SKU',
+  );
+  p = await ok<Product>(`/admin/products/${p.id}/unpublish`, { version: p.version });
+  p = await ok<Product>(skuRoute(p, 'disable'), { version: p.version });
+  assert.equal(p.skus[0]!.enabled, false);
+  assert.equal((await visible(skuId)).status, 404);
+  assert.equal(
+    (
+      await call(`/warehouse/warehouses/${warehouses[0]}/receipts`, {
+        actor: 1,
+        body: { sourceRef: 'disabled', lines: [line(skuId)] },
+      })
+    ).error?.code,
+    'SKU_DISABLED',
+  );
+  assert.equal((await post(pending)).error?.code, 'SKU_DISABLED');
+  assert.deepEqual(await facts(), before);
+  assert.equal(
+    (await call(`/admin/products/${p.id}/publish`, { actor: 0, body: { version: p.version } }))
+      .status,
+    409,
+  );
+  assert.equal(
+    (await call(skuRoute(p, 'disable'), { actor: 0, body: { version: p.version } })).error?.code,
+    'INVALID_TRANSITION',
+  );
+  p = await ok<Product>(skuRoute(p, 'enable'), { version: p.version });
+  assert.equal(p.status, 'UNPUBLISHED');
+  assert.equal((await visible(skuId)).status, 404);
+  p = await publish(p);
+  assert.equal((await visible(skuId)).data.priceCents, 29);
+  assert.deepEqual(await facts(), before);
+  assert.equal((await post(pending)).status, 200);
+  checks.push(
+    'SKU price/enable/disable preserve inventory and historical costs, public/receipt rules enforced',
+  );
+});
+
+test('published multi-SKU disabling affects only selected SKU and keeps product published', async () => {
+  const p0 = await product();
+  await db.sku.create({
+    data: {
+      id: randomUUID(),
+      productId: p0.id,
+      code: `SECOND-${run}`,
+      spec: '2包',
+      unit: '包',
+      priceCents: 800,
+      expiryManaged: false,
+    },
+  });
+  let p = await publish(await ok<Product>(`/admin/products/${p0.id}`));
+  const selected = p.skus[0]!,
+    other = p.skus[1]!;
+  p = await ok<Product>(skuRoute(p, 'disable', selected.id), { version: p.version });
+  assert.equal(p.status, 'PUBLISHED');
+  assert.equal((await visible(selected.id)).status, 404);
+  assert.equal((await visible(other.id)).status, 200);
+  assert.equal(
+    (await call(skuRoute(p, 'disable', other.id), { actor: 0, body: { version: p.version } })).error
+      ?.code,
+    'LAST_ENABLED_SKU',
+  );
+  p = await ok<Product>(skuRoute(p, 'enable', selected.id), { version: p.version });
+  assert.equal((await visible(selected.id)).status, 200);
+});
+
+test('SKU actions compete with metadata/publish/other SKU actions on one product version', async () => {
+  for (const competitor of ['metadata', 'publish', 'disable']) {
+    const p = await product();
+    const otherRoute =
+      competitor === 'metadata'
+        ? `/admin/products/${p.id}/update-details`
+        : competitor === 'publish'
+          ? `/admin/products/${p.id}/publish`
+          : skuRoute(p, 'disable');
+    const results = await Promise.all([
+      call<Product>(skuRoute(p, 'set-price'), {
+        actor: 0,
+        body: { version: p.version, priceCents: 99 },
+      }),
+      call<Product>(otherRoute, {
+        actor: 0,
+        body: competitor === 'metadata' ? detailsBody(p) : { version: p.version },
+      }),
+    ]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
+    assert.equal(results.find((r) => r.status === 409)?.error?.code, 'VERSION_CONFLICT');
+    assert.equal((await ok<Product>(`/admin/products/${p.id}`)).version, p.version + 1);
+  }
+});
+
+test('late SKU audit failure rolls back price/version and original key can be retried', async () => {
+  const p = await product(),
+    route = skuRoute(p, 'set-price'),
+    key = randomUUID(),
+    body = { version: p.version, priceCents: 29 };
+  await admin.query(
+    "CREATE FUNCTION fail_sku_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='SKU_SET_PRICE' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_sku_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_sku_audit()',
+  );
+  try {
+    assert.equal((await call(route, { actor: 0, body, key })).status, 500);
+    assert.deepEqual(await ok<Product>(`/admin/products/${p.id}`), p);
+    assert.equal(
+      await db.idempotencyRecord.count({
+        where: { scope: { endsWith: `:SKU_SET_PRICE:${p.skus[0]!.id}` } },
+      }),
+      0,
+    );
+  } finally {
+    await admin.query('DROP TRIGGER fail_sku_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_sku_audit()');
+  }
+  assert.equal((await ok<Product>(route, body, 0, key)).version, p.version + 1);
+});
+
+test('receipt posting versus SKU disabling serializes: posted stock is complete or unchanged', async () => {
+  for (let i = 0; i < 4; i++) {
+    const p = await product(),
+      skuId = p.skus[0]!.id;
+    const receipt = await approve(await draft([line(skuId, 7)]));
+    const [posting, disabling] = await Promise.all([
+      post(receipt),
+      call<Product>(skuRoute(p, 'disable'), { actor: 0, body: { version: p.version } }),
+    ]);
+    assert.equal(disabling.status, 200);
+    assert.equal(disabling.data.skus[0]!.enabled, false);
+    const count = await db.stockLedger.count({ where: { skuId } });
+    if (posting.status === 200) {
+      assert.equal(count, 1);
+      assert.equal((await db.stockBalance.findFirstOrThrow({ where: { skuId } })).onHand, 7);
+    } else {
+      assert.equal(posting.status, 409);
+      assert.equal(posting.error?.code, 'SKU_DISABLED');
+      assert.equal(count, 0);
+      assert.equal(await db.stockBalance.count({ where: { skuId } }), 0);
+      assert.equal(
+        (await db.inboundReceipt.findUniqueOrThrow({ where: { id: receipt.id } })).status,
+        'APPROVED',
+      );
+    }
+  }
+});

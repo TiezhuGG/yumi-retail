@@ -165,6 +165,62 @@ export class CatalogService {
       return result;
     });
   }
+  skuAction(
+    request: ApiRequest,
+    key: string,
+    id: string,
+    skuId: string,
+    version: number,
+    action: 'SET_PRICE' | 'ENABLE' | 'DISABLE',
+    priceCents?: number,
+  ) {
+    const auditAction = `SKU_${action}`;
+    return this.write(
+      request,
+      auditAction,
+      skuId,
+      key,
+      { productId: id, version, ...(priceCents === undefined ? {} : { priceCents }) },
+      async (tx) => {
+        // Catalog mutations share the product lock/version. Receipt posting takes
+        // a SKU share lock so its enabled check serializes with disabling.
+        await tx.$queryRaw`SELECT id FROM products WHERE id=${id}::uuid FOR UPDATE`;
+        const product = await tx.product.findUnique({ where: { id }, include: { skus: true } });
+        if (!product || !product.skus.some((s) => s.id === skuId))
+          throw failure(404, 'RESOURCE_NOT_FOUND', '商品或规格不存在');
+        if (product.version !== version)
+          throw failure(409, 'VERSION_CONFLICT', '商品已更新，请载入最新资料后重试');
+        await tx.$queryRaw`SELECT id FROM skus WHERE id=${skuId}::uuid FOR UPDATE`;
+        const sku = product.skus.find((s) => s.id === skuId)!;
+        if (action !== 'SET_PRICE' && sku.enabled === (action === 'ENABLE'))
+          throw failure(409, 'INVALID_TRANSITION', '规格已处于目标状态，请刷新核对');
+        if (
+          action === 'DISABLE' &&
+          product.status === 'PUBLISHED' &&
+          product.skus.filter((s) => s.enabled).length === 1
+        )
+          throw failure(409, 'LAST_ENABLED_SKU', '这是已上架商品的最后一个启用规格，请先下架商品');
+        await tx.sku.update({
+          where: { id: skuId },
+          data: action === 'SET_PRICE' ? { priceCents } : { enabled: action === 'ENABLE' },
+        });
+        const result = await tx.product.update({
+          where: { id },
+          data: { version: { increment: 1 } },
+          include: { skus: true },
+        });
+        await this.audit(
+          tx,
+          request,
+          auditAction,
+          skuId,
+          null,
+          `product ${id}; version ${version}->${result.version}; ${action === 'SET_PRICE' ? `priceCents ${sku.priceCents}->${priceCents}` : `enabled ${sku.enabled}->${action === 'ENABLE'}`}`,
+        );
+        return result;
+      },
+    );
+  }
   productAction(request: ApiRequest, key: string, id: string, version: number, publish: boolean) {
     return this.write(
       request,
@@ -220,6 +276,7 @@ export class CatalogService {
     return this.write(request, 'RECEIPT_CREATE', warehouseId, key, input, async (tx) => {
       await this.warehouse(tx, request, warehouseId);
       for (const line of input.lines) {
+        await tx.$queryRaw`SELECT id FROM skus WHERE id=${line.skuId}::uuid FOR SHARE`;
         const sku = await tx.sku.findUnique({ where: { id: line.skuId } });
         if (!sku) throw failure(400, 'VALIDATION_ERROR', '规格不存在');
         this.validateDates(sku, line);
