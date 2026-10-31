@@ -59,6 +59,7 @@ export interface ReceiptSkuLookup extends Sku {
   name: string;
 }
 export interface Product {
+  imageId?: string | null;
   id: string;
   categoryId: string;
   name: string;
@@ -108,6 +109,7 @@ export interface ReceiptDetail extends Receipt {
 }
 
 export interface SaleSku {
+  imageUrl?: string | null;
   id: string;
   productId: string;
   name: string;

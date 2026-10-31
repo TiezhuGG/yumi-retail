@@ -7,6 +7,7 @@ import { ReceiptWorkbench } from './receipts.js';
 import { usePage } from './use-page.js';
 import { Modal } from './modal.js';
 import { CategoryEditor } from './category-editor.js';
+import { ProductImageEditor } from './product-image-editor.js';
 import { SkuBarcodeEditor } from './sku-barcode-editor.js';
 import { SkuSpecEditor } from './sku-spec-editor.js';
 import { SkuEditor } from './sku-editor.js';
@@ -42,6 +43,7 @@ export function CatalogWorkbench({
   allowedViews?: WorkspaceView[];
   onNavigate?: (view: WorkspaceView) => void;
 }) {
+  const [editingImage, setEditingImage] = useState<string | null>(null);
   const [editingBarcode, setEditingBarcode] = useState<{ id: string; skuId: string } | null>(null);
   const [editingSpec, setEditingSpec] = useState<{ id: string; skuId: string } | null>(null);
   const [editingSku, setEditingSku] = useState<{ id: string; skuId: string } | null>(null);
@@ -477,7 +479,14 @@ export function CatalogWorkbench({
                     <tr key={s.id}>
                       <td>
                         <div className="product-cell">
-                          <ProductArt name={p.name} />
+                          <ProductArt
+                            name={p.name}
+                            imageSrc={
+                              p.imageId
+                                ? `/api/v1/admin/products/${p.id}/image/${p.imageId}`
+                                : undefined
+                            }
+                          />
                           <div>
                             <strong>{p.name}</strong>
                             <small>
@@ -540,6 +549,16 @@ export function CatalogWorkbench({
                                   disabled={busy}
                                   onClick={() => {
                                     setMessage('');
+                                    setEditingImage(p.id);
+                                  }}
+                                >
+                                  主图
+                                </button>
+                                <button
+                                  className="text-button"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setMessage('');
                                     setEditingId(p.id);
                                   }}
                                 >
@@ -592,7 +611,7 @@ export function CatalogWorkbench({
                 加载更多商品
               </button>
             )}
-            <small>商品图为包装示意</small>
+            <small>未设置主图时显示包装示意</small>
           </div>
         </section>
       )}
@@ -853,6 +872,25 @@ export function CatalogWorkbench({
             } catch {
               setFailed(true);
               setMessage('分类操作已确认，但列表刷新失败，请刷新分类核对当前资料。');
+            }
+          }}
+        />
+      )}
+      {editingImage && (
+        <ProductImageEditor
+          id={editingImage}
+          profile={profile}
+          onClose={() => setEditingImage(null)}
+          onSaved={async () => {
+            setEditingImage(null);
+            setFailed(false);
+            setMessage('主图操作已确认，正在读取当前列表…');
+            try {
+              await productsPage();
+              setMessage('主图操作已确认，列表已读取当前资料。');
+            } catch {
+              setFailed(true);
+              setMessage('主图操作已确认，但列表刷新失败，请刷新列表核对。');
             }
           }}
         />

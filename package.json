@@ -51,6 +51,7 @@
     "openapi:export": "npm run build:server && node --env-file=.env scripts/export-openapi.mjs",
     "test:mini-browse": "node --import tsx tests/mini-browse.test.ts",
     "verify:mini:api": "node scripts/verify-mini-api.mjs",
+    "verify:product-images": "node --env-file=.env scripts/check-product-image-store.mjs",
     "verify:mini": "node scripts/verify-mini-artifacts.mjs"
   },
   "pnpm": {

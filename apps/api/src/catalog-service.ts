@@ -568,13 +568,14 @@ export class CatalogService {
         name: string;
         description: string;
         categoryId: string;
+        imageUrl: string | null;
         spec: string;
         unit: string;
         priceCents: bigint;
         available: number;
       }>
     >`
-      SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",s.spec,s.unit,s.price_cents AS "priceCents",
+      SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",CASE WHEN p.image_id IS NULL THEN NULL ELSE '/api/v1/product-images/'||p.id::text||'/'||p.image_id::text END AS "imageUrl",s.spec,s.unit,s.price_cents AS "priceCents",
         CASE WHEN COALESCE(b.inventory_hold,false) OR b.active_count_id IS NOT NULL THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
       FROM skus s JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
       JOIN warehouses w ON w.id=${warehouseId}::uuid AND w.enabled

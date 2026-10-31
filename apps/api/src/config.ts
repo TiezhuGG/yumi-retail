@@ -4,6 +4,7 @@ export interface ApplicationConfig {
   staffSessionSeconds: number;
   docsEnabled: boolean;
   publicWarehouseId?: string;
+  productImageRoot?: string;
 }
 
 export function applicationConfig(env: NodeJS.ProcessEnv = process.env): ApplicationConfig {
@@ -30,6 +31,8 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     )
       throw new Error('Invalid staff origin configuration.');
   }
+  if (environment === 'production' && env.PRODUCT_IMAGE_LOCAL_DIR)
+    throw new Error('Local product image storage is development-only.');
   const seconds = Number(env.STAFF_SESSION_SECONDS ?? 28800);
   if (
     env.PUBLIC_WAREHOUSE_ID &&
@@ -44,5 +47,9 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     staffSessionSeconds: seconds,
     docsEnabled: environment !== 'production',
     publicWarehouseId: env.PUBLIC_WAREHOUSE_ID || undefined,
+    productImageRoot:
+      environment === 'production'
+        ? undefined
+        : env.PRODUCT_IMAGE_LOCAL_DIR || '.local/product-images',
   };
 }

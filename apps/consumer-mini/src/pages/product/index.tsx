@@ -40,7 +40,7 @@ export default function ProductDetail() {
       {product && (
         <>
           <View className="detail-visual">
-            <ProductVisual name={product.name} large />
+            <ProductVisual name={product.name} imageUrl={product.imageUrl} large />
             <View className="detail-caption">日常好物 / YUMI ESSENTIALS</View>
           </View>
           <View className="detail-card">
@@ -67,7 +67,10 @@ export default function ProductDetail() {
               {product.description || '用心挑选日常好物，更多商品信息整理中。'}
             </Text>
             <View className="detail-tip">
-              包装图为示意，具体以实际商品为准。当前开放商品浏览，在线下单和支付尚未开放。
+              {product.imageUrl
+                ? '商品主图由运营上传，具体以实际商品为准。'
+                : '包装图为示意，具体以实际商品为准。'}
+              当前开放商品浏览，在线下单和支付尚未开放。
             </View>
           </View>
           <View className="detail-footer">

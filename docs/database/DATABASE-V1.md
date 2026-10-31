@@ -283,3 +283,8 @@ CATEGORY_RENAME / CATEGORY_ENABLE / CATEGORY_DISABLE审计以分类为resourceId
 本轮无DDL/迁移。复用Sku.barcode唯一索引findUnique读取，再附当前Product.name；仓库鉴权优先于查询，不新增库存/成本读写。GET不生成业务审计或幂等记录，权限拒绝仍沿用认证审计。此前条码/分类迁移仍需先应用，本机已具备。
 
 查询不持有绑定租约，不把结果作为收货唯一真相；前端明确选择skuId，清空/重绑后查询反映新映射，但不追溯替换已选行。候选可能来自未载入的目录页，前端按id缓存该候选供该草稿展示/校验，不复制为新商品。创建收货及过账沿用仓库权限、SKU共享锁/启用/效期、唯一明细、成本整数分、幂等和库存事务；查询本身不增加数量或成本。不新增收货行条码历史快照。
+
+
+## 商品主图增量（202610310001_product_images）
+
+products.image_id可空，旧行NULL；product_images保存id/product_id/object_key/mime/bytes/width/height/created_at，object_key唯一、(id,product_id)唯一，产品(image_id,id)复合外键限制同商品引用。MIME限定PNG、字节1..4194304、边长1..1200。文件位于本地开发目录，不存PG二进制。版本/绑定/审计同事务，失败确认无DB引用才删除新对象；不确定结果保留待核对。解除/替换不删历史元数据，旧URL不可再读。数据库与对象需一起备份，恢复演练未完成；verify:product-images仅只读盘点。迁移已应用本机开发库并在测试隔离schema验证，无库存迁移。见[记录](../verification/S2-PRODUCT-IMAGE-2026-10-31.md)。

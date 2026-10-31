@@ -42,7 +42,8 @@ const skuSchema = object({
   expiryManaged: bool,
   enabled: bool,
 });
-const productSchema = object({
+export const productSchema = object({
+  imageId: { type: 'string', nullable: true },
   id: text,
   categoryId: text,
   name: text,
@@ -84,6 +85,7 @@ const receiptSchema = object({
   lines: { type: 'array', items: lineSchema },
 });
 const saleSchema = object({
+  imageUrl: { type: 'string', nullable: true },
   id: text,
   productId: text,
   name: text,

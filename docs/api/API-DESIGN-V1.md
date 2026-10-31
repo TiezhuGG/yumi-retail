@@ -335,3 +335,8 @@ GET `/api/v1/warehouse/warehouses/:warehouseId/skus/by-barcode?barcode=完整条
 返回ReceiptSkuLookup：原Sku字段及商品name，包含enabled/expiryManaged/barcode供显式选择；售价不是收货成本且UI不据此预填。唯一索引完整匹配，非按已载入页面过滤。停用SKU返回200并标记enabled=false（UI禁止选入，收货服务也拒绝）；草稿/下架商品及分类停用下的启用SKU仍可作为收货候选。不返回采购成本、库存量或其他仓数据。没有写业务审计、幂等记录或库存。
 
 结果代表本次读取时的映射，不构成绑定预留；清空返回404、重新绑定后指向新SKU。确认选入后收货payload仍使用skuId，服务端创建/过账重查SKU约束，不按当时条码自动改写SKU。见[记录](../verification/S2-RECEIPT-BARCODE-2026-10-31.md)及实际OpenAPI。
+
+
+## 商品主图已实现接口（2026-10-31，开发/测试）
+
+POST /api/v1/admin/products/:id/set-image，catalog.write、会话/Origin/CSRF/幂等键，严格 {version,image:{fileName,mime,base64}}，image:null解除，返回商品及SKU。PNG/JPEG原始≤2MiB、16–4096边长且≤900万像素、单页，输出最长1200的PNG≤4MiB；开发JSON≤3MiB，413超限、400无效、409版本/意图冲突、503未配置/繁忙。生产本地适配器不可启用。GET /api/v1/admin/products/:id/image/:imageId需catalog.read；GET /api/v1/product-images/:id/:imageId须满足公开目录条件。两者只读当前同商品绑定，成功image/png，失败JSON；历史/无资格404。目录新增可空imageUrl，Product新增可空imageId。详细边界及实际OpenAPI见[报告](../verification/S2-PRODUCT-IMAGE-2026-10-31.md)和openapi.json；预签名上传意图方案仍是生产待实现设计。

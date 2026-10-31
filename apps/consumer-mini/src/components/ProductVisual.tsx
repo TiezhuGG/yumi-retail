@@ -1,5 +1,28 @@
-import { View, Text } from '@tarojs/components';
-export function ProductVisual({ name, large = false }: { name: string; large?: boolean }) {
+import { useEffect, useState } from 'react';
+import { productImageUrl } from '../api';
+import { View, Text, Image } from '@tarojs/components';
+export function ProductVisual({
+  name,
+  large = false,
+  imageUrl,
+}: {
+  name: string;
+  large?: boolean;
+  imageUrl?: string | null;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageUrl]);
+  if (imageUrl && !failed)
+    return (
+      <View className={`product-visual ${large ? 'large' : ''}`}>
+        <Image
+          style={{ width: '100%', height: '100%' }}
+          mode="aspectFit"
+          src={productImageUrl(imageUrl)}
+          onError={() => setFailed(true)}
+        />
+      </View>
+    );
   const kind = /纸|巾/.test(name) ? 'paper' : /袋/.test(name) ? 'bag' : 'bottle';
   return (
     <View className={`product-visual ${kind} ${large ? 'large' : ''}`}>

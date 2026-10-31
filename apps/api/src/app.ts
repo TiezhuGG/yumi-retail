@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { Controller, Get, Module, Req } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { INestApplication } from '@nestjs/common';
 import { APP_GUARD, NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -23,6 +24,11 @@ import { StockDispositionService } from './stock-disposition-service.js';
 import { StockDispositionController } from './stock-disposition-controller.js';
 import { ReceiptReversalService } from './receipt-reversal-service.js';
 import { ReceiptReversalController } from './receipt-reversal-controller.js';
+import {
+  ProductImageController,
+  ProductImageService,
+  LocalProductImageStore,
+} from './product-images.js';
 import { CatalogService } from './catalog-service.js';
 import {
   CatalogAdminController,
@@ -80,6 +86,7 @@ export async function createApplication(
       WarehouseController,
       StaffAdminController,
       CatalogAdminController,
+      ProductImageController,
       InboundController,
       PublicCatalogController,
       InventoryController,
@@ -90,6 +97,13 @@ export async function createApplication(
     providers: [
       { provide: StaffAuthService, useValue: auth },
       { provide: CatalogService, useValue: catalog },
+      {
+        provide: ProductImageService,
+        useValue: new ProductImageService(
+          catalog,
+          new LocalProductImageStore(config.productImageRoot),
+        ),
+      },
       { provide: InventoryService, useValue: new InventoryService(catalog) },
       {
         provide: StockCountService,
@@ -108,7 +122,10 @@ export async function createApplication(
   })
   class ApplicationModule {}
 
-  const app = await NestFactory.create(ApplicationModule, { logger: ['error', 'warn'] });
+  const app = await NestFactory.create<NestExpressApplication>(ApplicationModule, {
+    logger: ['error', 'warn'],
+    bodyParser: false,
+  });
   app.setGlobalPrefix('api/v1');
   app.use((request: ApiRequest, response: ApiResponse, next: () => void) => {
     const start = Date.now();
@@ -129,6 +146,7 @@ export async function createApplication(
     });
     next();
   });
+  app.useBodyParser('json', { limit: config.environment === 'production' ? '100kb' : '3mb' });
   app.useGlobalFilters(new ApiExceptionFilter());
   const openApi = SwaggerModule.createDocument(
     app,

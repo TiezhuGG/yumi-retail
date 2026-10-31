@@ -158,7 +158,7 @@ export default function Index() {
               className="product-card"
               onClick={() => void Taro.navigateTo({ url: `/pages/product/index?id=${row.id}` })}
             >
-              <ProductVisual name={row.name} />
+              <ProductVisual name={row.name} imageUrl={row.imageUrl} />
               <View className="product-info">
                 <Text className="product-title">{row.name}</Text>
                 <Text className="product-spec">

@@ -1,0 +1,13 @@
+CREATE TABLE product_images (
+  id UUID PRIMARY KEY,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT ON UPDATE NO ACTION,
+  object_key VARCHAR(64) NOT NULL UNIQUE,
+  mime VARCHAR(32) NOT NULL CHECK (mime='image/png'),
+  bytes INTEGER NOT NULL CHECK (bytes BETWEEN 1 AND 4194304),
+  width INTEGER NOT NULL CHECK (width BETWEEN 1 AND 1200),
+  height INTEGER NOT NULL CHECK (height BETWEEN 1 AND 1200),
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(id,product_id)
+);
+ALTER TABLE products ADD COLUMN image_id UUID;
+ALTER TABLE products ADD CONSTRAINT products_image_owner_fk FOREIGN KEY(image_id,id) REFERENCES product_images(id,product_id) ON DELETE RESTRICT ON UPDATE NO ACTION;

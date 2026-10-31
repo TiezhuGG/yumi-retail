@@ -1,6 +1,7 @@
 import Taro from '@tarojs/taro';
 declare const API_BASE_URL: string;
 export interface SaleSku {
+  imageUrl?: string | null;
   id: string;
   productId: string;
   name: string;
@@ -25,3 +26,5 @@ export async function request<T>(path: string): Promise<T> {
     throw new Error(result.data.error?.message ?? '商品加载失败，请稍后重试');
   return result.data.data;
 }
+
+export const productImageUrl = (path: string) => API_BASE_URL.replace(/\/api\/v1\/?$/, '') + path;

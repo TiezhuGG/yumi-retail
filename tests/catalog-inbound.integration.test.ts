@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, mkdir, writeFile, rm } from 'node:fs/promises';
 import { createDatabase, hashPassword } from '../packages/database/src/index.ts';
 import { createApplication } from '../apps/api/dist/app.js';
 import { applicationConfig } from '../apps/api/dist/config.js';
@@ -150,6 +150,7 @@ before(async () => {
       ...process.env,
       NODE_ENV: 'test',
       PUBLIC_WAREHOUSE_ID: warehouses[0],
+      PRODUCT_IMAGE_LOCAL_DIR: `.local/test-images-${schema}`,
     }),
     accessLog: () => {},
   });
@@ -174,6 +175,7 @@ after(async () => {
   try {
     if (runtime) await runtime.close();
     await db.$disconnect();
+    await rm(`.local/test-images-${schema}`, { recursive: true, force: true });
     // Only this run's disposable schema is removed. Public development/test tables are untouched.
     assert.match(schema, /^s2_[a-f0-9]{32}$/);
     await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
@@ -1864,5 +1866,220 @@ test('barcode lookup follows clearing/rebinding and selected SKU creates receipt
   assert.equal(await db.stockBalance.count({ where: { skuId: first.id } }), 0);
   checks.push(
     'exact authorized barcode lookup follows binding, read-only; explicit receipt selection still uses normal guards',
+  );
+});
+
+async function imageFile(name = 'image-red.png') {
+  return {
+    fileName: name,
+    mime: name.endsWith('.jpg') ? 'image/jpeg' : 'image/png',
+    base64: (await readFile(`tests/fixtures/${name}`)).toString('base64'),
+  };
+}
+const imageRoute = (p: Product) => `/admin/products/${p.id}/set-image`;
+const photoUrl = (p: Product, publicRead = false) =>
+  publicRead
+    ? `/product-images/${p.id}/${p.imageId}`
+    : `/admin/products/${p.id}/image/${p.imageId}`;
+async function photo(p: Product, actor?: number, publicRead = false) {
+  return fetch(base + '/api/v1' + photoUrl(p, publicRead), {
+    headers: actor === undefined ? {} : { Cookie: identities[actor]!.cookie },
+  });
+}
+test('product image upload authorizes, strictly validates bytes/type/extension/decode/dimensions and JSON bounds', async () => {
+  const p = await product(),
+    image = await imageFile(),
+    body = { version: p.version, image },
+    route = imageRoute(p);
+  assert.equal((await call(route, { body })).status, 401);
+  for (const actor of [1, 2, 3]) assert.equal((await call(route, { actor, body })).status, 403);
+  const noCsrf = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: {
+      Cookie: identities[0]!.cookie,
+      Origin: 'http://127.0.0.1:5173',
+      'Content-Type': 'application/json',
+      'Idempotency-Key': randomUUID(),
+    },
+    body: JSON.stringify(body),
+  });
+  assert.equal(noCsrf.status, 403);
+  for (const invalid of [
+    { ...body, status: 'PUBLISHED' },
+    { ...body, version: -1 },
+    { ...body, image: { ...image, extra: true } },
+    { ...body, image: { ...image, fileName: '../a.png' } },
+    { ...body, image: { ...image, fileName: 'a.svg' } },
+    { ...body, image: { ...image, mime: 'image/jpeg' } },
+    {
+      ...body,
+      image: {
+        ...image,
+        base64: Buffer.from('<svg><script>bad()</script></svg>').toString('base64'),
+      },
+    },
+    { ...body, image: { ...image, base64: image.base64.slice(0, 48) } },
+    { ...body, image: await imageFile('image-tiny.png') },
+    { ...body, image: await imageFile('image-wide.png') },
+    { ...body, image: { ...image, base64: Buffer.alloc(2097153).toString('base64') } },
+  ])
+    assert.equal((await call(route, { actor: 0, body: invalid })).status, 400);
+  assert.equal(
+    (
+      await call(route, {
+        actor: 0,
+        body: { version: 0, image: { ...image, base64: 'a'.repeat(3200000) } },
+      })
+    ).status,
+    413,
+  );
+  const malformed = await fetch(base + '/api/v1' + route, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{oops',
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal(await db.productImage.count({ where: { productId: p.id } }), 0);
+  assert.equal((await ok<Product>(`/admin/products/${p.id}`)).version, 0);
+});
+
+test('normalized product image reads are scoped to current owner and current public visibility', async () => {
+  let p = await product();
+  p = await ok<Product>(imageRoute(p), {
+    version: p.version,
+    image: await imageFile('image-blue.jpg'),
+  });
+  assert(p.imageId);
+  assert.equal((await photo(p)).status, 401);
+  assert.equal((await photo(p, 2)).status, 403);
+  const response = await photo(p, 1);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/png');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(
+    Buffer.from(await response.arrayBuffer()).subarray(0, 8),
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+  );
+  assert.equal((await photo(p, undefined, true)).status, 404);
+  const other = await product();
+  assert.equal(
+    (await call(`/admin/products/${other.id}/image/${p.imageId}`, { actor: 0 })).status,
+    404,
+  );
+  await assert.rejects(
+    db.product.update({ where: { id: other.id }, data: { imageId: p.imageId! } }),
+  );
+  p = await publish(p);
+  assert.equal((await photo(p, undefined, true)).status, 200);
+  const sale = await visible(p.skus[0]!.id);
+  assert.equal(sale.data.imageUrl, '/api/v1' + photoUrl(p, true));
+  await db.category.update({ where: { id: p.categoryId }, data: { enabled: false } });
+  try {
+    assert.equal((await photo(p, undefined, true)).status, 404);
+  } finally {
+    await db.category.update({ where: { id: p.categoryId }, data: { enabled: true } });
+  }
+  const old = p;
+  p = await ok<Product>(imageRoute(p), { version: p.version, image: await imageFile() });
+  assert.notEqual(p.imageId, old.imageId);
+  assert.equal((await photo(old, 0)).status, 404);
+  assert.equal((await photo(old, undefined, true)).status, 404);
+  const current = p;
+  p = await ok<Product>(imageRoute(p), { version: p.version, image: null });
+  assert.equal(p.imageId, null);
+  assert.equal((await photo(current, undefined, true)).status, 404);
+  assert.equal((await visible(p.skus[0]!.id)).data.imageUrl, null);
+});
+
+test('image idempotency and competing catalog version preserve one binding and historical replay cannot restore removed photo', async () => {
+  const p = await product(),
+    route = imageRoute(p),
+    key = randomUUID(),
+    body = { version: 0, image: await imageFile() };
+  const results = await Promise.all(
+    Array.from({ length: 5 }, () => call<Product>(route, { actor: 0, body, key })),
+  );
+  assert(results.every((r) => r.status === 200 && r.data.imageId === results[0]!.data.imageId));
+  assert.equal(await db.productImage.count({ where: { productId: p.id } }), 1);
+  assert.equal(
+    await db.businessAudit.count({ where: { resourceId: p.id, action: 'PRODUCT_SET_IMAGE' } }),
+    1,
+  );
+  const current = results[0]!.data;
+  await ok<Product>(route, { version: current.version, image: null });
+  assert.equal((await ok<Product>(route, body, 0, key)).imageId, current.imageId);
+  assert.equal((await ok<Product>(`/admin/products/${p.id}`)).imageId, null);
+  assert.equal(
+    (await call(route, { actor: 0, body: { ...body, image: null }, key })).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+  const fresh = await product();
+  const race = await Promise.all([
+    call(imageRoute(fresh), { actor: 0, body: { version: 0, image: body.image } }),
+    call(`/admin/products/${fresh.id}/publish`, { actor: 0, body: { version: 0 } }),
+  ]);
+  assert.deepEqual(race.map((r) => r.status).sort(), [200, 409]);
+  assert.equal(race.find((r) => r.status === 409)?.error?.code, 'VERSION_CONFLICT');
+});
+
+test('image writes leave inventory, SKU identity, historical cost and status unchanged', async () => {
+  let p = await product();
+  const skuId = p.skus[0]!.id;
+  assert.equal((await post(await approve(await draft([line(skuId)])))).status, 200);
+  p = await publish(p);
+  const facts = async () => ({
+    balances: await db.stockBalance.findMany({ where: { skuId } }),
+    lots: await db.stockLot.findMany({ where: { skuId } }),
+    positions: await db.stockPosition.findMany({ where: { skuId } }),
+    lines: await db.inboundLine.findMany({ where: { skuId } }),
+    ledgers: await db.stockLedger.findMany({ where: { skuId } }),
+  });
+  const before = await facts(),
+    result = await ok<Product>(imageRoute(p), { version: p.version, image: await imageFile() });
+  assert.equal(result.status, p.status);
+  assert.deepEqual(result.skus, p.skus);
+  assert.deepEqual(await facts(), before);
+  assert.equal((await visible(skuId)).data.available, 3);
+});
+
+test('late image audit failure rolls back metadata/version and removes unreferenced file, original-key retry succeeds', async () => {
+  const p = await product(),
+    route = imageRoute(p),
+    key = randomUUID(),
+    body = { version: 0, image: await imageFile() };
+  const files = await readdir(`.local/test-images-${schema}`);
+  await admin.query(
+    "CREATE FUNCTION fail_image_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='PRODUCT_SET_IMAGE' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_image_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_image_audit()',
+  );
+  try {
+    assert.equal((await call(route, { actor: 0, body, key })).status, 500);
+    assert.equal(await db.productImage.count({ where: { productId: p.id } }), 0);
+    assert.equal((await ok<Product>(`/admin/products/${p.id}`)).version, 0);
+    assert.deepEqual((await readdir(`.local/test-images-${schema}`)).sort(), files.sort());
+  } finally {
+    await admin.query('DROP TRIGGER fail_image_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_image_audit()');
+  }
+  assert((await ok<Product>(route, body, 0, key)).imageId);
+  checks.push(
+    'image decoding, owner/public visibility, idempotent/version competition and rollback compensation preserve stock/cost',
+  );
+});
+
+test('local image storage cannot be enabled by production configuration', () => {
+  const config = applicationConfig({
+    NODE_ENV: 'production',
+    STAFF_ALLOWED_ORIGINS: 'https://staff.example.test',
+  });
+  assert.equal(config.productImageRoot, undefined);
+  assert.throws(() =>
+    applicationConfig({
+      NODE_ENV: 'production',
+      STAFF_ALLOWED_ORIGINS: 'https://staff.example.test',
+      PRODUCT_IMAGE_LOCAL_DIR: '.local/images',
+    }),
   );
 });

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 export function CornMark() {
   return (
     <svg viewBox="0 0 48 56" fill="none" aria-hidden="true">
@@ -27,7 +28,18 @@ export function Brand() {
     </span>
   );
 }
-export function ProductArt({ name }: { name: string }) {
+export function ProductArt({ name, imageSrc }: { name: string; imageSrc?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageSrc]);
+  if (imageSrc && !failed)
+    return (
+      <img
+        className="product-art-photo"
+        src={imageSrc}
+        alt={`${name}主图`}
+        onError={() => setFailed(true)}
+      />
+    );
   const kind = /纸|巾/.test(name) ? 'paper' : /袋/.test(name) ? 'bag' : 'bottle';
   return (
     <span className={`product-art ${kind}`} aria-label="包装示意图">

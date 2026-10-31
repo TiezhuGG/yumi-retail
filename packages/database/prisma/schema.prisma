@@ -157,18 +157,37 @@ model Category {
 }
 
 model Product {
-  id          String   @id @db.Uuid
-  categoryId  String   @map("category_id") @db.Uuid
-  name        String   @db.VarChar(120)
-  description String   @db.VarChar(2000)
-  status      String   @default("DRAFT") @db.VarChar(16)
-  version     Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  id          String         @id @db.Uuid
+  categoryId  String         @map("category_id") @db.Uuid
+  name        String         @db.VarChar(120)
+  description String         @db.VarChar(2000)
+  status      String         @default("DRAFT") @db.VarChar(16)
+  version     Int            @default(0)
+  imageId     String?        @map("image_id") @db.Uuid
+  image       ProductImage?  @relation("cover", fields: [imageId, id], references: [id, productId], onDelete: Restrict, onUpdate: NoAction)
+  images      ProductImage[] @relation("images")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  category    Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   skus        Sku[]
 
   @@index([categoryId, status, id])
   @@map("products")
+}
+
+model ProductImage {
+  id        String    @id @db.Uuid
+  productId String    @map("product_id") @db.Uuid
+  objectKey String    @unique @map("object_key") @db.VarChar(64)
+  mime      String    @db.VarChar(32)
+  bytes     Int
+  width     Int
+  height    Int
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  product   Product   @relation("images", fields: [productId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  covers    Product[] @relation("cover")
+
+  @@unique([id, productId])
+  @@map("product_images")
 }
 
 model Sku {

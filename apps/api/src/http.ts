@@ -34,8 +34,22 @@ export class ApiExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<ApiResponse>();
     const request = host.switchToHttp().getRequest<ApiRequest>();
-    const status = exception instanceof HttpException ? exception.getStatus() : 500;
-    const raw = exception instanceof HttpException ? exception.getResponse() : undefined;
+    const parserType =
+      exception instanceof Error && 'type' in exception ? exception.type : undefined;
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : parserType === 'entity.too.large'
+          ? 413
+          : parserType === 'entity.parse.failed'
+            ? 400
+            : 500;
+    const raw =
+      exception instanceof HttpException
+        ? exception.getResponse()
+        : parserType === 'entity.too.large'
+          ? { code: 'PAYLOAD_TOO_LARGE', message: '请求内容超出大小限制' }
+          : undefined;
     const payload = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
     const code =
       typeof payload.code === 'string'
