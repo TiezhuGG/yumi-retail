@@ -5,6 +5,7 @@ export interface ApplicationConfig {
   docsEnabled: boolean;
   publicWarehouseId?: string;
   productImageRoot?: string;
+  addressEncryptionKey?: string;
   consumerDevLogin?: boolean;
   consumerSessionSeconds?: number;
 }
@@ -59,7 +60,10 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     throw new Error('Invalid PUBLIC_WAREHOUSE_ID.');
   if (!Number.isInteger(seconds) || seconds < 60 || seconds > 86400)
     throw new Error('Invalid STAFF_SESSION_SECONDS.');
+  if (env.ADDRESS_ENCRYPTION_KEY && !/^[a-f0-9]{64}$/i.test(env.ADDRESS_ENCRYPTION_KEY))
+    throw new Error('Invalid ADDRESS_ENCRYPTION_KEY.');
   return {
+    addressEncryptionKey: env.ADDRESS_ENCRYPTION_KEY || undefined,
     environment: environment as ApplicationConfig['environment'],
     staffOrigins: origins,
     staffSessionSeconds: seconds,

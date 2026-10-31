@@ -1,1 +1,1 @@
-export default { navigationBarTitleText: '游客购物车' };
+export default { navigationBarTitleText: '购物车' };

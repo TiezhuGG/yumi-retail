@@ -590,13 +590,29 @@ export class CatalogService {
     const visible = rows.slice(0, query.limit);
     return { items: jsonValue(visible), hasMore, nextCursor: hasMore ? visible.at(-1)!.id : null };
   }
+  async checkoutSkus(tx: Tx, warehouseId: string, ids: string[]) {
+    return jsonValue(
+      await tx.$queryRaw<
+        Array<{
+          id: string;
+          name: string;
+          spec: string;
+          unit: string;
+          priceCents: bigint;
+          available: number;
+        }>
+      >(
+        Prisma.sql`SELECT id,name,spec,unit,"priceCents",available FROM (${this.visibleSkus(warehouseId, { keyword: '', categoryId: null })}) visible WHERE id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))})`,
+      ),
+    );
+  }
   private visibleSkus(
     warehouseId: string,
     query: { keyword: string; categoryId: string | null; skuId?: string; relatedToSkuId?: string },
   ) {
     return Prisma.sql`
       SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",CASE WHEN p.image_id IS NULL THEN NULL ELSE '/api/v1/product-images/'||p.id::text||'/'||p.image_id::text END AS "imageUrl",COALESCE((SELECT jsonb_agg('/api/v1/product-images/'||p.id::text||'/'||i.id::text ORDER BY i.sort_order) FROM product_images i WHERE i.product_id=p.id AND i.sort_order IS NOT NULL),'[]'::jsonb) AS "imageUrls",s.spec,s.unit,s.price_cents AS "priceCents",
-        CASE WHEN COALESCE(b.inventory_hold,false) OR b.active_count_id IS NOT NULL THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
+        CASE WHEN COALESCE(b.inventory_hold,false) OR b.active_count_id IS NOT NULL THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>statement_timestamp())),0))::int END AS available
       FROM skus s JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
       JOIN warehouses w ON w.id=${warehouseId}::uuid AND w.enabled
       LEFT JOIN stock_balances b ON b.sku_id=s.id AND b.warehouse_id=${warehouseId}::uuid

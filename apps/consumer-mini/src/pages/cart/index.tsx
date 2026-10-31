@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { View, Text, Button } from '@tarojs/components';
 import { guestCart } from '../../cart-storage';
+import {
+  cartIdentity,
+  readAccountCart,
+  cartRequest,
+  mergeGuest,
+  pendingMerge,
+} from '../../account-cart';
+import type { CartIdentity } from '../../account-cart';
+import type { ConsumerCart } from '../../../../../packages/contracts/src/index';
+import type { CartItem } from '../../guest-cart';
 import { cartSummary, checkCart } from '../../guest-cart';
 import type { CartDraft, CartCheck } from '../../guest-cart';
 import { request, CatalogRequestError } from '../../api';
@@ -13,6 +23,14 @@ export default function Cart() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const sequence = useRef(0);
+  const operation = useRef(false);
+  const guestViewRef = useRef(false);
+  const [identity, setIdentity] = useState<CartIdentity | null>(null);
+  const [accountMode, setAccountMode] = useState(false);
+  const [cartVersion, setCartVersion] = useState(0);
+  const [guestCount, setGuestCount] = useState(0);
+  const [pending, setPending] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
   useDidHide(() => {
     sequence.current++;
   });
@@ -30,9 +48,23 @@ export default function Cart() {
     setBusy(true);
     setError('');
     setChecks({});
+    setDraft(null);
+    setIdentity(null);
+    setAccountMode(false);
     try {
-      const current = guestCart.read();
+      const local = guestCart.read();
+      setGuestCount(local.items.length);
+      setPending(!!pendingMerge());
+      const actor = await cartIdentity();
+      if (token !== sequence.current) return;
+      setIdentity(actor);
+      const remote = actor && !guestViewRef.current ? await readAccountCart(actor) : null;
+      if (token !== sequence.current) return;
+      setAccountMode(!!remote);
+      setCartVersion(remote?.version ?? 0);
+      const current: CartDraft = remote ? { version: 1, items: remote.items } : local;
       setDraft(current);
+      setUncertain(false);
       await checkCart(
         current.items,
         (id) => request<SaleSku>(`/products/${id}`),
@@ -58,10 +90,87 @@ export default function Cart() {
     try {
       const next = action();
       setDraft(next);
+      setGuestCount(next.items.length);
       setError('');
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败');
     }
+  }
+  async function mutate(path: string, body: unknown, method: 'POST' | 'PUT' | 'DELETE') {
+    if (!identity || operation.current || uncertain || pending) return;
+    operation.current = true;
+    const current = ++sequence.current;
+    setBusy(true);
+    setError('');
+    try {
+      await cartRequest<ConsumerCart>(identity, path, body, method);
+      if (current === sequence.current) await refresh();
+    } catch (e) {
+      if (current === sequence.current) {
+        setUncertain(true);
+        setError(
+          (e instanceof Error ? e.message : '暂未确认保存结果') +
+            '；请先重新读取购物车，再决定下一次操作。',
+        );
+      }
+    } finally {
+      operation.current = false;
+      if (current === sequence.current) setBusy(false);
+    }
+  }
+  function update(item: CartItem, delta = 0, toggle = false) {
+    if (accountMode)
+      void mutate(
+        `/consumer/cart/items/${item.skuId}`,
+        {
+          version: cartVersion,
+          quantity: item.quantity + delta,
+          selected: toggle ? !item.selected : item.selected,
+        },
+        'PUT',
+      );
+    else
+      change(() => (toggle ? guestCart.toggle(item.skuId) : guestCart.adjust(item.skuId, delta)));
+  }
+  async function merge() {
+    if (!identity || operation.current) return;
+    const answer = pending
+      ? { confirm: true }
+      : await Taro.showModal({
+          title: '合并到当前账号？',
+          content: `将本机草稿合并到${identity.profile.user.displayName}。相同规格数量相加，已有勾选状态保留；失效或缺货项也会保留。`,
+          confirmText: '确认合并',
+        });
+    if (!answer.confirm || operation.current) return;
+    operation.current = true;
+    const current = ++sequence.current;
+    setBusy(true);
+    setError('');
+    try {
+      await mergeGuest(identity);
+      if (current === sequence.current) {
+        guestViewRef.current = false;
+        await refresh();
+        void Taro.showToast({ title: '合并已确认', icon: 'success' });
+      }
+    } catch (e) {
+      if (current === sequence.current) {
+        setError(e instanceof Error ? e.message : '合并结果未知，请保留原稿并重试');
+        try {
+          setPending(!!pendingMerge());
+        } catch {
+          /* Keep the original merge error and all local data for recovery. */
+        }
+      }
+    } finally {
+      operation.current = false;
+      if (current === sequence.current) setBusy(false);
+    }
+  }
+  function switchView() {
+    if (operation.current) return;
+    guestViewRef.current = !guestViewRef.current;
+    void refresh();
   }
   async function reset() {
     const result = await Taro.showModal({
@@ -87,19 +196,56 @@ export default function Cart() {
   return (
     <View className="cart-page">
       <View className="cart-heading">
-        <Text className="cart-title">购物车草稿</Text>
+        <Text className="cart-title">{accountMode ? '账号购物车' : '本机购物车草稿'}</Text>
         <Button disabled={busy} onClick={() => void refresh()}>
           {busy ? '正在核验…' : '刷新价格与库存'}
         </Button>
       </View>
       <View className="cart-note">
-        草稿仅保存在这台设备，不占库存；数量按所选规格的售卖单位计。参考小计不含配送费，不是下单报价；登录合并与结算尚未开放。
+        {accountMode
+          ? `当前账号：${identity?.profile.user.displayName}。账号购物车保存到服务端。`
+          : '草稿仅保存在这台设备。'}
+        购物车不占库存；参考小计不含配送费，不是下单报价，结算尚未开放。
       </View>
+      {identity && (
+        <View className="cart-merge-panel">
+          <Text>
+            {pending
+              ? '有一笔合并待确认，原稿已冻结；请使用原账号重试，勿重复提交。'
+              : `本机草稿有${guestCount}种规格，可确认后合并到当前账号。`}
+          </Text>
+          <Button disabled={busy} onClick={() => void switchView()}>
+            {accountMode ? '查看本机草稿' : '返回账号购物车'}
+          </Button>
+          {(guestCount > 0 || pending) && (
+            <Button className="cart-merge-button" disabled={busy} onClick={() => void merge()}>
+              {pending ? '重试确认原合并' : '将本机草稿合并到当前账号'}
+            </Button>
+          )}
+        </View>
+      )}
+      {!identity && pending && (
+        <View className="cart-merge-panel">
+          <Text>
+            原账号有一笔合并待确认。请前往“我的”恢复原身份，再重试；原稿已保留且暂不可修改。
+          </Text>
+        </View>
+      )}
+      {!identity && (
+        <Button
+          className="cart-account-link"
+          onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}
+        >
+          前往“我的”核验登录
+        </Button>
+      )}
       {error && (
         <View className="store-feedback">
           <Text>{error}</Text>
-          <Button onClick={() => void refresh()}>重新读取草稿</Button>
-          {!draft && <Button onClick={() => void reset()}>重置本机草稿</Button>}
+          <Button onClick={() => void refresh()}>重新读取购物车</Button>
+          {!draft && !accountMode && !pending && (
+            <Button onClick={() => void reset()}>重置本机草稿</Button>
+          )}
         </View>
       )}
       {draft && items.length === 0 && (
@@ -131,7 +277,8 @@ export default function Cart() {
             <Button
               className={`cart-check ${item.selected ? 'selected' : ''}`}
               aria-label={`${item.selected ? '取消勾选' : '勾选'}${item.name}`}
-              onClick={() => change(() => guestCart.toggle(item.skuId))}
+              disabled={pending || (accountMode && (busy || uncertain))}
+              onClick={() => update(item, 0, true)}
             >
               {item.selected ? '✓' : '○'}
             </Button>
@@ -163,22 +310,32 @@ export default function Cart() {
                 <View className="cart-stepper">
                   <Button
                     aria-label={`减少${item.name}`}
-                    disabled={item.quantity <= 1}
-                    onClick={() => change(() => guestCart.adjust(item.skuId, -1))}
+                    disabled={item.quantity <= 1 || pending || (accountMode && (busy || uncertain))}
+                    onClick={() => update(item, -1)}
                   >
                     −
                   </Button>
                   <Text>{item.quantity}</Text>
                   <Button
                     aria-label={`增加${item.name}`}
-                    onClick={() => change(() => guestCart.adjust(item.skuId, 1))}
+                    disabled={pending || (accountMode && (busy || uncertain))}
+                    onClick={() => update(item, 1)}
                   >
                     ＋
                   </Button>
                 </View>
                 <Button
                   className="cart-remove"
-                  onClick={() => change(() => guestCart.remove(item.skuId))}
+                  disabled={pending || (accountMode && (busy || uncertain))}
+                  onClick={() =>
+                    accountMode
+                      ? void mutate(
+                          `/consumer/cart/items/${item.skuId}`,
+                          { version: cartVersion },
+                          'DELETE',
+                        )
+                      : change(() => guestCart.remove(item.skuId))
+                  }
                 >
                   移除
                 </Button>
@@ -190,13 +347,24 @@ export default function Cart() {
       {!!items.length && (
         <View className="cart-selection">
           <Button
+            disabled={pending || (accountMode && (busy || uncertain))}
             onClick={() =>
-              change(() =>
-                guestCart.select(
-                  valid.map((i) => i.skuId),
-                  !allSelected,
-                ),
-              )
+              accountMode
+                ? void mutate(
+                    '/consumer/cart/selection',
+                    {
+                      version: cartVersion,
+                      skuIds: valid.map((i) => i.skuId),
+                      selected: !allSelected,
+                    },
+                    'POST',
+                  )
+                : change(() =>
+                    guestCart.select(
+                      valid.map((i) => i.skuId),
+                      !allSelected,
+                    ),
+                  )
             }
           >
             {allSelected ? '取消全选可用项' : '全选可用项'}
@@ -213,7 +381,16 @@ export default function Cart() {
           <Text>
             {summary.units}件已计入{summary.excluded ? ` · ${summary.excluded}项待处理未计入` : ''}
           </Text>
-          <Button disabled>结算尚未开放</Button>
+          {accountMode ? (
+            <Button
+              disabled={busy || uncertain || pending || !items.some((i) => i.selected)}
+              onClick={() => void Taro.navigateTo({ url: '/pages/checkout/index' })}
+            >
+              结算前核验
+            </Button>
+          ) : (
+            <Button disabled>登录账号后可核验费用</Button>
+          )}
         </View>
       )}
       <Button

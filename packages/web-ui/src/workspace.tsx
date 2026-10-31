@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
+import { CheckoutPolicyWorkbench } from './checkout-policy.js';
+import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
@@ -12,7 +14,9 @@ export type WorkspaceView =
   | 'locations'
   | 'counts'
   | 'dispositions'
-  | 'reversals';
+  | 'reversals'
+  | 'service-area'
+  | 'checkout-policy';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -40,6 +44,20 @@ const routes: Array<{
     glyph: '▤',
     hint: '让每一件好物都井然有序',
     permission: 'catalog.read',
+  },
+  {
+    id: 'service-area',
+    name: '配送范围',
+    glyph: '⌂',
+    hint: '维护服务小区与楼栋白名单',
+    permission: 'service-area.read',
+  },
+  {
+    id: 'checkout-policy',
+    name: '报价规则',
+    glyph: '¥',
+    hint: '配置运费、起送与手动报价状态',
+    permission: 'checkout-policy.read',
   },
   {
     id: 'stock',
@@ -184,11 +202,20 @@ export function Workspace({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
+          ) : activeView === 'checkout-policy' ? (
+            <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'service-area' ? (
+            <ServiceAreaWorkbench profile={profile} />
           ) : (
             <CatalogWorkbench
               profile={profile}
               view={activeView}
-              allowedViews={allowed.map((r) => r.id)}
+              allowedViews={allowed
+                .map((r) => r.id)
+                .filter(
+                  (id): id is Exclude<WorkspaceView, 'service-area' | 'checkout-policy'> =>
+                    id !== 'service-area' && id !== 'checkout-policy',
+                )}
               onNavigate={navigate}
             />
           )}

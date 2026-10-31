@@ -13,6 +13,12 @@ for (const name of [
   'pages/cart/index.wxml',
   'pages/account/index.js',
   'pages/account/index.wxml',
+  'pages/service-area/index.js',
+  'pages/service-area/index.wxml',
+  'pages/addresses/index.js',
+  'pages/addresses/index.wxml',
+  'pages/checkout/index.js',
+  'pages/checkout/index.wxml',
 ]) {
   assert.ok(existsSync(`${root}/${name}`), `Missing mini-program artifact: ${name}`);
 }
@@ -22,6 +28,9 @@ assert.deepEqual(config.pages, [
   'pages/product/index',
   'pages/cart/index',
   'pages/account/index',
+  'pages/service-area/index',
+  'pages/addresses/index',
+  'pages/checkout/index',
 ]);
 for (const file of [
   'project.config.json',

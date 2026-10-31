@@ -3,7 +3,7 @@ import Taro, { useLoad } from '@tarojs/taro';
 import { View, Text, Button, Swiper, SwiperItem } from '@tarojs/components';
 import { request } from '../../api';
 import { createDetailLoader, initialDetailState } from '../../detail-loader';
-import { guestCart } from '../../cart-storage';
+import { addCartItem, CartSaveUnknownError } from '../../account-cart';
 import { ProductVisual } from '../../components/ProductVisual';
 export default function ProductDetail() {
   const [state, setState] = useState(initialDetailState),
@@ -25,17 +25,26 @@ export default function ProductDetail() {
     : product?.imageUrl
       ? [product.imageUrl]
       : [];
-  function addToCart() {
-    if (!product) return;
+  const [adding, setAdding] = useState(false);
+  const [addUncertain, setAddUncertain] = useState(false);
+  const addingRef = useRef(false);
+  async function addToCart() {
+    if (!product || addingRef.current || addUncertain) return;
+    addingRef.current = true;
+    setAdding(true);
     try {
-      guestCart.add(product);
-      void Taro.showToast({ title: '已加入本机草稿', icon: 'success' });
+      const title = await addCartItem(product);
+      void Taro.showToast({ title, icon: 'success' });
     } catch (e) {
+      if (e instanceof CartSaveUnknownError) setAddUncertain(true);
       void Taro.showModal({
         title: '未能加入购物车',
         content: e instanceof Error ? e.message : '请重试',
         showCancel: false,
       });
+    } finally {
+      addingRef.current = false;
+      setAdding(false);
     }
   }
   const back = () => void Taro.reLaunch({ url: '/pages/index/index' });
@@ -157,8 +166,18 @@ export default function ProductDetail() {
             >
               购物车草稿
             </Button>
-            <Button className="detail-buy" disabled={product.available < 1} onClick={addToCart}>
-              {product.available > 0 ? '加入本机草稿' : '商品暂时缺货'}
+            <Button
+              className="detail-buy"
+              disabled={adding || addUncertain || product.available < 1}
+              onClick={addToCart}
+            >
+              {addUncertain
+                ? '请到购物车核对'
+                : adding
+                  ? '正在保存…'
+                  : product.available > 0
+                    ? '加入购物车'
+                    : '商品暂时缺货'}
             </Button>
           </View>
         </>

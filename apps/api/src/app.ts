@@ -15,6 +15,21 @@ import type { ApiRequest, ApiResponse } from './http.js';
 import { StaffAuthService } from './staff-auth.js';
 import { ConsumerAuthService, validateConsumerEnvironment } from './consumer-auth.js';
 import { ConsumerController } from './consumer-controller.js';
+import { CheckoutService } from './checkout.js';
+import {
+  CheckoutController,
+  CheckoutPolicyController,
+  StoreController,
+} from './checkout-controller.js';
+import { ConsumerAddressController } from './consumer-address-controller.js';
+import { ConsumerAddressService } from './consumer-address.js';
+import { ConsumerCartController } from './consumer-cart-controller.js';
+import { ConsumerCartService } from './consumer-cart.js';
+import { ServiceAreaService } from './service-area.js';
+import {
+  ServiceAreaAdminController,
+  PublicServiceAreaController,
+} from './service-area-controller.js';
 import { Public, StaffGuard } from './staff-guard.js';
 import { StaffAdminController, StaffController, WarehouseController } from './staff-controller.js';
 import { ApiResult, object, text } from './api-result.js';
@@ -89,6 +104,13 @@ export async function createApplication(
     controllers: [
       HealthController,
       ConsumerController,
+      ConsumerCartController,
+      ConsumerAddressController,
+      CheckoutController,
+      CheckoutPolicyController,
+      StoreController,
+      ServiceAreaAdminController,
+      PublicServiceAreaController,
       StaffController,
       WarehouseController,
       StaffAdminController,
@@ -106,7 +128,14 @@ export async function createApplication(
     providers: [
       { provide: StaffAuthService, useValue: auth },
       { provide: ConsumerAuthService, useValue: consumer },
+      {
+        provide: ConsumerAddressService,
+        useValue: new ConsumerAddressService(catalog, config.addressEncryptionKey),
+      },
+      { provide: ConsumerCartService, useValue: new ConsumerCartService(catalog) },
+      { provide: CheckoutService, useValue: new CheckoutService(catalog) },
       { provide: CatalogService, useValue: catalog },
+      { provide: ServiceAreaService, useValue: new ServiceAreaService(catalog) },
       {
         provide: ProductImageService,
         useValue: new ProductImageService(
@@ -163,9 +192,9 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、本机开发消费者会话、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；微信登录及交易接口尚未实现。',
+        '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；微信登录及交易接口尚未实现。',
       )
-      .setVersion('0.7.0')
+      .setVersion('0.11.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

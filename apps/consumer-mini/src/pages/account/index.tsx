@@ -107,10 +107,12 @@ export default function Account() {
         <View className="account-card">
           <View className="account-link-heading">
             <Text className="account-card-title">我的购物车</Text>
-            <Text className="account-chip">本机草稿</Text>
+            <Text className="account-chip">{profile ? '账号购物车' : '本机草稿'}</Text>
           </View>
           <Text className="account-copy">
-            草稿保存在这台设备，当前登录不会合并到账号。切换身份后仍是同一份本机草稿；结算尚未开放。
+            {profile
+              ? '登录后加购保存到本人账号。本机草稿可在购物车确认合并；响应未知时请保留原稿并重试。'
+              : '游客草稿保存在这台设备。登录后可在购物车确认合并，退出不会清空账号购物车；结算尚未开放。'}
           </Text>
           <Button
             className="account-link"
@@ -121,10 +123,18 @@ export default function Account() {
         </View>
         <View className="account-card account-services">
           <Text className="account-card-title">个人服务</Text>
-          <View>
-            <Text>收货地址</Text>
-            <Text>待开放</Text>
-          </View>
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/service-area/index' })}
+          >
+            查看配送范围 →
+          </Button>
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/addresses/index' })}
+          >
+            我的收货地址 →
+          </Button>
           <View>
             <Text>我的订单</Text>
             <Text>待开放</Text>

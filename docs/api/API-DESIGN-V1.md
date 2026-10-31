@@ -372,3 +372,59 @@ GET /api/v1/storefront/products公开，严格limit/cursor/keyword/categoryId；
 ## 2026-10-31 消费者开发会话已实施
 
 POST /api/v1/consumer/auth/dev-session仅显式开启的非生产、隔离本机库、直接回环请求可用；无Forwarded/X-Forwarded-*，有Origin需允许，必须X-Yumi-Dev-Login:1。JSON仅profile=customer-a|customer-b，返回token/expiresAt/user{id,displayName,provider:DEVELOPMENT}；默认关闭404，非法字段400、入口头403、停用401、30次/15分钟/IP后429。GET /consumer/me及POST /consumer/auth/logout用独立Authorization Bearer，拒绝员工Cookie/令牌，不接受userId等额外查询或退出字段；返回最小user/expiresAt或loggedOut。无消费者Set-Cookie，不接受客户端角色/openid；到期/撤销/停用/版本变化401；网络异常5xx不等于退出。没有/auth/wechat/session或/cart/merge实现。OpenAPI已同步，见[记录](../verification/S4-CONSUMER-SESSION-2026-10-31.md)。
+
+
+## 2026-10-31 账号购物车接口实施
+
+新增消费者Bearer下GET /consumer/cart；POST /consumer/cart/items(version,skuId加入1件)；PUT /consumer/cart/items/:skuId(version,quantity,selected)；DELETE /consumer/cart/items/:skuId(body.version)；POST /consumer/cart/selection(version,skuIds,selected)；POST /consumer/cart/merge(items+Idempotency-Key)。只从会话取userId，严格字段/查询白名单；全购物车版本控制，旧版本409。合并按user+key+规范化请求摘要重放，返回cart与合并当时checks(available/unavailable/excess/unknown)，当前读需另GET，超50行/总200件整笔409 CART_LIMIT_EXCEEDED；无效或缺货引用也保留，不静默丢失。全部为实现接口，替代此前未实施/cart路径的计划项；价格和可用量复用公开商品API，不提供报价/结算。见[契约和异常](../verification/S4-ACCOUNT-CART-2026-10-31.md)。
+
+
+## 2026-10-31 已实现的配送范围接口
+
+以下均位于/api/v1，OpenAPI已导出。
+
+| 接口 | 输入/返回 |
+|---|---|
+| GET /admin/service-area | 员工范围鉴权；{area:null或含warehouse/buildings的完整快照} |
+| POST /admin/service-area | {name}，全局唯一，默认停用 |
+| POST /admin/service-area/update | {version,name,enabled} |
+| POST /admin/service-area/buildings | {version,name}，默认停用 |
+| POST /admin/service-area/buildings/:id/update | {version,name,enabled}，楼栋必须属于当前小区 |
+| GET /service-areas | 公开{items:[{id,name,version}]}，最多1个，未配置或暂停为空 |
+| GET /service-areas/:id/buildings | 公开{area:{id,name,version},items:[{id,name}]}，最多200 |
+| GET /service-areas/:id/buildings/:buildingId | 公开核验当前有效链，{area,building}；不可替代未来地址/订单写时校验 |
+
+后台需service-area.read/write，SUPER_ADMIN/OPERATIONS且当前经营仓库授权；写入要求Origin、CSRF和UUID Idempotency-Key，不接受客户端warehouse_id/area_id。固定经营仓库由PUBLIC_WAREHOUSE_ID限定。名称trim并合并连续空白，小区最多100字/楼栋80字，拒绝控制字符；楼栋名称按数据库lower唯一，数量200为技术边界。全范围版本不匹配409，历史同键重放返回原快照但仍复验当前角色与仓库范围；客户端成功后GET最新状态。额外字段/查询400，未登录401，无权限/仓库停用403，不存在或公开不可用404，重复/版本/容量/键冲突409，未知结果沿用原键重试。未配置经营仓库的后台503、公开列表为空。
+
+
+## 2026-10-31 已实现本人收货地址API
+
+原设计/addresses路由未启用，实际均为/api/v1/consumer/addresses并要求消费者Bearer。GET返回{version,items}，条目为id、areaId/areaName、buildingId/buildingName、unit、room、contactName、phone、note、isDefault、available，无userId或密文。最多20条，默认条目前置；失效范围的旧资料仍属本人，可读取和删除，available=false不能作为可下单证明。
+
+| 接口 | 输入/返回 |
+|---|---|
+| GET /consumer/addresses | 本人完整地址簿；无额外查询字段 |
+| POST /consumer/addresses | version、areaId、buildingId、unit、room、contactName、phone、note、isDefault |
+| POST /consumer/addresses/:id/update | 同创建的完整可变字段及地址簿version |
+| POST /consumer/addresses/:id/default | {version}，目标必须属于本人且范围当前有效 |
+| POST /consumer/addresses/:id/delete | {version}，软删除并清除联系密文，不自动另设默认 |
+
+所有写入要求UUID Idempotency-Key，成功仅{id,version}。回执在当前身份复验后、版本/范围校验前查重，历史成功重放不会撤销后来编辑或复活已删地址；相同键不同动作/目标/内容409。归属判定在非重放时优先于版本，外部/已删除ID404。额外字段/格式400、未登录/失效401、归属不存在404、范围停用/旧版本/容量/键冲突409、密钥未配置503。姓名、电话、门牌不得进入日志/回执/审计，正常地址响应仅发送本人。客户端结果未知保持原内容、键和账号，重试成功后GET最新列表；页面退出不自动重发，重新进入应先核对列表。未来结算仍须事务内重新校验范围和地址版本。
+
+
+## 2026-10-31 已实现的规则、预检与报价
+
+实际路由在/api/v1下，取代此前尚未启用的/checkout/quotes计划路径。
+
+| 接口 | 鉴权及行为 |
+|---|---|
+| GET /store | 公开{status:UNCONFIGURED/PAUSED/OPEN,policy:null或规则} |
+| GET /admin/checkout-policy | checkout-policy.read+当前经营仓库授权，{policy} |
+| POST /admin/checkout-policy | checkout-policy.write、Cookie/Origin/CSRF、UUID幂等键；{version:null或整数,deliveryFeeCents,minGoodsCents,freeDeliveryThresholdCents:null或整数,open}；新建open必须false |
+| POST /consumer/checkout/preview | 消费者Bearer；{addressId,addressVersion,cartVersion}；返回ready、issues、逐行状态/价格/数量和可空金额；不落报价 |
+| POST /consumer/checkout/quotes | 同输入+UUID Idempotency-Key；通过核验才保存并返回{id,createdAt,expiresAt,expired,preview} |
+| GET /consumer/checkout/quotes/:id | 本人历史快照及expired，到期不删除或续期；外部ID404 |
+
+preview逐行status为AVAILABLE/UNAVAILABLE/EXCESS，无有效售价为null；整单商品失效/超量时goodsCents=null，任何阻断条件下deliveryFeeCents/payableCents=null。issues区分EMPTY_SELECTION、CART_LIMIT_EXCEEDED、ADDRESS_OUT_OF_RANGE、POLICY_UNCONFIGURED、STORE_PAUSED、ITEMS_UNAVAILABLE、BELOW_MINIMUM。商品额只含当前全部有效选中行，不接受客户端单价、合计或SKU清单。addressVersion是全地址簿版本，不是单地址版本。
+
+额外字段/参数或金额格式400，身份失效401，角色/仓库/CSRF403，非本人地址/报价404，版本/同键内容冲突409；预检中的普通业务阻断返回200和ready=false，生成报价有阻断则409 CHECKOUT_BLOCKED；并发可重试冲突503，超过20个有效报价429。客户端未知结果保留原内容、键和本人账号，重试确认；历史重放保持原时间/金额，不把已过期历史快照变成新报价。规则版本变化或价格变化需重新核验和新键，不能自动覆盖旧报价。订单/支付路由未实现。

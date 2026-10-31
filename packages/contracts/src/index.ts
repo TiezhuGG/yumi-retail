@@ -301,3 +301,107 @@ export interface ProductCardPage {
   hasMore: boolean;
   nextCursor: string | null;
 }
+
+export interface ConsumerCartItem {
+  skuId: string;
+  quantity: number;
+  selected: boolean;
+  name: string;
+  spec: string;
+  unit: string;
+}
+export interface ConsumerCart {
+  version: number;
+  items: ConsumerCartItem[];
+}
+export interface CartMergeResult {
+  cart: ConsumerCart;
+  checks: Array<{ skuId: string; status: 'available' | 'unavailable' | 'excess' | 'unknown' }>;
+}
+
+export interface ServiceBuilding {
+  id: string;
+  name: string;
+  enabled: boolean;
+}
+export interface ServiceAreaDetail {
+  id: string;
+  name: string;
+  enabled: boolean;
+  version: number;
+  warehouse: { id: string; name: string };
+  buildings: ServiceBuilding[];
+}
+export interface PublicServiceArea {
+  id: string;
+  name: string;
+  version: number;
+}
+export interface PublicServiceBuildings {
+  area: PublicServiceArea;
+  items: Array<{ id: string; name: string }>;
+}
+
+export interface ConsumerAddressInput {
+  areaId: string;
+  buildingId: string;
+  unit: string;
+  room: string;
+  contactName: string;
+  phone: string;
+  note: string;
+  isDefault: boolean;
+}
+export interface ConsumerAddress extends ConsumerAddressInput {
+  id: string;
+  areaName: string;
+  buildingName: string;
+  available: boolean;
+}
+export interface ConsumerAddressBook {
+  version: number;
+  items: ConsumerAddress[];
+}
+export interface ConsumerAddressReceipt {
+  id: string;
+  version: number;
+}
+
+export interface CheckoutPolicy {
+  version: number;
+  deliveryFeeCents: number;
+  minGoodsCents: number;
+  freeDeliveryThresholdCents: number | null;
+  open: boolean;
+}
+export interface CheckoutLine {
+  skuId: string;
+  name: string;
+  spec: string;
+  unit: string;
+  quantity: number;
+  priceCents: number | null;
+  lineCents: number | null;
+  available: number;
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'EXCESS';
+}
+export interface CheckoutPreview {
+  addressId: string;
+  addressVersion: number;
+  cartVersion: number;
+  policy: CheckoutPolicy | null;
+  areaVersion: number | null;
+  ready: boolean;
+  issues: Array<{ code: string; message: string }>;
+  lines: CheckoutLine[];
+  goodsCents: number | null;
+  deliveryFeeCents: number | null;
+  payableCents: number | null;
+}
+export interface CheckoutQuote {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+  preview: CheckoutPreview;
+}

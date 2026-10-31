@@ -65,7 +65,9 @@ export default function Index() {
           </View>
         </View>
         <View className="community">
-          <Text>⌂ 单小区配送</Text>
+          <Text onClick={() => void Taro.navigateTo({ url: '/pages/service-area/index' })}>
+            ⌂ 单小区配送 ›
+          </Text>
           <Text className="community-note">用心选好物</Text>
         </View>
         <View className="store-search">

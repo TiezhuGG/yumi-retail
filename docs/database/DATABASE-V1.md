@@ -84,11 +84,11 @@ erDiagram
 | staff_warehouses | staff_id、warehouse_id | 组合唯一，限制仓库数据范围 |
 | sessions | subject_type/id、token_hash、expires_at、revoked_at、rotation_family | token_hash唯一，索引有效期；消费者/员工会话隔离 |
 | warehouses | code、name、address、status | code唯一，首期1条有效经营仓库 |
-| service_areas | warehouse_id、name、status、version | warehouse_id/status；单小区也保留实体 |
-| service_buildings | area_id、building_code/name、unit_rules、status | UNIQUE(area_id,building_code) |
+| service_areas | warehouse_id、singleton、name、enabled、version | 全局singleton=true唯一，warehouse_id唯一，默认停用 |
+| service_buildings | area_id、name、name_key、enabled | UNIQUE(area_id,name_key)，name_key=lower(name)，默认停用；编码/单元规则未实现 |
 | store_settings | singleton/business_id、opening_rules、min_goods_cents、delivery_fee_cents、paused、rule_version | 修改留审计；金额/暂停状态独立列 |
-| addresses | user_id、area_id、building_id、unit、room、contact_name、phone_ciphertext、note、is_deleted | (user_id,is_deleted)；电话/详细地址敏感字段加密 |
-| user_preferences | user_id、default_address_id | user_id主键；默认地址必须属于同一用户且有效 |
+| consumer_addresses（已实现） | user_id、area_id、building_id、payload、is_default、deleted | payload为联系/门牌JSON的AES-256-GCM密文；本人索引；有效默认部分唯一 |
+| consumer_address_books（已实现） | user_id、version | 每人独立版本和锁；当前默认用地址表部分唯一标记，未建立user_preferences |
 | categories | parent_id、name、sort、status | (parent_id,status,sort)，应用层禁止循环与超过两级 |
 | products | public_id、category_id、name、description、status | (category_id,status,id)，关键字检索初期限制范围并分页 |
 | skus | product_id、sku_code、barcode、spec、unit、price_cents、expiry_managed、status | sku_code唯一；barcode可空且唯一策略按真实商品规范确定 |
@@ -165,7 +165,7 @@ RETURNING warehouse_id, sku_id, reserved;
 
 | 表 | 关键字段 / 约束 | 索引与说明 |
 |---|---|---|
-| checkout_quotes | user_id、address_id/version、rule_version、snapshot_json、hash、expires_at | (user_id,expires_at)，绑定数量/价格/地址与主体 |
+| checkout_quotes（已实现） | user_id、key、digest、snapshot、request_id、created_at、expires_at | UNIQUE(user_id,key)，(user_id,expires_at)；无地址联系明文 |
 | orders | public_id、order_no、user_id、warehouse_id、area_id、order_status、fulfillment_status、goods_cents、delivery_fee_cents、payable_cents、paid_cents、refund_reserved_cents、refunded_cents、payment_deadline、paid_at、address_snapshot_ciphertext、version | order_no唯一；(user_id,created_at,id)、(warehouse_id,order_status,created_at)、(order_status,payment_deadline) |
 | order_items | order_id、sku_id、name/spec/unit/image_snapshot、unit_price_cents、ordered_qty、canceled_qty、dispatched_qty、subtotal_cents、refund_reserved_qty/cents、refunded_qty/cents | (order_id,id)，快照不跟随商品修改；行金额核对 |
 | order_events | order_id、event_type、before/after、actor_type/id、reason、request_id、created_at | (order_id,id)，只追加 |
@@ -320,3 +320,37 @@ products.image_id可空，旧行NULL；product_images保存id/product_id/object_
 ## 2026-10-31 消费者开发会话增量
 
 202610310004_consumer_sessions新增consumer_users(provider,subject唯一；当前约束仅DEVELOPMENT和两项预设身份)、consumer_sessions(随机令牌SHA256摘要、user_id、auth_version、绝对到期及撤销)、consumer_login_throttles和consumer_auth_audits。与staff完全独立，不改既有商品/库存/金额表。默认会话8小时，技术配置范围60–86400秒。开发库已迁移；集成测试仅一次性schema，yumi_test/public尚未应用新迁移。前端yumi.consumer-session.v1:API_BASE_URL只存token/expiresAt；购物车键不变。真实users微信身份及cart_items仍是后续设计，不能将开发subject当作openid，见[兼容性记录](../verification/S4-CONSUMER-SESSION-2026-10-31.md)。
+
+
+## 2026-10-31 账号购物车数据实施
+
+202610310005_consumer_carts新增consumer_carts(user_id唯一/version)、consumer_cart_items(user_id+sku_id唯一/数量1–200/selected/未核验标签)、consumer_cart_merges(user_id+key唯一/digest/result)及consumer_cart_audits。依附consumer_users；不设SKU外键，保留失效或未知引用，禁止通过隐藏商品资料补全。全购物车版本代替计划中逐行版本，所有动作锁本人cart、复验并共享锁会话/用户，购物车写入、版本、审计、回执同事务。无价格/库存/成本快照，无库存预占；回执暂不自动过期。开发库已应用，测试为一次性schema，yumi_test/public未迁移。原本机键保留version1/items并增加可选merge:{key,userId,items独立快照}，待确认时冻结，权威拒绝保留稿解除、成功确认才清空。真实微信用户仍待下一适配，见[兼容性记录](../verification/S4-ACCOUNT-CART-2026-10-31.md)。
+
+
+## 2026-10-31 服务范围增量
+
+迁移202610310006_service_areas仅增加上述两表，外键RESTRICT，整数版本非负，不触碰历史商品/库存/购物车；无默认小区和楼栋。全范围版本随所有小区/楼栋修改递增。写事务先经营仓库共享锁，再全局小区advisory锁及小区行排他锁，名称唯一和200栋容量在锁内校验；审计和既有idempotency_records同事务提交。公开楼栋读取在事务内共享锁定有效父小区和仓库，返回该快照的有效楼栋；下次刷新可能变化，未来地址写入仍需重新事务校验。
+
+本机yumi_dev/public已增量迁移；测试使用一次性yumi_test schema完整迁移后删除。部署顺序：停API、迁移、生成客户端/构建、重启。无删表回退；不修改已应用迁移。真实范围尚待提供，不在种子脚本写入样例。
+
+
+## 2026-10-31 本人地址增量
+
+202610310007_consumer_addresses新增地址簿、地址、幂等操作回执、地址审计四表；外键RESTRICT，数据库约束有效默认唯一，已删行必须payload=null且非默认。20条容量在本人地址簿排他锁内计算；当前消费者/会话在共享锁下二次核验。范围共享锁持续至地址、默认标记、版本、审计及回执一起提交，与范围启停互斥。默认替换先清本人旧默认，再设置本人目标，同事务回滚。没有地址删除级联影响其他模块。
+
+payload使用AES-256-GCM随机12字节nonce、128位认证标签，AAD绑定userId:addressId；存v1.nonce.tag.ciphertext，不存联系明文。回执只存id/version、内容摘要用同环境密钥HMAC-SHA256，避免对电话等低熵内容暴露无密钥摘要；审计仅动作、地址ID、本人ID、版本、requestId和时间。默认查询返回解密后的本人资料以及当前小区/楼栋名称、available状态。
+
+ADDRESS_ENCRYPTION_KEY为32随机字节的64位hex环境配置，无默认值；缺失时地址服务503，其他模块保持可用。已有密文必须保留对应密钥，备份数据库时另行受控备份密钥；当前仅单密钥v1，轮换须显式离线解密/重加密及回执摘要迁移，禁止直接改值。生产KMS、多密钥轮换/保留清理仍未实施。删除清payload，不删除最小墓碑/审计/回执，避免迟到重试重新创建。
+
+迁移已应用本机yumi_dev/public并重启API，无样例地址/经营范围。隔离测试schema完整迁移后清理；yumi_test/public未做本次增量。其他环境先停消费者写入、迁移、生成客户端/构建、重启，不删表回退。订单快照模型后续实现，不能由地址可变行替代。
+
+
+## 2026-10-31 报价增量
+
+202610310008_checkout_quotes新增checkout_policies与checkout_quotes。规则warehouse_id主键并外键绑定仓库，整数分配送/起送/免运在0–100000000，免运可null，open默认false，版本非负。报价user_id外键绑定消费者，唯一(user_id,key)，保存规范化输入摘要和不可变JSON明细、服务端生成时间/到期时间、request_id，不存电话/门牌/联系人。snapshot引用地址ID与全地址簿版本、购物车版本、范围版本、规则版本和SKU数量/名称/规格/单价/行额/可用量快照。未创建订单、库存预占或事件表。
+
+预检/报价使用READ COMMITTED事务：共享锁二次校验消费者会话；共享锁本人地址簿、本人购物车及有效范围链、规则行，使这些配置在本次校验期间保持一致；已选商品的可见性/批次/库位/余额汇总在一个SQL语句快照读取。效期使用statement_timestamp()，防止事务等锁后仍按事务开始时间销售已过期批次。只在短事务期间保护配置，事务提交不持库存锁或预占，之后可能变化。
+
+生成报价先按用户取advisory事务锁串行化多键创建和查重，同键摘要冲突409，已成功重放先于当前版本/范围重新核验以保持历史结果但不延长到期。最新有效报价最多20条，过期记录暂保留以保障迟到重放；自动清理/存储治理仍待后续设计。未来订单必须重新核验报价所有依赖、过期、价格和库存，不能只信snapshot.ready。无独立报价审计表，报价不可变行保存本人/时间/requestId作为生成记录；规则变更用既有business_audits同事务。
+
+已应用本机yumi_dev/public并重启API，未配置经营规则或样例报价。全部测试使用一次性yumi_test schema并清理，未改变public结构或库存。部署按停写/迁移/生成客户端/构建/重启执行，不删表回退。

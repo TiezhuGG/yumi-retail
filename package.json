@@ -58,7 +58,17 @@
     "verify:mini": "node scripts/verify-mini-artifacts.mjs",
     "pretest:consumer-session": "npm run build:server",
     "test:consumer-session": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-session.integration.test.ts",
-    "test:mini-session": "node --import tsx tests/consumer-session.test.ts"
+    "test:mini-session": "node --import tsx tests/consumer-session.test.ts",
+    "pretest:consumer-cart": "npm run build:server",
+    "test:consumer-cart": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-cart.integration.test.ts",
+    "test:cart-merge": "node --import tsx tests/cart-merge.test.ts",
+    "pretest:service-area": "npm run build:server",
+    "test:service-area": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/service-area.integration.test.ts",
+    "setup:address-key": "node scripts/configure-address-key.mjs",
+    "pretest:consumer-address": "npm run build:server",
+    "test:consumer-address": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-address.integration.test.ts",
+    "pretest:checkout": "npm run build:server",
+    "test:checkout": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/checkout.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

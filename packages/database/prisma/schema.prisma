@@ -51,6 +51,7 @@ model Warehouse {
   code        String              @unique
   name        String
   enabled     Boolean             @default(true)
+  serviceArea ServiceArea?
   staffScopes StaffWarehouse[]
   receipts    InboundReceipt[]
   balances    StockBalance[]
@@ -594,6 +595,8 @@ model ConsumerUser {
   enabled     Boolean  @default(true)
   authVersion Int      @default(0) @map("auth_version")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  addressBook ConsumerAddressBook?
+  cart        ConsumerCart?
   sessions    ConsumerSession[]
   audits      ConsumerAuthAudit[]
 
@@ -634,4 +637,135 @@ model ConsumerAuthAudit {
 
   @@index([userId, createdAt])
   @@map("consumer_auth_audits")
+}
+
+model ConsumerCart {
+  userId String @id @map("user_id") @db.Uuid
+  version Int @default(0)
+  user ConsumerUser @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  items ConsumerCartItem[]
+  merges ConsumerCartMerge[]
+  audits ConsumerCartAudit[]
+  @@map("consumer_carts")
+}
+model ConsumerCartItem {
+  userId String @map("user_id") @db.Uuid
+  skuId String @map("sku_id") @db.Uuid
+  quantity Int
+  selected Boolean
+  name String @db.VarChar(120)
+  spec String @db.VarChar(100)
+  unit String @db.VarChar(16)
+  cart ConsumerCart @relation(fields: [userId], references: [userId], onDelete: Restrict, onUpdate: NoAction)
+  @@id([userId, skuId])
+  @@map("consumer_cart_items")
+}
+model ConsumerCartMerge {
+  userId String @map("user_id") @db.Uuid
+  key String @db.Uuid
+  digest String @db.Char(64)
+  result Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  cart ConsumerCart @relation(fields: [userId], references: [userId], onDelete: Restrict, onUpdate: NoAction)
+  @@id([userId, key])
+  @@map("consumer_cart_merges")
+}
+model ConsumerCartAudit {
+  id String @id @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  action String @db.VarChar(16)
+  version Int
+  requestId String @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  cart ConsumerCart @relation(fields: [userId], references: [userId], onDelete: Restrict, onUpdate: NoAction)
+  @@index([userId, createdAt])
+  @@map("consumer_cart_audits")
+}
+
+model ServiceArea {
+  id String @id @db.Uuid
+  singleton Boolean @unique @default(true)
+  warehouseId String @unique @map("warehouse_id") @db.Uuid
+  name String @db.VarChar(100)
+  enabled Boolean @default(false)
+  version Int @default(0)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  buildings ServiceBuilding[]
+  @@map("service_areas")
+}
+model ServiceBuilding {
+  id String @id @db.Uuid
+  areaId String @map("area_id") @db.Uuid
+  name String @db.VarChar(80)
+  nameKey String @map("name_key") @db.VarChar(80)
+  enabled Boolean @default(false)
+  area ServiceArea @relation(fields: [areaId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@unique([areaId, nameKey])
+  @@map("service_buildings")
+}
+
+model ConsumerAddressBook {
+ userId String @id @map("user_id") @db.Uuid
+ version Int @default(0)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ addresses ConsumerAddress[]
+ operations ConsumerAddressOperation[]
+ audits ConsumerAddressAudit[]
+ @@map("consumer_address_books")
+}
+model ConsumerAddress {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ areaId String @map("area_id") @db.Uuid
+ buildingId String @map("building_id") @db.Uuid
+ payload String?
+ isDefault Boolean @default(false) @map("is_default")
+ deleted Boolean @default(false)
+ book ConsumerAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@index([userId,deleted])
+ @@map("consumer_addresses")
+}
+model ConsumerAddressOperation {
+ userId String @map("user_id") @db.Uuid
+ key String @db.Uuid
+ digest String @db.Char(64)
+ result Json
+ book ConsumerAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@id([userId,key])
+ @@map("consumer_address_operations")
+}
+model ConsumerAddressAudit {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ addressId String @map("address_id") @db.Uuid
+ version Int
+ action String @db.VarChar(16)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ book ConsumerAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@index([userId,createdAt])
+ @@map("consumer_address_audits")
+}
+
+model CheckoutPolicy {
+ warehouseId String @id @map("warehouse_id") @db.Uuid
+ version Int @default(0)
+ deliveryFeeCents Int @map("delivery_fee_cents")
+ minGoodsCents Int @map("min_goods_cents")
+ freeDeliveryThresholdCents Int? @map("free_delivery_threshold_cents")
+ open Boolean @default(false)
+ @@map("checkout_policies")
+}
+model CheckoutQuote {
+ requestId String @map("request_id") @db.Uuid
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ key String @db.Uuid
+ digest String @db.Char(64)
+ snapshot Json
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+ @@unique([userId,key])
+ @@index([userId,expiresAt])
+ @@map("checkout_quotes")
 }
