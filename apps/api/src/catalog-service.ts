@@ -550,6 +550,15 @@ export class CatalogService {
       },
     );
   }
+  async publicStore() {
+    const warehouseId = this.publicWarehouseId;
+    if (
+      !warehouseId ||
+      !(await this.db.warehouse.findFirst({ where: { id: warehouseId, enabled: true } }))
+    )
+      throw failure(503, 'STORE_UNAVAILABLE', '经营仓库尚未配置或已暂停');
+    return warehouseId;
+  }
   async catalog(query: {
     limit: number;
     cursor?: string;
@@ -558,12 +567,7 @@ export class CatalogService {
     skuId?: string;
     relatedToSkuId?: string;
   }) {
-    const warehouseId = this.publicWarehouseId;
-    if (
-      !warehouseId ||
-      !(await this.db.warehouse.findFirst({ where: { id: warehouseId, enabled: true } }))
-    )
-      throw failure(503, 'STORE_UNAVAILABLE', '经营仓库尚未配置或已暂停');
+    const warehouseId = await this.publicStore();
     const rows = await this.db.$queryRaw<
       Array<{
         id: string;

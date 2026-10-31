@@ -1,29 +1,55 @@
-import { View, Text, Button, Input } from '@tarojs/components';
+import { View, Text, Button, Input, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import { useState, useRef, useEffect } from 'react';
 import { request } from '../../api';
-import type { ProductPage } from '../../api';
+import type { ProductPage, PublicCategory, PublicCategoryPage } from '../../api';
 import { createBrowseLoader, initialBrowseState } from '../../browse-loader';
+import { createCategoryLoader, initialCategoryState } from '../../category-loader';
 import { ProductVisual } from '../../components/ProductVisual';
-const themes = [
-  { name: '全部好物', icon: '▦', keyword: '', tone: 'cream' },
-  { name: '日用纸品', icon: '▤', keyword: '纸', tone: 'pink' },
-  { name: '衣物清洁', icon: '♧', keyword: '洗', tone: 'mint' },
-  { name: '家居收纳', icon: '▣', keyword: '袋', tone: 'blue' },
-];
 export default function Index() {
   const [browse, setBrowse] = useState(initialBrowseState);
   const [keyword, setKeyword] = useState('');
   const [tab, setTab] = useState('home');
+  const [categories, setCategories] = useState(initialCategoryState);
+  const [selectedCategory, setSelectedCategory] = useState<PublicCategory | null>(null);
+  useEffect(() => {
+    setSelectedCategory((selected) =>
+      selected ? (categories.rows.find((c) => c.id === selected.id) ?? selected) : null,
+    );
+  }, [categories.rows]);
+  const categoryLoader = useRef<ReturnType<typeof createCategoryLoader> | null>(null);
+  if (!categoryLoader.current)
+    categoryLoader.current = createCategoryLoader(
+      (path) => request<PublicCategoryPage>(path),
+      setCategories,
+    );
   const loader = useRef<ReturnType<typeof createBrowseLoader> | null>(null);
   if (!loader.current)
     loader.current = createBrowseLoader((path) => request<ProductPage>(path), setBrowse);
   const { rows, keyword: activeKeyword, cursor, busy, error } = browse;
   const load = (search?: string, more = false) => loader.current!.load(search, more);
-  useEffect(() => () => loader.current?.cancel(), []);
+  useEffect(
+    () => () => {
+      loader.current?.cancel();
+      categoryLoader.current?.cancel();
+    },
+    [],
+  );
   useDidShow(() => {
     void load();
+    void categoryLoader.current!.load();
   });
+  function chooseCategory(category: PublicCategory | null, targetTab = 'category') {
+    setTab(targetTab);
+    setSelectedCategory(category);
+    setKeyword('');
+    void loader.current!.load('', false, category?.id ?? null);
+  }
+  const categoryName = selectedCategory
+    ? selectedCategory.parentName
+      ? `${selectedCategory.parentName} / ${selectedCategory.name}`
+      : selectedCategory.name
+    : '全部商品';
   function choose(search: string) {
     setKeyword(search);
     void load(search);
@@ -64,24 +90,62 @@ export default function Index() {
         </View>
       </View>
       <View className="store-content">
-        <Text className="browse-note">快捷找好物 · 按关键词查找，完整商品分类待开放</Text>
-        <View className="theme-grid">
-          {themes.map((t) => (
+        <View className="category-panel">
+          <View className="category-panel-heading">
+            <Text>商品分类</Text>
             <Button
-              className="theme"
-              key={t.name}
-              disabled={busy}
+              className="category-refresh"
+              disabled={categories.busy}
               onClick={() => {
-                setTab('category');
-                choose(t.keyword);
+                void categoryLoader.current!.load();
+                void load();
               }}
             >
-              <View className={`theme-icon ${t.tone}`}>{t.icon}</View>
-              <Text>{t.name}</Text>
+              刷新分类
             </Button>
-          ))}
+          </View>
+          <ScrollView scrollX className="category-scroll">
+            <View className="category-chips">
+              <Button
+                className={`category-chip ${!selectedCategory ? 'selected' : ''}`}
+                onClick={() => chooseCategory(null)}
+              >
+                全部商品
+              </Button>
+              {categories.rows.map((category) => (
+                <Button
+                  key={category.id}
+                  className={`category-chip ${selectedCategory?.id === category.id ? 'selected' : ''}`}
+                  onClick={() => chooseCategory(category)}
+                >
+                  {category.parentName
+                    ? `${category.parentName} / ${category.name}`
+                    : category.name}
+                </Button>
+              ))}
+            </View>
+          </ScrollView>
+          {categories.busy && <Text className="category-status">正在加载分类…</Text>}
+          {categories.error && (
+            <View className="category-error">
+              <Text>分类暂时没能加载：{categories.error}</Text>
+              <Button onClick={() => void categoryLoader.current!.retry()}>重试分类</Button>
+            </View>
+          )}
+          {!categories.busy && !categories.error && !categories.rows.length && (
+            <Text className="category-status">暂无可浏览分类，可先查看全部商品。</Text>
+          )}
+          {categories.cursor && !categories.error && (
+            <Button
+              className="category-more"
+              disabled={categories.busy}
+              onClick={() => void categoryLoader.current!.load(true)}
+            >
+              更多分类
+            </Button>
+          )}
         </View>
-        {tab === 'home' && !activeKeyword && (
+        {tab === 'home' && !activeKeyword && !selectedCategory && (
           <View className="store-hero">
             <View className="hero-badge">日常好物 · 用心甄选</View>
             <Text className="hero-title">
@@ -91,8 +155,7 @@ export default function Index() {
             <Button
               className="hero-button"
               onClick={() => {
-                setTab('category');
-                choose('');
+                chooseCategory(null);
               }}
             >
               逛逛好物 →
@@ -113,18 +176,27 @@ export default function Index() {
               {activeKeyword
                 ? `“${activeKeyword}”相关好物`
                 : tab === 'category'
-                  ? '全部商品'
+                  ? categoryName
                   : '为你精选'}
             </Text>
           </View>
           {activeKeyword ? (
             <Button className="section-link" disabled={busy} onClick={() => choose('')}>
-              查看全部
+              {selectedCategory ? '清除关键词' : '查看全部'}
             </Button>
           ) : (
             <Text className="section-subtitle">好好生活，从小事开始</Text>
           )}
         </View>
+        {(selectedCategory || activeKeyword) && (
+          <View className="category-context">
+            <Text>
+              当前分类：{categoryName}
+              {activeKeyword ? ` · 关键词：${activeKeyword}` : ''}
+            </Text>
+            <Button onClick={() => chooseCategory(null)}>清除筛选</Button>
+          </View>
+        )}
         {error && (
           <View className="store-feedback">
             <Text>暂时没能加载商品</Text>
@@ -147,8 +219,8 @@ export default function Index() {
           <View className="store-feedback">
             <Text className="empty-symbol">⌕</Text>
             <Text>还没找到这件好物</Text>
-            <Text className="feedback-copy">换个关键词，或看看其他商品吧</Text>
-            <Button onClick={() => choose('')}>看看全部商品</Button>
+            <Text className="feedback-copy">当前筛选下暂无商品，换个分类或清除筛选再看看吧</Text>
+            <Button onClick={() => chooseCategory(null)}>看看全部商品</Button>
           </View>
         )}
         <View className={`product-grid ${tab === 'category' ? 'category-products' : ''}`}>
@@ -189,14 +261,13 @@ export default function Index() {
         {!busy && rows.length > 0 && !cursor && (
           <Text className="store-end">— 每一份日常，都值得用心 —</Text>
         )}
-        <Text className="browse-note">商品包装为示意图 · 在线下单尚未开放</Text>
+        <Text className="browse-note">未上传图片时显示包装示意 · 在线下单尚未开放</Text>
       </View>
       <View className="store-tabs">
         <Button
           className={tab === 'home' ? 'selected' : ''}
           onClick={() => {
-            setTab('home');
-            choose('');
+            chooseCategory(null, 'home');
           }}
         >
           <Text>⌂</Text>
@@ -205,12 +276,11 @@ export default function Index() {
         <Button
           className={tab === 'category' ? 'selected' : ''}
           onClick={() => {
-            setTab('category');
-            choose('');
+            chooseCategory(null);
           }}
         >
           <Text>▦</Text>
-          <Text>找好物</Text>
+          <Text>分类</Text>
         </Button>
         <Button onClick={() => upcoming('购物车')}>
           <Text>♧</Text>

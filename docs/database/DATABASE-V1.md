@@ -300,3 +300,8 @@ products.image_id可空，旧行NULL；product_images保存id/product_id/object_
 ## 规格详情读取增量（2026-10-31）
 
 无DDL或新迁移。复用skus.product_id索引及公开目录SQL，以启用的锚点SKU所属product_id限定兄弟规格，同一语句快照继续计算公开仓各SKU可用量。最多20+1检测异常过量，不分页截断。GET不改商品、库存、成本、审计或幂等记录；商品创建1–20上限不变。此前图片集/审计增量仍为工程运行前置。见[验证记录](../verification/S2-PRODUCT-VARIANTS-2026-10-31.md)。
+
+
+## 公开分类读取增量（2026-10-31）
+
+无DDL/新迁移。复用categories父关联及UUID游标，条件enabled且父enabled，投影id/name/parent_id与父name；公开分类和商品共享经营仓可用性检查。读取不写分类版本、审计、幂等、库存/成本。商品筛选继续本级或直接子级，并按既有公开目录条件过滤。见[验证记录](../verification/S2-CONSUMER-CATEGORIES-2026-10-31.md)。

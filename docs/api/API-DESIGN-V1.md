@@ -352,3 +352,8 @@ GET /api/v1/admin/products/:id/images需catalog.read，返回 {product,images:[{
 ## 公开详情规格增量（2026-10-31）
 
 GET /api/v1/products/:id保留SaleSku字段，新增variants: SaleSku[]（1–20，同商品启用规格含缺货、UUID升序）。同一SQL读取选中SKU/兄弟规格及价格/原可用量计算，不依赖列表分页。锚点须启用且公开：无效UUID/额外查询参数400、隐藏/停用/未知404、经营仓不可用或异常超过20个启用规格503；不递补其他规格。列表接口结构不变，relatedToSkuId只供内部调用。兼容旧客户端只读顶层；新客户端对旧API无variants按单规格显示，完整功能依赖新版API。GET无业务写入，快照不构成锁价/锁货；见[本轮记录](../verification/S2-PRODUCT-VARIANTS-2026-10-31.md)与实际OpenAPI。
+
+
+## 公开分类接口（2026-10-31已实现）
+
+GET /api/v1/categories公开分页读取，参数仅limit（默认20，1–50）/cursor（UUID），返回 {items:[{id,name,parentId,parentName}],hasMore,nextCursor}，UUID升序。只返回enabled分类且父节点启用，根parent字段null，子项附父名称，含空分类，无内部维护字段或统计；参数400、经营仓未配置/停用503。GET无业务写入。原GET /products?categoryId=UUID继续父级含直接子级、子级仅自身，可同时keyword/cursor；未知/停用分类返回空商品页。实际契约与功能/UI分离证据见[报告](../verification/S2-CONSUMER-CATEGORIES-2026-10-31.md)和openapi.json。

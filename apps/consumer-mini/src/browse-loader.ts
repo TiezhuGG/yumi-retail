@@ -3,6 +3,7 @@ import type { ProductPage, SaleSku } from './api';
 export interface BrowseState {
   rows: SaleSku[];
   keyword: string;
+  categoryId: string | null;
   cursor: string | null;
   busy: boolean;
   error: string;
@@ -10,12 +11,14 @@ export interface BrowseState {
 export const initialBrowseState: BrowseState = {
   rows: [],
   keyword: '',
+  categoryId: null,
   cursor: null,
   busy: false,
   error: '',
 };
 interface Intent {
   keyword: string;
+  categoryId: string | null;
   cursor: string | null;
   append: boolean;
 }
@@ -38,6 +41,7 @@ export function createBrowseLoader(
     publish({
       ...state,
       keyword: intent.keyword,
+      categoryId: intent.categoryId,
       rows: intent.append ? state.rows : [],
       cursor: intent.append ? state.cursor : null,
       busy: true,
@@ -45,7 +49,7 @@ export function createBrowseLoader(
     });
     try {
       const result = await fetchPage(
-        `/products?limit=20${intent.keyword ? `&keyword=${encodeURIComponent(intent.keyword)}` : ''}${intent.cursor ? `&cursor=${encodeURIComponent(intent.cursor)}` : ''}`,
+        `/products?limit=20${intent.keyword ? `&keyword=${encodeURIComponent(intent.keyword)}` : ''}${intent.categoryId ? `&categoryId=${encodeURIComponent(intent.categoryId)}` : ''}${intent.cursor ? `&cursor=${encodeURIComponent(intent.cursor)}` : ''}`,
       );
       if (token !== sequence) return;
       const rows = intent.append ? [...state.rows, ...result.items] : result.items;
@@ -66,9 +70,21 @@ export function createBrowseLoader(
     }
   }
   return {
-    load(keyword = state.keyword, more = false) {
-      if (more && (state.busy || !state.cursor)) return Promise.resolve();
-      return run({ keyword: keyword.trim(), cursor: more ? state.cursor : null, append: more });
+    load(keyword = state.keyword, more = false, categoryId = state.categoryId) {
+      if (
+        more &&
+        (state.busy ||
+          !state.cursor ||
+          categoryId !== state.categoryId ||
+          keyword.trim() !== state.keyword)
+      )
+        return Promise.resolve();
+      return run({
+        keyword: keyword.trim(),
+        categoryId,
+        cursor: more ? state.cursor : null,
+        append: more,
+      });
     },
     retry: () => (failed ? run(failed) : Promise.resolve()),
     cancel: () => {

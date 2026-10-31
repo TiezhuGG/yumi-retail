@@ -34,6 +34,7 @@ import {
   CatalogAdminController,
   InboundController,
   PublicCatalogController,
+  PublicCategoryController,
 } from './catalog-controller.js';
 
 export interface AccessEvent {
@@ -89,6 +90,7 @@ export async function createApplication(
       ProductImageController,
       InboundController,
       PublicCatalogController,
+      PublicCategoryController,
       InventoryController,
       StockCountController,
       StockDispositionController,

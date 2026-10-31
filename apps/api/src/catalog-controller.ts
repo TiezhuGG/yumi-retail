@@ -798,3 +798,51 @@ export class PublicCatalogController {
     return success(request, { ...selected, variants: result.items });
   }
 }
+
+@ApiTags('公开分类')
+@Controller('categories')
+export class PublicCategoryController {
+  constructor(@Inject(CatalogService) private readonly service: CatalogService) {}
+  @Get()
+  @Public()
+  @paging()
+  @ApiOperation({ summary: '启用分类及启用父分类下的子分类，含空分类，无商品数量统计' })
+  @ApiResult(
+    paged(
+      object({
+        id: text,
+        name: text,
+        parentId: { type: 'string', nullable: true },
+        parentName: { type: 'string', nullable: true },
+      }),
+    ),
+    [400, 503, 500],
+  )
+  async list(@Req() request: ApiRequest, @Query() query: Record<string, unknown>) {
+    fields(query, ['limit', 'cursor']);
+    const { limit, cursor } = page(query);
+    await this.service.publicStore();
+    const rows = await this.service.db.category.findMany({
+      where: {
+        enabled: true,
+        ...(cursor ? { id: { gt: cursor } } : {}),
+        OR: [{ parentId: null }, { parent: { enabled: true } }],
+      },
+      include: { parent: { select: { name: true } } },
+      orderBy: { id: 'asc' },
+      take: limit + 1,
+    });
+    return success(
+      request,
+      resultPage(
+        rows.map((c) => ({
+          id: c.id,
+          name: c.name,
+          parentId: c.parentId,
+          parentName: c.parent?.name ?? null,
+        })),
+        limit,
+      ),
+    );
+  }
+}

@@ -33,3 +33,15 @@ export const productImageUrl = (path: string) => API_BASE_URL.replace(/\/api\/v1
 export interface SaleSkuDetail extends SaleSku {
   variants: SaleSku[];
 }
+
+export interface PublicCategory {
+  id: string;
+  name: string;
+  parentId: string | null;
+  parentName: string | null;
+}
+export interface PublicCategoryPage {
+  items: PublicCategory[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}

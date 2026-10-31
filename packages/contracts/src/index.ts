@@ -271,3 +271,15 @@ export interface ProductGallery {
 export interface SaleSkuDetail extends SaleSku {
   variants: SaleSku[];
 }
+
+export interface PublicCategory {
+  id: string;
+  name: string;
+  parentId: string | null;
+  parentName: string | null;
+}
+export interface PublicCategoryPage {
+  items: PublicCategory[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}

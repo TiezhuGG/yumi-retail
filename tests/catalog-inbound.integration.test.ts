@@ -8,6 +8,7 @@ import { createApplication } from '../apps/api/dist/app.js';
 import { applicationConfig } from '../apps/api/dist/config.js';
 import type {
   ProductGallery,
+  PublicCategory,
   Category,
   Page,
   Product,
@@ -2570,5 +2571,142 @@ test('20-spec detail includes the selected last UUID and all enabled siblings wi
   assert.equal((await visible(anchor.id)).status, 200);
   checks.push(
     'public detail: all current enabled siblings, selected identity, stock/prices, hidden anchor and 20-spec boundary',
+  );
+});
+
+test('public categories page only enabled categories with enabled parents, preserve empty nodes and expose no staff fields', async () => {
+  const root = await ok<Category>('/admin/categories', { name: '公开分类根' });
+  const child = await ok<Category>('/admin/categories', { name: '空子分类', parentId: root.id });
+  const disabled = await ok<Category>('/admin/categories', { name: '停用分类' });
+  const hiddenChild = await ok<Category>('/admin/categories', {
+    name: '被父隐藏子分类',
+    parentId: disabled.id,
+  });
+  await ok<Category>(`/admin/categories/${disabled.id}/disable`, { version: disabled.version });
+  const before = {
+    audit: await db.businessAudit.count(),
+    keys: await db.idempotencyRecord.count(),
+    balance: await db.stockBalance.count(),
+  };
+  const rows: import('../packages/contracts/src/index.ts').PublicCategory[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: { status: number; data: Page<PublicCategory> } = await call<Page<PublicCategory>>(
+      `/categories?limit=7${cursor ? `&cursor=${cursor}` : ''}`,
+    );
+    assert.equal(page.status, 200);
+    rows.push(...page.data.items);
+    cursor = page.data.nextCursor;
+  } while (cursor);
+  assert.equal(new Set(rows.map((r) => r.id)).size, rows.length);
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    rows.map((r) => r.id).sort(),
+  );
+  assert.deepEqual(
+    rows.find((r) => r.id === child.id),
+    { id: child.id, name: child.name, parentId: root.id, parentName: root.name },
+  );
+  assert(rows.some((r) => r.id === root.id));
+  assert(!rows.some((r) => r.id === disabled.id || r.id === hiddenChild.id));
+  assert(rows.every((r) => Object.keys(r).sort().join(',') === 'id,name,parentId,parentName'));
+  assert.deepEqual(
+    {
+      audit: await db.businessAudit.count(),
+      keys: await db.idempotencyRecord.count(),
+      balance: await db.stockBalance.count(),
+    },
+    before,
+  );
+});
+
+test('public category pagination validates strict query and follows rename/parent disabling and store availability', async () => {
+  let root = await ok<Category>('/admin/categories', { name: '动态公开根' });
+  const child = await ok<Category>('/admin/categories', { name: '动态公开子', parentId: root.id });
+  for (const q of ['limit=0', 'limit=51', 'cursor=bad', 'keyword=x', 'enabled=false'])
+    assert.equal((await call(`/categories?${q}`)).status, 400);
+  root = await ok<Category>(`/admin/categories/${root.id}/rename`, {
+    version: root.version,
+    name: '新公开根名称',
+  });
+  // Read all pages to ensure public names are current even when not on the first page.
+  const all = async () => {
+    const rows: import('../packages/contracts/src/index.ts').PublicCategory[] = [];
+    let cursor: string | null = null;
+    do {
+      const p: Page<PublicCategory> = await ok<Page<PublicCategory>>(
+        `/categories?limit=50${cursor ? `&cursor=${cursor}` : ''}`,
+      );
+      rows.push(...p.items);
+      cursor = p.nextCursor;
+    } while (cursor);
+    return rows;
+  };
+  assert.equal((await all()).find((r) => r.id === child.id)!.parentName, root.name);
+  await ok<Category>(`/admin/categories/${root.id}/disable`, { version: root.version });
+  assert(!(await all()).some((r) => r.id === child.id || r.id === root.id));
+  await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: false } });
+  try {
+    assert.equal((await call('/categories')).status, 503);
+  } finally {
+    await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: true } });
+  }
+  assert.equal((await call('/admin/categories')).status, 401);
+});
+
+test('real category browsing combines parent/child scope, keyword and cursor without leaking sibling products', async () => {
+  const root = await ok<Category>('/admin/categories', { name: '筛选根' }),
+    child = await ok<Category>('/admin/categories', { name: '筛选子', parentId: root.id }),
+    other = await ok<Category>('/admin/categories', { name: '筛选外' });
+  const products: Product[] = [];
+  for (const [i, category] of [root, child, child, other].entries()) {
+    let p = await ok<Product>('/admin/products', {
+      categoryId: category.id,
+      name: `分类筛选${i === 2 ? '特别' : '普通'}-${run}`,
+      description: '合成筛选资料',
+      skus: [
+        {
+          code: `CBROWSE-${i}-${run}`,
+          spec: '1包',
+          unit: '包',
+          priceCents: 450,
+          expiryManaged: false,
+        },
+      ],
+    });
+    p = await publish(p);
+    products.push(p);
+  }
+  const first = await ok<Page<SaleSku>>(`/products?categoryId=${root.id}&limit=1`);
+  assert.equal(first.items.length, 1);
+  assert(first.nextCursor);
+  const ids = first.items.map((r) => r.id);
+  let cursor: string | null = first.nextCursor;
+  while (cursor) {
+    const p: Page<SaleSku> = await ok<Page<SaleSku>>(
+      `/products?categoryId=${root.id}&limit=1&cursor=${cursor}`,
+    );
+    ids.push(...p.items.map((r) => r.id));
+    cursor = p.nextCursor;
+  }
+  assert.deepEqual(
+    ids,
+    products
+      .slice(0, 3)
+      .map((p) => p.skus[0]!.id)
+      .sort(),
+  );
+  const exact = await ok<Page<SaleSku>>(
+    `/products?categoryId=${child.id}&keyword=${encodeURIComponent('特别')}`,
+  );
+  assert.deepEqual(
+    exact.items.map((r) => r.id),
+    [products[2]!.skus[0]!.id],
+  );
+  assert.equal((await ok<Page<SaleSku>>(`/products?categoryId=${randomUUID()}`)).items.length, 0);
+  await ok<Category>(`/admin/categories/${root.id}/disable`, { version: root.version });
+  assert.equal((await ok<Page<SaleSku>>(`/products?categoryId=${child.id}`)).items.length, 0);
+  checks.push(
+    'public categories: enabled parent scope, paging/names/empty nodes, strict query, read-only and actual category+keyword+cursor',
   );
 });
