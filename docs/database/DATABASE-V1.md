@@ -354,3 +354,14 @@ ADDRESS_ENCRYPTION_KEY为32随机字节的64位hex环境配置，无默认值；
 生成报价先按用户取advisory事务锁串行化多键创建和查重，同键摘要冲突409，已成功重放先于当前版本/范围重新核验以保持历史结果但不延长到期。最新有效报价最多20条，过期记录暂保留以保障迟到重放；自动清理/存储治理仍待后续设计。未来订单必须重新核验报价所有依赖、过期、价格和库存，不能只信snapshot.ready。无独立报价审计表，报价不可变行保存本人/时间/requestId作为生成记录；规则变更用既有business_audits同事务。
 
 已应用本机yumi_dev/public并重启API，未配置经营规则或样例报价。全部测试使用一次性yumi_test schema并清理，未改变public结构或库存。部署按停写/迁移/生成客户端/构建/重启执行，不删表回退。
+
+
+## 2026-11-01 订单预占增量
+
+迁移`202611010001_order_reservations`新增consumer_orders、order_items、order_allocations、order_events，不回填合成订单或修改旧库存数量。订单以BIGINT整数分保存金额，以(user_id,key)、quote_id及order_no唯一；报价必须属于同消费者。商品快照和逐位置分配数量受延迟约束检查，预占/释放流水必须与仓库、SKU、批次、位置及数量配平。分配只能一次性补写release_ledger_id，不可删除；商品/事件追加后不可改；订单快照不可改，只允许未支付取消及version+1。现有事件仅PENDING，不宣称完整Outbox消费者已实现。
+
+地址小区/楼栋名称、联系人/电话/门牌/地址备注及单独orderNote整体AES-256-GCM加密，以订单+用户ID作AAD；随机nonce，复用已配置地址密钥。源地址修改/删除不改变订单快照。key/digest使用规范化请求HMAC，不把备注明文放入流水、事件、日志或幂等回执；密钥须随数据库备份，未配置不能创建/读取联系资料。
+
+stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；actor_id变可空，新增consumer_actor_id。CHECK强制三种合法结构：STAFF仅员工、CONSUMER仅消费者、SYSTEM无用户ID。消费者预占/主动取消记录真实consumerActorId，后台超时记SYSTEM，不借用员工身份。现有员工写入不传actor_kind仍取STAFF，保持兼容。实物on_hand不因创建/取消/超时改变，reserved在汇总、批次、位置同事务增减，stock_balance和position版本递增；配套不可变两级流水。
+
+创建按SKU有序锁汇总，再锁批次/位置及商品元数据，分配FEFO并排除过期、停售、冻结、隔离、核对暂停和无效位置。取消与超时先锁订单，再按SKU有序锁汇总，共用释放内核；最后库存争抢、晚期事件失败、取消/超时竞争均通过真实PostgreSQL验证。工作进程每次事务只处理一笔，最长批次20笔，不将Redis当库存真相。

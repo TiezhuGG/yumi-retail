@@ -68,7 +68,10 @@
     "pretest:consumer-address": "npm run build:server",
     "test:consumer-address": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-address.integration.test.ts",
     "pretest:checkout": "npm run build:server",
-    "test:checkout": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/checkout.integration.test.ts"
+    "test:checkout": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/checkout.integration.test.ts",
+    "pretest:orders": "npm run build:server",
+    "test:orders": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/orders.integration.test.ts",
+    "test:order-intent": "node --import tsx tests/order-intent.test.ts"
   },
   "pnpm": {
     "overrides": {

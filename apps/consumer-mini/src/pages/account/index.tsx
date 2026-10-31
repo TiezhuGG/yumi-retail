@@ -135,10 +135,12 @@ export default function Account() {
           >
             我的收货地址 →
           </Button>
-          <View>
-            <Text>我的订单</Text>
-            <Text>待开放</Text>
-          </View>
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/orders/index' })}
+          >
+            我的订单 →
+          </Button>
           <View>
             <Text>售后服务</Text>
             <Text>待开放</Text>

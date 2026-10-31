@@ -427,4 +427,24 @@ POST /api/v1/consumer/auth/dev-session仅显式开启的非生产、隔离本机
 
 preview逐行status为AVAILABLE/UNAVAILABLE/EXCESS，无有效售价为null；整单商品失效/超量时goodsCents=null，任何阻断条件下deliveryFeeCents/payableCents=null。issues区分EMPTY_SELECTION、CART_LIMIT_EXCEEDED、ADDRESS_OUT_OF_RANGE、POLICY_UNCONFIGURED、STORE_PAUSED、ITEMS_UNAVAILABLE、BELOW_MINIMUM。商品额只含当前全部有效选中行，不接受客户端单价、合计或SKU清单。addressVersion是全地址簿版本，不是单地址版本。
 
-额外字段/参数或金额格式400，身份失效401，角色/仓库/CSRF403，非本人地址/报价404，版本/同键内容冲突409；预检中的普通业务阻断返回200和ready=false，生成报价有阻断则409 CHECKOUT_BLOCKED；并发可重试冲突503，超过20个有效报价429。客户端未知结果保留原内容、键和本人账号，重试确认；历史重放保持原时间/金额，不把已过期历史快照变成新报价。规则版本变化或价格变化需重新核验和新键，不能自动覆盖旧报价。订单/支付路由未实现。
+额外字段/参数或金额格式400，身份失效401，角色/仓库/CSRF403，非本人地址/报价404，版本/同键内容冲突409；预检中的普通业务阻断返回200和ready=false，生成报价有阻断则409 CHECKOUT_BLOCKED；并发可重试冲突503，超过20个有效报价429。客户端未知结果保留原内容、键和本人账号，重试确认；历史重放保持原时间/金额，不把已过期历史快照变成新报价。规则版本变化或价格变化需重新核验和新键，不能自动覆盖旧报价。该次报价切片未实现订单/支付路由；订单开发基础见2026-11-01增量，支付仍未实现。
+
+
+## 2026-11-01 本人订单与真实预占（仅本机开发）
+
+`GET /store`新增`orderSubmissionEnabled`，由服务端开发开关决定，默认false；此标志不代表已确认经营规则或支付能力。以下路由均位于`/api/v1`，仅消费者Bearer，不接受员工Cookie替代本人身份。
+
+| 接口 | 输入与行为 |
+|---|---|
+| POST /consumer/orders | UUID Idempotency-Key；`{quoteId,note?}`，备注最多200字符；成功仅`{id}` |
+| GET /consumer/orders | 可选UUID cursor；本人订单按createdAt/id倒序，每页20，返回items/hasMore/nextCursor |
+| GET /consumer/orders/:id | 本人订单完整明细、金额、加密收货资料解密结果与状态；外部ID404 |
+| POST /consumer/orders/:id/cancel | 空对象；仅本人且从未开始支付的待支付订单，成功`{id}`；已取消重复调用仍成功 |
+
+创建仅在ORDER_DEV_SUBMIT_ENABLED=1、非生产、loopback API和本地yumi_dev/yumi_test数据库允许；默认关闭。提交不接受客户端商品、数量、价格、地址明文或状态。事务内复验会话、原报价归属/有效期/唯一消费、购物车/地址簿/范围/规则版本与实时商品/库存，任何一行失效整单拒绝。锁定汇总/批次/位置后按效期优先、无效期最后预占，同时保存不可变商品/金额及加密地址快照、逐位置分配、汇总和位置流水与ORDER_CREATED待处理事件。实物on_hand不变。下单后购物车保留，再次购买须重新报价。
+
+同账号同键同规范化内容返回原订单ID，即使原报价已到期或订单已取消；改内容409，另一键复用报价409。客户端先持久化原账号/报价/键，响应未知或页面重入使用原键，不自动换键；取到本人订单后才清除待确认记录。401/服务失败保留记录，明确业务拒绝需用户确认后才能重新核验。服务端每账号最多5笔待支付订单属于技术保护，不是经营规则。
+
+状态仅AWAITING_PAYMENT→CANCELED，paymentState=NOT_STARTED，fulfillmentState=NOT_READY。取消/后台超时复用事务释放内核，订单行锁与原分配保证只释放一次；只更改reserved，追加释放流水/事件，不改原事实、不退款。开发预占默认900秒，可设ORDER_DEV_HOLD_SECONDS=1..900用于隔离测试，非已确认付款承诺。worker启动即检查，此后30秒一轮，每轮最多20笔、每笔独立事务并SKIP LOCKED；任何未来已开始/未知支付状态必须先对账/关单，不进入直接释放路径。事件当前持久化为PENDING，未实现消费者、履约派发或外部消息投递。
+
+严格输入400、身份失效401、非本人报价/订单404、过期/变化/已用报价/库存不足/幂等冲突409、开发关闭或并发可重试503。真实支付、退款、微信身份、合法域名与真机网络需另外交付验收。

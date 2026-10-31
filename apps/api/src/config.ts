@@ -6,6 +6,8 @@ export interface ApplicationConfig {
   publicWarehouseId?: string;
   productImageRoot?: string;
   addressEncryptionKey?: string;
+  orderDevSubmit?: boolean;
+  orderDevHoldSeconds?: number;
   consumerDevLogin?: boolean;
   consumerSessionSeconds?: number;
 }
@@ -60,9 +62,26 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     throw new Error('Invalid PUBLIC_WAREHOUSE_ID.');
   if (!Number.isInteger(seconds) || seconds < 60 || seconds > 86400)
     throw new Error('Invalid STAFF_SESSION_SECONDS.');
+  if (env.ORDER_DEV_SUBMIT_ENABLED && !['0', '1'].includes(env.ORDER_DEV_SUBMIT_ENABLED))
+    throw new Error('Invalid ORDER_DEV_SUBMIT_ENABLED.');
+  const orderDevSubmit = env.ORDER_DEV_SUBMIT_ENABLED === '1';
+  if (
+    orderDevSubmit &&
+    (environment === 'production' ||
+      (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
+  )
+    throw new Error('Order submission foundation is local development only.');
   if (env.ADDRESS_ENCRYPTION_KEY && !/^[a-f0-9]{64}$/i.test(env.ADDRESS_ENCRYPTION_KEY))
     throw new Error('Invalid ADDRESS_ENCRYPTION_KEY.');
+  if (
+    !Number.isInteger(Number(env.ORDER_DEV_HOLD_SECONDS ?? 900)) ||
+    Number(env.ORDER_DEV_HOLD_SECONDS ?? 900) < 1 ||
+    Number(env.ORDER_DEV_HOLD_SECONDS ?? 900) > 900
+  )
+    throw new Error('Invalid ORDER_DEV_HOLD_SECONDS.');
   return {
+    orderDevHoldSeconds: Number(env.ORDER_DEV_HOLD_SECONDS ?? 900),
+    orderDevSubmit,
     addressEncryptionKey: env.ADDRESS_ENCRYPTION_KEY || undefined,
     environment: environment as ApplicationConfig['environment'],
     staffOrigins: origins,

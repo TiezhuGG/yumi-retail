@@ -274,7 +274,10 @@ test('legacy migration preserves quantities and old facts and backfills actual p
       legacy.ledger,
     ])
   ).rows[0]!.value;
-  assert.deepEqual(after, oldLedger);
+  const { actor_kind, consumer_actor_id, ...historicalColumns } = after as Record<string, unknown>;
+  assert.deepEqual(historicalColumns, oldLedger);
+  assert.equal(actor_kind, 'STAFF');
+  assert.equal(consumer_actor_id, null);
   const pos = (await positions(legacy.sku))[0]!;
   assert.equal(pos.onHand, 10);
   assert.equal(pos.locationCode, 'DEFAULT');

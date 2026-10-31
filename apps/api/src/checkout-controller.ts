@@ -84,6 +84,7 @@ export class StoreController {
   @Public()
   @ApiResult(
     object({
+      orderSubmissionEnabled: flag,
       status: { type: 'string', enum: ['UNCONFIGURED', 'PAUSED', 'OPEN'] },
       policy: { ...policy, nullable: true },
     }),

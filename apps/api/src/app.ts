@@ -15,6 +15,8 @@ import type { ApiRequest, ApiResponse } from './http.js';
 import { StaffAuthService } from './staff-auth.js';
 import { ConsumerAuthService, validateConsumerEnvironment } from './consumer-auth.js';
 import { ConsumerController } from './consumer-controller.js';
+import { OrderService } from './orders.js';
+import { OrderController } from './order-controller.js';
 import { CheckoutService } from './checkout.js';
 import {
   CheckoutController,
@@ -74,10 +76,21 @@ export async function createApplication(
 }> {
   const config = options.config ?? applicationConfig();
   validateConsumerEnvironment(databaseUrl, config);
+  if (config.orderDevSubmit) {
+    const url = new URL(databaseUrl);
+    if (
+      config.environment === 'production' ||
+      !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
+      !['/yumi_dev', '/yumi_test'].includes(url.pathname)
+    )
+      throw new Error('Development order submission requires local isolated database.');
+  }
   const db = createDatabase(databaseUrl);
   const auth = new StaffAuthService(db, config);
   const consumer = new ConsumerAuthService(db, config);
   const catalog = new CatalogService(db, config.publicWarehouseId);
+  const checkout = new CheckoutService(catalog, config.orderDevSubmit);
+  const addresses = new ConsumerAddressService(catalog, config.addressEncryptionKey);
 
   @Controller('health')
   class HealthController {
@@ -105,6 +118,7 @@ export async function createApplication(
       HealthController,
       ConsumerController,
       ConsumerCartController,
+      OrderController,
       ConsumerAddressController,
       CheckoutController,
       CheckoutPolicyController,
@@ -130,10 +144,19 @@ export async function createApplication(
       { provide: ConsumerAuthService, useValue: consumer },
       {
         provide: ConsumerAddressService,
-        useValue: new ConsumerAddressService(catalog, config.addressEncryptionKey),
+        useValue: addresses,
       },
       { provide: ConsumerCartService, useValue: new ConsumerCartService(catalog) },
-      { provide: CheckoutService, useValue: new CheckoutService(catalog) },
+      { provide: CheckoutService, useValue: checkout },
+      {
+        provide: OrderService,
+        useValue: new OrderService(
+          checkout,
+          addresses,
+          config.addressEncryptionKey,
+          config.orderDevHoldSeconds,
+        ),
+      },
       { provide: CatalogService, useValue: catalog },
       { provide: ServiceAreaService, useValue: new ServiceAreaService(catalog) },
       {
@@ -192,9 +215,9 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；微信登录及交易接口尚未实现。',
+        '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.11.0')
+      .setVersion('0.12.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

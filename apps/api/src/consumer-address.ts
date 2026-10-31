@@ -70,7 +70,7 @@ export class ConsumerAddressService {
       encrypted.toString('base64'),
     ].join('.');
   }
-  private decrypt(userId: string, id: string, payload: string) {
+  decryptSnapshot(userId: string, id: string, payload: string) {
     const [v, iv, tag, data] = payload.split('.');
     if (v !== 'v1' || !iv || !tag || !data) throw Error('Invalid encrypted address');
     const cipher = createDecipheriv('aes-256-gcm', this.key(), Buffer.from(iv, 'base64'));
@@ -124,7 +124,7 @@ export class ConsumerAddressService {
             area.warehouse.enabled &&
             building.enabled &&
             building.areaId === area.id,
-          ...this.decrypt(userId, row.id, row.payload!),
+          ...this.decryptSnapshot(userId, row.id, row.payload!),
         });
       }
       return { version, items };

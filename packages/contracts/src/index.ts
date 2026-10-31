@@ -405,3 +405,38 @@ export interface CheckoutQuote {
   expired: boolean;
   preview: CheckoutPreview;
 }
+
+export interface ConsumerOrderAddress {
+  areaName: string;
+  buildingName: string;
+  unit: string;
+  room: string;
+  contactName: string;
+  phone: string;
+  note: string;
+  orderNote: string;
+}
+export interface ConsumerOrder {
+  id: string;
+  orderNo: string;
+  status: 'AWAITING_PAYMENT' | 'CANCELED';
+  paymentState: 'NOT_STARTED';
+  fulfillmentState: 'NOT_READY';
+  goodsCents: number;
+  deliveryFeeCents: number;
+  payableCents: number;
+  createdAt: string;
+  paymentDeadline: string;
+  cancelReason: string | null;
+  version: number;
+  address: ConsumerOrderAddress;
+  items: Array<{
+    skuId: string;
+    name: string;
+    spec: string;
+    unit: string;
+    quantity: number;
+    priceCents: number;
+    lineCents: number;
+  }>;
+}

@@ -11,13 +11,18 @@ import type {
 import { cartIdentity, readAccountCart, pendingMerge } from '../../account-cart';
 import type { CartIdentity } from '../../account-cart';
 import { addressRequest, addressOperationKey, AddressRequestError } from '../../address-api';
+import { OrderSubmit } from '../../components/OrderSubmit';
 import { request } from '../../api';
 const money = (c: number | null) => (c === null ? '待核验' : '¥' + (c / 100).toFixed(2));
 export default function Checkout() {
   const [identity, setIdentity] = useState<CartIdentity | null>(null),
     [addresses, setAddresses] = useState<ConsumerAddressBook | null>(null),
     [cart, setCart] = useState<ConsumerCart | null>(null),
-    [store, setStore] = useState<{ status: string; policy: CheckoutPolicy | null } | null>(null),
+    [store, setStore] = useState<{
+      status: string;
+      policy: CheckoutPolicy | null;
+      orderSubmissionEnabled?: boolean;
+    } | null>(null),
     [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
@@ -27,6 +32,7 @@ export default function Checkout() {
     [unknown, setUnknown] = useState(false),
     [mergePending, setMergePending] = useState(false),
     [now, setNow] = useState(Date.now());
+  const [orderPending, setOrderPending] = useState(false);
   const sequence = useRef(0),
     writing = useRef(false),
     intent = useRef<{ identity: CartIdentity; key: string; body: unknown } | null>(null);
@@ -57,7 +63,11 @@ export default function Checkout() {
       const [book, basket, policy] = await Promise.all([
         addressRequest<ConsumerAddressBook>(who, '/consumer/addresses'),
         readAccountCart(who),
-        request<{ status: string; policy: CheckoutPolicy | null }>('/store'),
+        request<{
+          status: string;
+          policy: CheckoutPolicy | null;
+          orderSubmissionEnabled?: boolean;
+        }>('/store'),
       ]);
       if (n !== sequence.current) return;
       setAddresses(book);
@@ -159,7 +169,7 @@ export default function Checkout() {
       </View>
       <View className="address-content">
         <View className="checkout-notice">
-          当前可以核验和查看报价，提交订单及支付尚未开放。报价不锁价、不占库存，正式下单时仍须重新校验。
+          报价不锁价、不占库存。订单提交仅限显式开启的本机开发验证，支付尚未开放。
         </View>
         {error && (
           <View className="address-alert checkout-error">
@@ -202,7 +212,7 @@ export default function Checkout() {
               <Text className="address-section-title">收货地址</Text>
               <Picker
                 mode="selector"
-                disabled={busy || unknown}
+                disabled={busy || unknown || orderPending}
                 range={[
                   '请选择收货地址',
                   ...addresses.items.map(
@@ -238,7 +248,7 @@ export default function Checkout() {
               )}
               <Button
                 className="checkout-link"
-                disabled={busy || unknown}
+                disabled={busy || unknown || orderPending}
                 onClick={() => void Taro.navigateTo({ url: '/pages/addresses/index' })}
               >
                 管理收货地址
@@ -267,7 +277,7 @@ export default function Checkout() {
                 ))}
               <Button
                 className="checkout-link"
-                disabled={busy || unknown}
+                disabled={busy || unknown || orderPending}
                 onClick={() => void Taro.navigateTo({ url: '/pages/cart/index' })}
               >
                 返回购物车调整
@@ -275,7 +285,9 @@ export default function Checkout() {
             </View>
             <Button
               className="account-primary checkout-check"
-              disabled={busy || unknown || !selected || !selectedCount || mergePending}
+              disabled={
+                busy || unknown || orderPending || !selected || !selectedCount || mergePending
+              }
               onClick={() => void check()}
             >
               {busy ? '正在核验…' : '核验商品与费用'}
@@ -359,7 +371,7 @@ export default function Checkout() {
                   preview.ready && (
                     <Button
                       className="account-primary checkout-generate"
-                      disabled={busy || unknown}
+                      disabled={busy || unknown || orderPending}
                       onClick={() => void generate()}
                     >
                       生成本次报价
@@ -370,14 +382,17 @@ export default function Checkout() {
             )}
             <Button
               className="checkout-refresh address-cancel"
-              disabled={busy || unknown}
+              disabled={busy || unknown || orderPending}
               onClick={() => void load()}
             >
               刷新购物车与地址资料
             </Button>
-            <Button disabled className="checkout-order-disabled">
-              提交订单尚未开放
-            </Button>
+            <OrderSubmit
+              identity={identity}
+              quote={quote}
+              allowed={store.orderSubmissionEnabled === true}
+              onPending={setOrderPending}
+            />
           </>
         )}
       </View>

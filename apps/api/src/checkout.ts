@@ -6,7 +6,10 @@ import { fields, integer, uuid } from './catalog-input.js';
 import { failure } from './http.js';
 import type { ApiRequest } from './http.js';
 export class CheckoutService {
-  constructor(readonly catalog: CatalogService) {}
+  constructor(
+    readonly catalog: CatalogService,
+    readonly orderDevSubmit = false,
+  ) {}
   private warehouseId() {
     const id = this.catalog.publicWarehouseId;
     if (!id) throw failure(503, 'STORE_UNAVAILABLE', '尚未配置经营仓库');
@@ -23,10 +26,12 @@ export class CheckoutService {
   }
   async store() {
     const id = this.catalog.publicWarehouseId;
-    if (!id) return { status: 'UNCONFIGURED', policy: null };
+    if (!id)
+      return { status: 'UNCONFIGURED', policy: null, orderSubmissionEnabled: this.orderDevSubmit };
     const w = await this.catalog.db.warehouse.findUnique({ where: { id } });
     const row = await this.catalog.db.checkoutPolicy.findUnique({ where: { warehouseId: id } });
     return {
+      orderSubmissionEnabled: this.orderDevSubmit,
       status: !row ? 'UNCONFIGURED' : !w?.enabled || !row.open ? 'PAUSED' : 'OPEN',
       policy: row ? this.policy(row) : null,
     };
@@ -87,7 +92,7 @@ export class CheckoutService {
       },
     );
   }
-  private async session(tx: Prisma.TransactionClient, request: ApiRequest) {
+  async session(tx: Prisma.TransactionClient, request: ApiRequest) {
     const c = request.consumerContext!;
     const rows = await tx.$queryRaw<
       Array<{ id: string }>
@@ -103,7 +108,7 @@ export class CheckoutService {
       cartVersion: integer(r.cartVersion, 0, 2147483646),
     };
   }
-  private async preview(
+  async preview(
     tx: Prisma.TransactionClient,
     userId: string,
     input: ReturnType<CheckoutService['input']>,

@@ -23,6 +23,23 @@ let mini,
   readFail = false,
   delay = 0;
 const keys = [];
+async function verifyRestoredStorage() {
+  const afterKeys = (await mini.callWxMethod('getStorageInfoSync')).keys;
+  if (hadSession) {
+    if (
+      JSON.stringify(await mini.callWxMethod('getStorageSync', sessionKey)) !==
+      JSON.stringify(backup)
+    )
+      throw Error('Login storage restoration verification failed');
+  } else if (afterKeys.includes(sessionKey)) throw Error('Temporary login storage was not removed');
+  if (hadCart) {
+    if (
+      JSON.stringify(await mini.callWxMethod('getStorageSync', cartKey)) !==
+      JSON.stringify(cartBackup)
+    )
+      throw Error('Cart storage restoration verification failed');
+  } else if (afterKeys.includes(cartKey)) throw Error('Temporary cart storage was not removed');
+}
 try {
   mini = await automator.connect({ wsEndpoint: 'ws://127.0.0.1:9420' });
   const storage = (await mini.callWxMethod('getStorageInfoSync')).keys;
@@ -181,22 +198,7 @@ try {
         if (hadCart) await mini.callWxMethod('setStorageSync', cartKey, cartBackup);
         else await mini.callWxMethod('removeStorageSync', cartKey);
       }
-      const afterKeys = (await mini.callWxMethod('getStorageInfoSync')).keys;
-      if (hadSession) {
-        if (
-          JSON.stringify(await mini.callWxMethod('getStorageSync', sessionKey)) !==
-          JSON.stringify(backup)
-        )
-          throw Error('Login storage restoration verification failed');
-      } else if (afterKeys.includes(sessionKey))
-        throw Error('Temporary login storage was not removed');
-      if (hadCart) {
-        if (
-          JSON.stringify(await mini.callWxMethod('getStorageSync', cartKey)) !==
-          JSON.stringify(cartBackup)
-        )
-          throw Error('Cart storage restoration verification failed');
-      } else if (afterKeys.includes(cartKey)) throw Error('Temporary cart storage was not removed');
+      await verifyRestoredStorage();
       await mini.disconnect();
     } catch (e) {
       process.exitCode = 1;

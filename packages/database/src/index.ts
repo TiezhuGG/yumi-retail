@@ -20,3 +20,9 @@ export function createDatabase(connectionString: string) {
   );
   return new PrismaClient({ adapter, log: ['warn'] });
 }
+
+export {
+  orderReservationDelta,
+  releaseUnpaidOrder,
+  expireUnpaidOrders,
+} from './order-reservations.js';

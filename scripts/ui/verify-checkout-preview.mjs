@@ -217,7 +217,7 @@ body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;}butto
   await page.getByText('当前库存不足', { exact: true }).waitFor();
   await shot('UNAVAILABLE');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  assert.equal(await page.getByRole('button', { name: '提交订单尚未开放' }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: '订单提交尚未开放' }).isDisabled(), true);
   console.log(
     'Checkout real isolated API + actual React source: missing rules, admin create-paused/open, cent amounts, response-loss replay, expiry, loading/error/retry, inventory hold and desktop/mobile layouts passed. Consumer screenshots are browser previews.',
   );

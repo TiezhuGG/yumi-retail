@@ -7,6 +7,8 @@ export default {
     'pages/service-area/index',
     'pages/addresses/index',
     'pages/checkout/index',
+    'pages/orders/index',
+    'pages/order/index',
   ],
   window: {
     navigationBarTitleText: '玉米百货',
