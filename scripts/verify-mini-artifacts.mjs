@@ -9,11 +9,13 @@ for (const name of [
   'pages/index/index.wxml',
   'pages/product/index.js',
   'pages/product/index.wxml',
+  'pages/cart/index.js',
+  'pages/cart/index.wxml',
 ]) {
   assert.ok(existsSync(`${root}/${name}`), `Missing mini-program artifact: ${name}`);
 }
 const config = JSON.parse(readFileSync(`${root}/app.json`, 'utf8'));
-assert.deepEqual(config.pages, ['pages/index/index', 'pages/product/index']);
+assert.deepEqual(config.pages, ['pages/index/index', 'pages/product/index', 'pages/cart/index']);
 for (const file of [
   'project.config.json',
   'apps/consumer-mini/project.config.json',

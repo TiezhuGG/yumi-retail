@@ -362,3 +362,8 @@ GET /api/v1/categories公开分页读取，参数仅limit（默认20，1–50）
 ## 商品聚合卡片接口（2026-10-31）
 
 GET /api/v1/storefront/products公开，严格limit/cursor/keyword/categoryId；默认20、最多50，cursor为商品UUID。返回items的id=商品ID、entrySkuId=价格入口SKU，并含name/categoryId/imageUrl/spec/unit/priceCents/variantCount/hasStock。先筛可展示且匹配的SKU，按商品计数，优先available>0、再priceCents、SKU UUID选代表行；全缺货仍保留最低价参考；按商品游标分页，不返回库存总和。参数400、经营仓不可用503。原/products SKU列表/详情保留，新客户端需新版API，不用旧页前端去重降级。见[兼容性/验证](../verification/S3-PRODUCT-CARDS-2026-10-31.md)与实际OpenAPI。
+
+
+## 游客草稿接续边界（2026-10-31）
+
+无新API；游客草稿在本机保存，逐SKU复用GET /products/:id读取当前售价/可用量，客户端保留HTTP状态区分404失效与网络/503未知，最多4并发、刷新取消保护。参考小计不是报价，不提供结算动作。此前设计的登录/cart/merge和服务端cart_items未因本轮草稿而实现，不能向公众启用开发身份；见[记录](../verification/S4-GUEST-CART-2026-10-31.md)。

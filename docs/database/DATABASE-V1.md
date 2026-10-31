@@ -310,3 +310,8 @@ products.image_id可空，旧行NULL；product_images保存id/product_id/object_
 ## 商品聚合列表读取（2026-10-31）
 
 无新表/DDL/迁移。提取既有公开SKU SQL供SKU列表/详情与商品卡片共用；以匹配SKU窗口计数/BOOL_OR有货及ROW_NUMBER选最低有货价（否则最低参考价，UUID打破同价），随后以product_id做游标和limit。价格/有货/入口同语句快照，金额仍整数分，混合单位不相加库存；不写业务数据/审计/幂等。旧SKU接口身份和分页不变。见[验证记录](../verification/S3-PRODUCT-CARDS-2026-10-31.md)。
+
+
+## 游客草稿本机结构（2026-10-31）
+
+无PG表/迁移变化。微信本机键yumi.guest-cart.v1:API_BASE_URL保存 {version:1,items:[{skuId,quantity,selected,name,spec,unit}]}，只缓存身份标签，不存售价/库存/顾客资料。数量1–200、最多50 SKU且总量≤200，非法/重复/未知版本保留原值并拒绝操作，明确重置才覆盖；同步写入成功才发布新状态，每次修改重新读当前稿。现有cart_items/user_id设计仍待登录购物车切片。无订单/资金/库存唯一真相落在本机，见[验收记录](../verification/S4-GUEST-CART-2026-10-31.md)。

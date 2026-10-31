@@ -17,6 +17,15 @@ export interface ProductPage {
   hasMore: boolean;
   nextCursor: string | null;
 }
+export class CatalogRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CatalogRequestError';
+  }
+}
 export async function request<T>(path: string): Promise<T> {
   const result = await Taro.request<{ data: T; error?: { message: string } }>({
     url: API_BASE_URL + path,
@@ -24,7 +33,10 @@ export async function request<T>(path: string): Promise<T> {
     timeout: 10000,
   });
   if (result.statusCode !== 200)
-    throw new Error(result.data.error?.message ?? '商品加载失败，请稍后重试');
+    throw new CatalogRequestError(
+      result.statusCode,
+      result.data.error?.message ?? '商品加载失败，请稍后重试',
+    );
   return result.data.data;
 }
 

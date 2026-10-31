@@ -51,6 +51,7 @@
     "openapi:export": "npm run build:server && node --env-file=.env scripts/export-openapi.mjs",
     "test:mini-detail": "node --import tsx tests/mini-detail.test.ts",
     "test:mini-categories": "node --import tsx tests/mini-categories.test.ts",
+    "test:guest-cart": "node --import tsx tests/guest-cart.test.ts",
     "test:mini-browse": "node --import tsx tests/mini-browse.test.ts",
     "verify:mini:api": "node scripts/verify-mini-api.mjs",
     "verify:product-images": "node --env-file=.env scripts/check-product-image-store.mjs",

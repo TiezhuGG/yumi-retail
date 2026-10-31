@@ -294,10 +294,10 @@ export default function Index() {
           <Text>▦</Text>
           <Text>分类</Text>
         </Button>
-        <Button onClick={() => upcoming('购物车')}>
+        <Button onClick={() => void Taro.navigateTo({ url: '/pages/cart/index' })}>
           <Text>♧</Text>
           <Text>
-            购物车<Text className="coming-soon">待开放</Text>
+            购物车<Text className="coming-soon">本机草稿</Text>
           </Text>
         </Button>
         <Button onClick={() => upcoming('我的服务')}>

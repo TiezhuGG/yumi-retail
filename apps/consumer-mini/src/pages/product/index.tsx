@@ -3,6 +3,7 @@ import Taro, { useLoad } from '@tarojs/taro';
 import { View, Text, Button, Swiper, SwiperItem } from '@tarojs/components';
 import { request } from '../../api';
 import { createDetailLoader, initialDetailState } from '../../detail-loader';
+import { guestCart } from '../../cart-storage';
 import { ProductVisual } from '../../components/ProductVisual';
 export default function ProductDetail() {
   const [state, setState] = useState(initialDetailState),
@@ -24,6 +25,19 @@ export default function ProductDetail() {
     : product?.imageUrl
       ? [product.imageUrl]
       : [];
+  function addToCart() {
+    if (!product) return;
+    try {
+      guestCart.add(product);
+      void Taro.showToast({ title: '已加入本机草稿', icon: 'success' });
+    } catch (e) {
+      void Taro.showModal({
+        title: '未能加入购物车',
+        content: e instanceof Error ? e.message : '请重试',
+        showCancel: false,
+      });
+    }
+  }
   const back = () => void Taro.reLaunch({ url: '/pages/index/index' });
   return (
     <View className="detail-page">
@@ -137,8 +151,14 @@ export default function ProductDetail() {
             <Button className="back-home" onClick={back}>
               <Text>⌂</Text>首页
             </Button>
-            <Button className="detail-buy" disabled>
-              {product.available > 0 ? '在线下单待开放' : '商品暂时缺货'}
+            <Button
+              className="detail-cart-link"
+              onClick={() => void Taro.navigateTo({ url: '/pages/cart/index' })}
+            >
+              购物车草稿
+            </Button>
+            <Button className="detail-buy" disabled={product.available < 1} onClick={addToCart}>
+              {product.available > 0 ? '加入本机草稿' : '商品暂时缺货'}
             </Button>
           </View>
         </>
