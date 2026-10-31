@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Catch, HttpException } from '@nestjs/common';
 import type { ArgumentsHost, ExceptionFilter } from '@nestjs/common';
 import type { StaffContext } from './staff-auth.js';
+import type { ConsumerContext } from './consumer-auth.js';
 
 export interface ApiRequest {
   method: string;
@@ -9,6 +10,7 @@ export interface ApiRequest {
   socket: { remoteAddress?: string };
   requestId: string;
   staffContext?: StaffContext;
+  consumerContext?: ConsumerContext;
   route?: { path?: string };
 }
 export interface ApiResponse {

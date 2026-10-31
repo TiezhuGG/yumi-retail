@@ -5,12 +5,17 @@ import { randomUUID } from 'node:crypto';
 import { StaffAuthService } from './staff-auth.js';
 import { failure } from './http.js';
 import type { ApiRequest } from './http.js';
+import { ConsumerAuthService } from './consumer-auth.js';
 
 export const Public = () => SetMetadata('public', true);
+export const Consumer = () => SetMetadata('consumer', true);
 export const Permissions = (...permissions: string[]) => SetMetadata('permissions', permissions);
 export class StaffGuard implements CanActivate {
   private readonly reflector = new Reflector();
-  constructor(private readonly auth: StaffAuthService) {}
+  constructor(
+    private readonly auth: StaffAuthService,
+    private readonly consumer: ConsumerAuthService,
+  ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (
       this.reflector.getAllAndOverride<boolean>('public', [
@@ -20,6 +25,15 @@ export class StaffGuard implements CanActivate {
     )
       return true;
     const request = context.switchToHttp().getRequest<ApiRequest>();
+    if (
+      this.reflector.getAllAndOverride<boolean>('consumer', [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      request.consumerContext = await this.consumer.authenticate(request);
+      return true;
+    }
     const staff = await this.auth.authenticate(request);
     request.staffContext = staff;
     const permissions =

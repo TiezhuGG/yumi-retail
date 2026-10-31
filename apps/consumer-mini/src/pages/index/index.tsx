@@ -54,12 +54,6 @@ export default function Index() {
     setKeyword(search);
     void load(search);
   }
-  const upcoming = (name: string) =>
-    void Taro.showModal({
-      title: `${name}暂未开放`,
-      content: '当前可以浏览与查找商品，在线下单和个人服务将在开放后提供。',
-      showCancel: false,
-    });
   return (
     <View className="store-page">
       <View className="store-header">
@@ -300,11 +294,9 @@ export default function Index() {
             购物车<Text className="coming-soon">本机草稿</Text>
           </Text>
         </Button>
-        <Button onClick={() => upcoming('我的服务')}>
+        <Button onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}>
           <Text>♙</Text>
-          <Text>
-            我的<Text className="coming-soon">待开放</Text>
-          </Text>
+          <Text>我的</Text>
         </Button>
       </View>
     </View>

@@ -367,3 +367,8 @@ GET /api/v1/storefront/products公开，严格limit/cursor/keyword/categoryId；
 ## 游客草稿接续边界（2026-10-31）
 
 无新API；游客草稿在本机保存，逐SKU复用GET /products/:id读取当前售价/可用量，客户端保留HTTP状态区分404失效与网络/503未知，最多4并发、刷新取消保护。参考小计不是报价，不提供结算动作。此前设计的登录/cart/merge和服务端cart_items未因本轮草稿而实现，不能向公众启用开发身份；见[记录](../verification/S4-GUEST-CART-2026-10-31.md)。
+
+
+## 2026-10-31 消费者开发会话已实施
+
+POST /api/v1/consumer/auth/dev-session仅显式开启的非生产、隔离本机库、直接回环请求可用；无Forwarded/X-Forwarded-*，有Origin需允许，必须X-Yumi-Dev-Login:1。JSON仅profile=customer-a|customer-b，返回token/expiresAt/user{id,displayName,provider:DEVELOPMENT}；默认关闭404，非法字段400、入口头403、停用401、30次/15分钟/IP后429。GET /consumer/me及POST /consumer/auth/logout用独立Authorization Bearer，拒绝员工Cookie/令牌，不接受userId等额外查询或退出字段；返回最小user/expiresAt或loggedOut。无消费者Set-Cookie，不接受客户端角色/openid；到期/撤销/停用/版本变化401；网络异常5xx不等于退出。没有/auth/wechat/session或/cart/merge实现。OpenAPI已同步，见[记录](../verification/S4-CONSUMER-SESSION-2026-10-31.md)。

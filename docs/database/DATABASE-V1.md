@@ -315,3 +315,8 @@ products.image_id可空，旧行NULL；product_images保存id/product_id/object_
 ## 游客草稿本机结构（2026-10-31）
 
 无PG表/迁移变化。微信本机键yumi.guest-cart.v1:API_BASE_URL保存 {version:1,items:[{skuId,quantity,selected,name,spec,unit}]}，只缓存身份标签，不存售价/库存/顾客资料。数量1–200、最多50 SKU且总量≤200，非法/重复/未知版本保留原值并拒绝操作，明确重置才覆盖；同步写入成功才发布新状态，每次修改重新读当前稿。现有cart_items/user_id设计仍待登录购物车切片。无订单/资金/库存唯一真相落在本机，见[验收记录](../verification/S4-GUEST-CART-2026-10-31.md)。
+
+
+## 2026-10-31 消费者开发会话增量
+
+202610310004_consumer_sessions新增consumer_users(provider,subject唯一；当前约束仅DEVELOPMENT和两项预设身份)、consumer_sessions(随机令牌SHA256摘要、user_id、auth_version、绝对到期及撤销)、consumer_login_throttles和consumer_auth_audits。与staff完全独立，不改既有商品/库存/金额表。默认会话8小时，技术配置范围60–86400秒。开发库已迁移；集成测试仅一次性schema，yumi_test/public尚未应用新迁移。前端yumi.consumer-session.v1:API_BASE_URL只存token/expiresAt；购物车键不变。真实users微信身份及cart_items仍是后续设计，不能将开发subject当作openid，见[兼容性记录](../verification/S4-CONSUMER-SESSION-2026-10-31.md)。

@@ -13,6 +13,8 @@ import type { ApplicationConfig } from './config.js';
 import { ApiExceptionFilter, failure, success } from './http.js';
 import type { ApiRequest, ApiResponse } from './http.js';
 import { StaffAuthService } from './staff-auth.js';
+import { ConsumerAuthService, validateConsumerEnvironment } from './consumer-auth.js';
+import { ConsumerController } from './consumer-controller.js';
 import { Public, StaffGuard } from './staff-guard.js';
 import { StaffAdminController, StaffController, WarehouseController } from './staff-controller.js';
 import { ApiResult, object, text } from './api-result.js';
@@ -55,9 +57,11 @@ export async function createApplication(
   openApi: OpenAPIObject;
   close(): Promise<void>;
 }> {
-  const db = createDatabase(databaseUrl);
   const config = options.config ?? applicationConfig();
+  validateConsumerEnvironment(databaseUrl, config);
+  const db = createDatabase(databaseUrl);
   const auth = new StaffAuthService(db, config);
+  const consumer = new ConsumerAuthService(db, config);
   const catalog = new CatalogService(db, config.publicWarehouseId);
 
   @Controller('health')
@@ -84,6 +88,7 @@ export async function createApplication(
   @Module({
     controllers: [
       HealthController,
+      ConsumerController,
       StaffController,
       WarehouseController,
       StaffAdminController,
@@ -100,6 +105,7 @@ export async function createApplication(
     ],
     providers: [
       { provide: StaffAuthService, useValue: auth },
+      { provide: ConsumerAuthService, useValue: consumer },
       { provide: CatalogService, useValue: catalog },
       {
         provide: ProductImageService,
@@ -113,7 +119,7 @@ export async function createApplication(
         provide: StockCountService,
         useValue: new StockCountService(new InventoryService(catalog)),
       },
-      { provide: APP_GUARD, useValue: new StaffGuard(auth) },
+      { provide: APP_GUARD, useValue: new StaffGuard(auth, consumer) },
       {
         provide: ReceiptReversalService,
         useValue: new ReceiptReversalService(new InventoryService(catalog)),
@@ -157,9 +163,10 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；交易接口尚未实现。',
+        '员工认证、本机开发消费者会话、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；微信登录及交易接口尚未实现。',
       )
-      .setVersion('0.6.0')
+      .setVersion('0.7.0')
+      .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
   );

@@ -4,6 +4,23 @@ import { isIP } from 'node:net';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+export function consumerDevelopmentBuild(flag, target, apiBase, environment) {
+  assert(
+    flag === undefined || flag === '0' || flag === '1',
+    'Invalid consumer development build flag',
+  );
+  if (flag !== '1') return false;
+  const url = new URL(apiBase);
+  assert(
+    target === 'local' &&
+      environment !== 'production' &&
+      url.protocol === 'http:' &&
+      url.hostname === '127.0.0.1',
+    '开发身份仅允许显式本机开发构建，不能用于真机或生产。',
+  );
+  return true;
+}
+
 export function apiBaseForBuild(value, target) {
   assert(['local', 'device'].includes(target), 'Unknown mini build target');
   const invalid = '请配置不含账号、查询参数或片段的 API 地址，路径必须为 /api/v1。';

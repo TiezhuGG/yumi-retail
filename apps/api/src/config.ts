@@ -5,6 +5,8 @@ export interface ApplicationConfig {
   docsEnabled: boolean;
   publicWarehouseId?: string;
   productImageRoot?: string;
+  consumerDevLogin?: boolean;
+  consumerSessionSeconds?: number;
 }
 
 export function applicationConfig(env: NodeJS.ProcessEnv = process.env): ApplicationConfig {
@@ -33,6 +35,22 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
   }
   if (environment === 'production' && env.PRODUCT_IMAGE_LOCAL_DIR)
     throw new Error('Local product image storage is development-only.');
+  if (env.CONSUMER_DEV_LOGIN_ENABLED && !['0', '1'].includes(env.CONSUMER_DEV_LOGIN_ENABLED))
+    throw new Error('Invalid CONSUMER_DEV_LOGIN_ENABLED.');
+  const consumerDevLogin = env.CONSUMER_DEV_LOGIN_ENABLED === '1';
+  if (
+    consumerDevLogin &&
+    (environment === 'production' ||
+      (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
+  )
+    throw new Error('Consumer development login requires non-production loopback binding.');
+  const consumerSessionSeconds = Number(env.CONSUMER_SESSION_SECONDS ?? 28800);
+  if (
+    !Number.isInteger(consumerSessionSeconds) ||
+    consumerSessionSeconds < 60 ||
+    consumerSessionSeconds > 86400
+  )
+    throw new Error('Invalid CONSUMER_SESSION_SECONDS.');
   const seconds = Number(env.STAFF_SESSION_SECONDS ?? 28800);
   if (
     env.PUBLIC_WAREHOUSE_ID &&
@@ -46,6 +64,8 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     staffOrigins: origins,
     staffSessionSeconds: seconds,
     docsEnabled: environment !== 'production',
+    consumerDevLogin,
+    consumerSessionSeconds,
     publicWarehouseId: env.PUBLIC_WAREHOUSE_ID || undefined,
     productImageRoot:
       environment === 'production'

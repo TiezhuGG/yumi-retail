@@ -584,3 +584,54 @@ model ReceiptReversal {
   @@index([lotId])
   @@map("receipt_reversals")
 }
+
+// Development identities are deliberately separate from future verified WeChat identities.
+model ConsumerUser {
+  id          String   @id @db.Uuid
+  provider    String   @db.VarChar(16)
+  subject     String   @db.VarChar(64)
+  displayName String   @map("display_name") @db.VarChar(80)
+  enabled     Boolean  @default(true)
+  authVersion Int      @default(0) @map("auth_version")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  sessions    ConsumerSession[]
+  audits      ConsumerAuthAudit[]
+
+  @@unique([provider, subject])
+  @@map("consumer_users")
+}
+
+model ConsumerSession {
+  id          String   @id @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  tokenHash   String   @unique @map("token_hash") @db.Char(64)
+  authVersion Int      @map("auth_version")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(3)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+  user        ConsumerUser @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([userId, expiresAt])
+  @@map("consumer_sessions")
+}
+
+model ConsumerLoginThrottle {
+  key             String   @id @db.Char(64)
+  attemptCount    Int      @map("attempt_count")
+  windowStartedAt DateTime @map("window_started_at") @db.Timestamptz(3)
+
+  @@map("consumer_login_throttles")
+}
+
+model ConsumerAuthAudit {
+  id        String   @id @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String   @db.VarChar(32)
+  outcome   String   @db.VarChar(16)
+  requestId String   @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      ConsumerUser? @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@index([userId, createdAt])
+  @@map("consumer_auth_audits")
+}

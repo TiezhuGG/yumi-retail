@@ -79,3 +79,21 @@ test('manifest detects stale API and changed/added/missing output', () =>
     rmSync(join(root, 'app.js'));
     assert.throws(() => verifyBuildInfo(root, info, 'device'));
   }));
+
+test('development consumer identity is explicit, local-only and unavailable in device/production builds', async () => {
+  const { consumerDevelopmentBuild } = await import('../scripts/mini-build-info.mjs');
+  assert.equal(
+    consumerDevelopmentBuild(undefined, 'local', 'http://127.0.0.1:3000/api/v1', 'development'),
+    false,
+  );
+  assert.equal(
+    consumerDevelopmentBuild('1', 'local', 'http://127.0.0.1:3000/api/v1', 'development'),
+    true,
+  );
+  for (const [target, api, environment] of [
+    ['device', 'https://api.yumi-retail.com/api/v1', 'development'],
+    ['local', 'http://127.0.0.1:3000/api/v1', 'production'],
+    ['local', 'https://remote.invalid/api/v1', 'development'],
+  ])
+    assert.throws(() => consumerDevelopmentBuild('1', target, api, environment));
+});
