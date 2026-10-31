@@ -55,6 +55,9 @@ export interface Sku {
   expiryManaged: boolean;
   enabled: boolean;
 }
+export interface ReceiptSkuLookup extends Sku {
+  name: string;
+}
 export interface Product {
   id: string;
   categoryId: string;

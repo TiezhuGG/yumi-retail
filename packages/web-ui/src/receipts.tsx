@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import type { Product, Receipt, ReceiptDetail, StaffProfile } from '@yumi/contracts';
+import type {
+  Product,
+  Receipt,
+  ReceiptDetail,
+  ReceiptSkuLookup,
+  StaffProfile,
+} from '@yumi/contracts';
 import { staffRequest } from './index.js';
+import { ReceiptBarcodePicker } from './receipt-barcode-picker.js';
 import { TaskDialog } from './task-dialog.js';
 import { usePage } from './use-page.js';
 
@@ -287,7 +294,13 @@ function ReceiptCreate({
   const products = usePage<Product>(
     profile.permissions.includes('catalog.read') ? '/admin/products?limit=50' : null,
   );
-  const skus = products.items.flatMap((p) => p.skus.map((s) => ({ ...s, name: p.name })));
+  const [queriedSkus, setQueriedSkus] = useState<ReceiptSkuLookup[]>([]);
+  const skus = [
+    ...products.items
+      .flatMap((p) => p.skus.map((s) => ({ ...s, name: p.name })))
+      .filter((s) => !queriedSkus.some((q) => q.id === s.id)),
+    ...queriedSkus,
+  ];
   const [sourceRef, setSourceRef] = useState(''),
     [lines, setLines] = useState<DraftLine[]>(() => [blank()]);
   const [busy, setBusy] = useState(false),
@@ -412,6 +425,16 @@ function ReceiptCreate({
                     </button>
                   )}
                 </div>
+                <ReceiptBarcodePicker
+                  root={root}
+                  duplicateIds={lines
+                    .filter((other) => other.key !== l.key)
+                    .map((other) => other.skuId)}
+                  onPick={(selected) => {
+                    setQueriedSkus((old) => [...old.filter((s) => s.id !== selected.id), selected]);
+                    patch(l.key, 'skuId', selected.id);
+                  }}
+                />
                 <div className="business-form">
                   <label className="full">
                     收货商品
@@ -522,7 +545,7 @@ function ReceiptCreate({
           )}
           <button
             className="primary-button"
-            disabled={busy || products.loading || !!products.error || !skus.length}
+            disabled={busy || lines.some((l) => !skus.some((s) => s.id === l.skuId && s.enabled))}
           >
             {busy ? '正在保存…' : uncertain ? '使用原意图重试查询' : '保存收货草稿'}
           </button>

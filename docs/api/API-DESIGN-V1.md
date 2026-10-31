@@ -327,3 +327,11 @@ POST `/api/v1/admin/products/:id/skus/:skuId/set-barcode`，严格body `{version
 成功返回完整Product及SKUs、Product.version+1，后台SKU增加可空barcode字段；公开SaleSku及收货详情读结构保持原样，不对顾客暴露新条码字段。旧版本409 VERSION_CONFLICT，其他SKU已绑定409 BARCODE_IN_USE（停用SKU仍占用），同键异内容409 IDEMPOTENCY_CONFLICT，事务竞争503可原键原内容重试。重复绑定竞争由数据库唯一索引保证，不以事先查询替代约束。
 
 幂等范围员工/SKU_SET_BARCODE/SKU，请求摘要包括商品ID、版本及规范化条码。清空后另一SKU复用时，重放旧成功请求只返回首次历史结果，不能重新绑定条码；当前状态由GET /admin/products/:id核对。UI确认后GET当前列表，响应未知冻结原内容及键重试，冲突明确载入；重复条码错误保留可编辑输入。关闭窗口不持久化未知意图。见[记录](../verification/S2-SKU-BARCODE-2026-10-30.md)及实际OpenAPI。
+
+## 收货候选条码精确查询（2026-10-31）
+
+GET `/api/v1/warehouse/warehouses/:warehouseId/skus/by-barcode?barcode=完整条码`，同时要求catalog.read及receipt.write、有效员工会话、本仓授权且仓库启用。查询参数只允许barcode：trim后1–64位ASCII数字文本，不允许空/缺省/额外参数，前导零保留。无CSRF/幂等头要求（只读GET）；错误UUID或条码400，未登录401，角色/仓库/停用仓库403，未绑定404 BARCODE_NOT_FOUND。
+
+返回ReceiptSkuLookup：原Sku字段及商品name，包含enabled/expiryManaged/barcode供显式选择；售价不是收货成本且UI不据此预填。唯一索引完整匹配，非按已载入页面过滤。停用SKU返回200并标记enabled=false（UI禁止选入，收货服务也拒绝）；草稿/下架商品及分类停用下的启用SKU仍可作为收货候选。不返回采购成本、库存量或其他仓数据。没有写业务审计、幂等记录或库存。
+
+结果代表本次读取时的映射，不构成绑定预留；清空返回404、重新绑定后指向新SKU。确认选入后收货payload仍使用skuId，服务端创建/过账重查SKU约束，不按当时条码自动改写SKU。见[记录](../verification/S2-RECEIPT-BARCODE-2026-10-31.md)及实际OpenAPI。

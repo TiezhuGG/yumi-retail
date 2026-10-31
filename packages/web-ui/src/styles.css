@@ -1833,3 +1833,19 @@ small {
 .notice.error .secondary-button {
   margin: 6px 8px;
 }
+
+.receipt-barcode-picker {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 18px;
+  min-width: 0;
+}
+.receipt-barcode-picker input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+}
+.receipt-barcode-picker > button {
+  justify-self: start;
+}

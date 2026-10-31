@@ -1755,3 +1755,114 @@ test('barcode database constraints and late audit failure roll back binding/vers
   }
   assert.equal((await ok<Product>(route, body, 0, key)).skus[0]!.barcode, body.barcode);
 });
+
+const lookupRoute = (barcode: string, warehouseId = warehouses[0]!) =>
+  `/warehouse/warehouses/${warehouseId}/skus/by-barcode?barcode=${encodeURIComponent(barcode)}`;
+test('receipt barcode lookup is exact, text-preserving and enforces permissions/warehouse scope', async () => {
+  const p = await product(),
+    skuId = p.skus[0]!.id,
+    barcode = '0000000005555';
+  await ok<Product>(skuRoute(p, 'set-barcode'), { version: p.version, barcode });
+  assert.equal((await call(lookupRoute(barcode))).status, 401);
+  for (const actor of [2, 3])
+    assert.equal((await call(lookupRoute(barcode), { actor })).status, 403);
+  assert.equal((await call(lookupRoute(barcode, warehouses[1]!), { actor: 1 })).status, 403);
+  for (const value of ['', '5555', '555', 'abc', '１２３', '1'.repeat(65)])
+    assert.equal(
+      (await call(lookupRoute(value), { actor: 1 })).status,
+      value && /^[0-9]{1,64}$/.test(value) ? 404 : 400,
+    );
+  assert.equal((await call(lookupRoute(barcode) + '&extra=1', { actor: 1 })).status, 400);
+  const result = await ok<import('../packages/contracts/src/index.ts').ReceiptSkuLookup>(
+    lookupRoute(' ' + barcode + ' '),
+    undefined,
+    1,
+  );
+  assert.equal(result.id, skuId);
+  assert.equal(result.name, p.name);
+  assert.equal(result.barcode, barcode);
+  assert.equal(result.spec, p.skus[0]!.spec);
+  await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: false } });
+  try {
+    assert.equal((await call(lookupRoute(barcode), { actor: 1 })).status, 403);
+  } finally {
+    await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: true } });
+  }
+});
+
+test('receipt lookup includes drafts/unpublished/category-disabled and disabled SKU status without writing business data', async () => {
+  let p = await product();
+  const barcode = '0000000006666';
+  p = await ok<Product>(skuRoute(p, 'set-barcode'), { version: p.version, barcode });
+  const before = {
+    audits: await db.businessAudit.count(),
+    receipts: await db.inboundReceipt.count(),
+    stock: await db.stockLedger.count(),
+  };
+  const read = () =>
+    ok<import('../packages/contracts/src/index.ts').ReceiptSkuLookup>(
+      lookupRoute(barcode),
+      undefined,
+      1,
+    );
+  assert.equal((await read()).id, p.skus[0]!.id);
+  const cat = await db.category.findUniqueOrThrow({ where: { id: p.categoryId } });
+  await db.category.update({ where: { id: cat.id }, data: { enabled: false } });
+  try {
+    assert.equal((await read()).enabled, true);
+  } finally {
+    await db.category.update({ where: { id: cat.id }, data: { enabled: true } });
+  }
+  assert.deepEqual(
+    {
+      audits: await db.businessAudit.count(),
+      receipts: await db.inboundReceipt.count(),
+      stock: await db.stockLedger.count(),
+    },
+    before,
+  );
+  p = await ok<Product>(skuRoute(p, 'disable'), { version: p.version });
+  assert.equal((await read()).enabled, false);
+  assert.equal(
+    (
+      await call(`/warehouse/warehouses/${warehouses[0]}/receipts`, {
+        actor: 1,
+        body: { sourceRef: '停用查询候选不可收货', lines: [line(p.skus[0]!.id)] },
+      })
+    ).error?.code,
+    'SKU_DISABLED',
+  );
+});
+
+test('barcode lookup follows clearing/rebinding and selected SKU creates receipt through existing stock safeguards', async () => {
+  let a = await product();
+  const b = await product(),
+    barcode = '0000000007777';
+  a = await ok<Product>(skuRoute(a, 'set-barcode'), { version: a.version, barcode });
+  const first = await ok<import('../packages/contracts/src/index.ts').ReceiptSkuLookup>(
+    lookupRoute(barcode),
+    undefined,
+    1,
+  );
+  assert.equal(first.id, a.skus[0]!.id);
+  a = await ok<Product>(skuRoute(a, 'set-barcode'), { version: a.version, barcode: null });
+  assert.equal((await call(lookupRoute(barcode), { actor: 1 })).error?.code, 'BARCODE_NOT_FOUND');
+  await ok<Product>(skuRoute(b, 'set-barcode'), { version: b.version, barcode });
+  const current = await ok<import('../packages/contracts/src/index.ts').ReceiptSkuLookup>(
+    lookupRoute(barcode),
+    undefined,
+    1,
+  );
+  assert.equal(current.id, b.skus[0]!.id);
+  const receipt = await draft([line(current.id, 2)]);
+  assert.equal(await db.stockBalance.count({ where: { skuId: current.id } }), 0);
+  assert.equal((await post(await approve(receipt))).status, 200);
+  assert.equal(
+    (await db.stockBalance.findFirstOrThrow({ where: { skuId: current.id } })).onHand,
+    2,
+  );
+  assert.equal(await db.stockBalance.count({ where: { skuId: first.id } }), 0);
+  checks.push(
+    'exact authorized barcode lookup follows binding, read-only; explicit receipt selection still uses normal guards',
+  );
+});

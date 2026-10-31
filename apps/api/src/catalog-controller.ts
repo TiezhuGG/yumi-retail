@@ -485,6 +485,29 @@ export class CatalogAdminController {
 @Controller('warehouse/warehouses/:warehouseId')
 export class InboundController {
   constructor(@Inject(CatalogService) private readonly service: CatalogService) {}
+  @Get('skus/by-barcode')
+  @Permissions('receipt.write', 'catalog.read')
+  @ApiOperation({ summary: '在授权仓库按完整条码读取收货候选规格，不改变库存或单据' })
+  @ApiQuery({ name: 'barcode', required: true, type: String })
+  @ApiResult(object({ ...skuSchema.properties, name: text }), [400, 401, 403, 404, 500])
+  async skuByBarcode(
+    @Param('warehouseId') warehouseId: string,
+    @Req() request: ApiRequest,
+    @Query() query: Record<string, unknown>,
+  ) {
+    await this.service.warehouse(this.service.db, request, uuid(warehouseId));
+    const q = fields(query, ['barcode']);
+    const barcode = skuBarcodeInput({ version: 0, barcode: q.barcode }).barcode;
+    if (!barcode) throw failure(400, 'VALIDATION_ERROR', '查询需填写完整条码');
+    const row = await this.service.db.sku.findUnique({
+      where: { barcode },
+      include: { product: { select: { name: true } } },
+    });
+    if (!row)
+      throw failure(404, 'BARCODE_NOT_FOUND', '未找到已绑定此条码的商品，请核对或联系运营维护');
+    const { product, ...sku } = row;
+    return success(request, jsonValue({ ...sku, name: product.name }));
+  }
   @Get('receipts')
   @Permissions('receipt.read')
   @paging()
