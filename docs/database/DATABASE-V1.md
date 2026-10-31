@@ -288,3 +288,15 @@ CATEGORY_RENAME / CATEGORY_ENABLE / CATEGORY_DISABLE审计以分类为resourceId
 ## 商品主图增量（202610310001_product_images）
 
 products.image_id可空，旧行NULL；product_images保存id/product_id/object_key/mime/bytes/width/height/created_at，object_key唯一、(id,product_id)唯一，产品(image_id,id)复合外键限制同商品引用。MIME限定PNG、字节1..4194304、边长1..1200。文件位于本地开发目录，不存PG二进制。版本/绑定/审计同事务，失败确认无DB引用才删除新对象；不确定结果保留待核对。解除/替换不删历史元数据，旧URL不可再读。数据库与对象需一起备份，恢复演练未完成；verify:product-images仅只读盘点。迁移已应用本机开发库并在测试隔离schema验证，无库存迁移。见[记录](../verification/S2-PRODUCT-IMAGE-2026-10-31.md)。
+
+
+## 图片集和结构化审计迁移（2026-10-31）
+
+202610310002_product_gallery：product_images.sort_order可空，CHECK 0..5、UNIQUE(product_id,sort_order)，非空为当前集，NULL为历史。只回填当前同商品主图为0，不激活历史对象。应用持商品行锁、清空旧顺序再写连续位置，同事务同步products.image_id=首图或NULL、version、审计与幂等；已有复合归属外键保留。202610310003_audit_details：business_audits.details可空JSONB，保存完整before/after有序图片ID，reason只存200字符内版本/数量摘要，旧记录不改。
+
+两项迁移已应用本机开发库并在隔离测试schema验证；无库存迁移。需停止旧API写入后应用全部迁移再重启新版，不允许旧写入和新排序逻辑混跑。移除只解绑/清空排序，历史元数据/对象保留、API不提供旧图片恢复。备份/恢复和只读对象盘点边界沿用前轮，见[报告](../verification/S2-PRODUCT-GALLERY-2026-10-31.md)。
+
+
+## 规格详情读取增量（2026-10-31）
+
+无DDL或新迁移。复用skus.product_id索引及公开目录SQL，以启用的锚点SKU所属product_id限定兄弟规格，同一语句快照继续计算公开仓各SKU可用量。最多20+1检测异常过量，不分页截断。GET不改商品、库存、成本、审计或幂等记录；商品创建1–20上限不变。此前图片集/审计增量仍为工程运行前置。见[验证记录](../verification/S2-PRODUCT-VARIANTS-2026-10-31.md)。

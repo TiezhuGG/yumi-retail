@@ -159,3 +159,8 @@ ReceiptReversalService复用余额锁、完整账本核对及持久化幂等/审
 ## 商品主图开发适配器决策（2026-10-31）
 
 本地可审查切片使用ProductImageStore接口及本地文件适配器；PG保存归属和尺寸元数据，受权限/当前绑定/公开目录条件控制的API输出规范PNG。仅dev/test开放有界base64写入并用sharp重编码，每进程最多2个解码。生产拒绝PRODUCT_IMAGE_LOCAL_DIR，不自动使用本地磁盘或模拟云服务；生产对象存储及预签名上传意图未实施。失败补偿先确认DB未引用，未知结果保留文件；历史文件保留、只读盘点、不自动GC。此决策不替代生产存储、备份恢复和域名方案，见[交付记录](../verification/S2-PRODUCT-IMAGE-2026-10-31.md)。
+
+
+## 图片集增量（2026-10-31）
+
+复用现有ProductImageStore、sharp限制和开发本地对象适配器；PG元数据sort_order 0..5决定当前集，有序首图同步Product.image_id。图片事务仍按商品行锁和Product.version串行化，同事务记录完整有序ID审计details、幂等结果；异常补偿逻辑不变。生产本地适配器仍禁止，生产对象存储、预签名上传、自动GC/恢复未交付。两项迁移及旧单图接口的首图递补语义见[本轮记录](../verification/S2-PRODUCT-GALLERY-2026-10-31.md)。

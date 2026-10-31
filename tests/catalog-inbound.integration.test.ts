@@ -7,6 +7,7 @@ import { createDatabase, hashPassword } from '../packages/database/src/index.ts'
 import { createApplication } from '../apps/api/dist/app.js';
 import { applicationConfig } from '../apps/api/dist/config.js';
 import type {
+  ProductGallery,
   Category,
   Page,
   Product,
@@ -1418,7 +1419,11 @@ test('published SKU spec display changes while stock, costs, units, other SKUs a
   const expected = structuredClone(p);
   expected.version++;
   expected.skus.find((s) => s.id === skuId)!.spec = spec;
-  assert.deepEqual(updated, expected);
+  const byId = (rows: Product['skus']) => [...rows].sort((a, b) => a.id.localeCompare(b.id));
+  assert.deepEqual(
+    { ...updated, skus: byId(updated.skus) },
+    { ...expected, skus: byId(expected.skus) },
+  );
   assert.deepEqual(await facts(), before);
   const sale = await visible(skuId);
   assert.equal(sale.data.spec, spec);
@@ -2081,5 +2086,489 @@ test('local image storage cannot be enabled by production configuration', () => 
       STAFF_ALLOWED_ORIGINS: 'https://staff.example.test',
       PRODUCT_IMAGE_LOCAL_DIR: '.local/images',
     }),
+  );
+});
+
+const galleryRoute = (p: Product, action = 'images') => `/admin/products/${p.id}/${action}`;
+async function addPhoto(p: Product, file = 'image-red.png') {
+  return ok<ProductGallery>(galleryRoute(p, 'add-image'), {
+    version: p.version,
+    image: await imageFile(file),
+  });
+}
+async function orderPhotos(g: ProductGallery, imageIds: string[], key?: string) {
+  return ok<ProductGallery>(
+    galleryRoute(g.product, 'set-images'),
+    { version: g.product.version, imageIds },
+    0,
+    key,
+  );
+}
+test('gallery API enforces auth, strict order input, image validation and database position constraints', async () => {
+  const p = await product(),
+    route = galleryRoute(p, 'set-images');
+  assert.equal((await call(galleryRoute(p))).status, 401);
+  assert.equal((await call(galleryRoute(p), { actor: 2 })).status, 403);
+  assert.equal((await ok<ProductGallery>(galleryRoute(p), undefined, 1)).images.length, 0);
+  for (const action of ['add-image', 'set-images']) {
+    const body =
+      action === 'add-image'
+        ? { version: 0, image: await imageFile() }
+        : { version: 0, imageIds: [] };
+    assert.equal((await call(galleryRoute(p, action), { body })).status, 401);
+    assert.equal((await call(galleryRoute(p, action), { actor: 1, body })).status, 403);
+    const csrf = await fetch(base + '/api/v1' + galleryRoute(p, action), {
+      method: 'POST',
+      headers: {
+        Cookie: identities[0]!.cookie,
+        Origin: 'http://127.0.0.1:5173',
+        'Content-Type': 'application/json',
+        'Idempotency-Key': randomUUID(),
+      },
+      body: JSON.stringify(body),
+    });
+    assert.equal(csrf.status, 403);
+  }
+  for (const body of [
+    { version: 0, imageIds: 'bad' },
+    {
+      version: 0,
+      imageIds: [randomUUID(), randomUUID(), ...Array.from({ length: 5 }, () => randomUUID())],
+    },
+    { version: -1, imageIds: [] },
+    { version: 0, imageIds: [], extra: true },
+    { version: 0, imageIds: ['invalid'] },
+    { version: 0, imageIds: [p.id, p.id] },
+  ])
+    assert.equal((await call(route, { actor: 0, body })).status, 400);
+  assert.equal(
+    (await call(galleryRoute(p, 'add-image'), { actor: 0, body: { version: 0, image: null } }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (
+      await call(galleryRoute(p, 'add-image'), {
+        actor: 0,
+        body: { version: 0, image: await imageFile('image-wide.png') },
+      })
+    ).status,
+    400,
+  );
+  const g = await addPhoto(p),
+    image = await db.productImage.findUniqueOrThrow({ where: { id: g.images[0]!.id } });
+  await assert.rejects(db.productImage.update({ where: { id: image.id }, data: { sortOrder: 6 } }));
+  await assert.rejects(
+    db.productImage.create({
+      data: { ...image, id: randomUUID(), objectKey: `${randomUUID()}.png` },
+    }),
+  );
+});
+
+test('gallery add, reorder, remove and public detail preserve cover agreement, ownership and inventory facts', async () => {
+  let p = await product();
+  await post(await approve(await draft([line(p.skus[0]!.id)])));
+  p = await publish(p);
+  const before = await db.stockBalance.findMany({ where: { skuId: p.skus[0]!.id } });
+  let g = await addPhoto(p);
+  const first = g.images[0]!.id;
+  g = await addPhoto(g.product, 'image-blue.jpg');
+  const second = g.images[1]!.id;
+  const read = (imageId: string) => fetch(base + `/api/v1/product-images/${p.id}/${imageId}`);
+  assert.equal((await read(second)).status, 200);
+  assert.equal(g.product.imageId, first);
+  g = await orderPhotos(g, [second, first]);
+  assert.equal(g.product.imageId, second);
+  const audit = await db.businessAudit.findFirstOrThrow({
+    where: { resourceId: p.id, action: 'PRODUCT_SET_IMAGES' },
+    orderBy: { createdAt: 'desc' },
+  });
+  assert.deepEqual(audit.details, { before: [first, second], after: [second, first] });
+  let sale = (await visible(p.skus[0]!.id)).data;
+  assert.deepEqual(
+    sale.imageUrls,
+    [second, first].map((id) => `/api/v1/product-images/${p.id}/${id}`),
+  );
+  assert.equal(sale.imageUrl, sale.imageUrls![0]);
+  const other = await addPhoto(await product());
+  for (const imageId of [other.images[0]!.id, randomUUID()])
+    assert.equal(
+      (
+        await call(galleryRoute(p, 'set-images'), {
+          actor: 0,
+          body: { version: g.product.version, imageIds: [imageId] },
+        })
+      ).error?.code,
+      'INVALID_IMAGE_REFERENCE',
+    );
+  assert.equal(
+    (await call(`/admin/products/${other.product.id}/image/${first}`, { actor: 0 })).status,
+    404,
+  );
+  g = await orderPhotos(g, [first]);
+  assert.equal((await read(second)).status, 404);
+  assert.equal(
+    (
+      await call(galleryRoute(p, 'set-images'), {
+        actor: 0,
+        body: { version: g.product.version, imageIds: [second] },
+      })
+    ).status,
+    400,
+  );
+  assert.equal(await db.productImage.count({ where: { productId: p.id } }), 2, 'metadata retained');
+  await db.category.update({ where: { id: p.categoryId }, data: { enabled: false } });
+  try {
+    assert.equal((await read(first)).status, 404);
+  } finally {
+    await db.category.update({ where: { id: p.categoryId }, data: { enabled: true } });
+  }
+  g = await orderPhotos(g, []);
+  assert.equal(g.product.imageId, null);
+  sale = (await visible(p.skus[0]!.id)).data;
+  assert.deepEqual(sale.imageUrls, []);
+  assert.equal(sale.imageUrl, null);
+  assert.equal((await read(first)).status, 404);
+  assert.equal(g.product.status, p.status);
+  assert.deepEqual(g.product.skus, p.skus);
+  assert.deepEqual(await db.stockBalance.findMany({ where: { skuId: p.skus[0]!.id } }), before);
+});
+
+test('six-image cap survives concurrent adds and allows append after removal without restoring history', async () => {
+  let g = await addPhoto(await product());
+  for (let i = 1; i < 5; i++) g = await addPhoto(g.product);
+  const route = galleryRoute(g.product, 'add-image'),
+    body = { version: g.product.version, image: await imageFile() };
+  const race = await Promise.all([
+    call<ProductGallery>(route, { actor: 0, body }),
+    call<ProductGallery>(route, { actor: 0, body }),
+  ]);
+  assert.deepEqual(race.map((r) => r.status).sort(), [200, 409]);
+  g = race.find((r) => r.status === 200)!.data;
+  const files = await readdir(`.local/test-images-${schema}`);
+  assert.equal(
+    (await call(route, { actor: 0, body: { ...body, version: g.product.version } })).error?.code,
+    'IMAGE_LIMIT',
+  );
+  assert.deepEqual((await readdir(`.local/test-images-${schema}`)).sort(), files.sort());
+  g = await orderPhotos(
+    g,
+    g.images.slice(1).map((i) => i.id),
+  );
+  g = await addPhoto(g.product);
+  assert.equal(g.images.length, 6);
+  assert.deepEqual(
+    (
+      await db.productImage.findMany({
+        where: { productId: g.product.id, sortOrder: { not: null } },
+        orderBy: { sortOrder: 'asc' },
+      })
+    ).map((i) => i.sortOrder),
+    [0, 1, 2, 3, 4, 5],
+  );
+});
+
+test('gallery idempotent replay is historical and concurrent reorder/catalog edits have one winner', async () => {
+  const p = await product(),
+    route = galleryRoute(p, 'add-image'),
+    key = randomUUID(),
+    body = { version: p.version, image: await imageFile() };
+  const copies = await Promise.all(
+    Array.from({ length: 4 }, () => call<ProductGallery>(route, { actor: 0, body, key })),
+  );
+  assert(
+    copies.every((r) => r.status === 200 && r.data.images[0]!.id === copies[0]!.data.images[0]!.id),
+  );
+  assert.equal(await db.productImage.count({ where: { productId: p.id } }), 1);
+  assert.equal(
+    await db.businessAudit.count({ where: { resourceId: p.id, action: 'PRODUCT_ADD_IMAGE' } }),
+    1,
+  );
+  let g = await addPhoto(copies[0]!.data.product);
+  const orderKey = randomUUID(),
+    orderBody = { version: g.product.version, imageIds: [...g.images].reverse().map((i) => i.id) };
+  g = await ok<ProductGallery>(galleryRoute(p, 'set-images'), orderBody, 0, orderKey);
+  await orderPhotos(g, []);
+  assert.deepEqual(
+    (await ok<ProductGallery>(galleryRoute(p, 'set-images'), orderBody, 0, orderKey)).images,
+    g.images,
+  );
+  assert.deepEqual((await ok<ProductGallery>(galleryRoute(p))).images, []);
+  assert.equal(
+    (
+      await call(route, {
+        actor: 0,
+        body: { ...body, image: await imageFile('image-blue.jpg') },
+        key,
+      })
+    ).error?.code,
+    'IDEMPOTENCY_CONFLICT',
+  );
+  const fresh = await addPhoto(await product());
+  const race = await Promise.all([
+    call(galleryRoute(fresh.product, 'set-images'), {
+      actor: 0,
+      body: { version: fresh.product.version, imageIds: [] },
+    }),
+    call(`/admin/products/${fresh.product.id}/publish`, {
+      actor: 0,
+      body: { version: fresh.product.version },
+    }),
+  ]);
+  assert.deepEqual(race.map((r) => r.status).sort(), [200, 409]);
+});
+
+test('legacy cover update/removal preserves remaining gallery images and promotes next cover', async () => {
+  let g = await addPhoto(await product());
+  g = await addPhoto(g.product, 'image-blue.jpg');
+  const retained = g.images[1]!.id,
+    removed = g.images[0]!.id;
+  let p = await ok<Product>(imageRoute(g.product), {
+    version: g.product.version,
+    image: await imageFile(),
+  });
+  g = await ok<ProductGallery>(galleryRoute(p));
+  assert.deepEqual(
+    g.images.map((i) => i.id),
+    [p.imageId, retained],
+  );
+  assert.equal((await call(`/admin/products/${p.id}/image/${removed}`, { actor: 0 })).status, 404);
+  p = await ok<Product>(imageRoute(p), { version: p.version, image: null });
+  assert.equal(p.imageId, retained);
+  assert.deepEqual(
+    (await ok<ProductGallery>(galleryRoute(p))).images.map((i) => i.id),
+    [retained],
+  );
+});
+
+test('gallery late audit failure rolls back reorder/removal and compensates appended file with original-key retry', async () => {
+  let g = await addPhoto(await product());
+  g = await addPhoto(g.product);
+  const before = await ok<ProductGallery>(galleryRoute(g.product)),
+    files = await readdir(`.local/test-images-${schema}`);
+  await admin.query(
+    "CREATE FUNCTION fail_gallery_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('PRODUCT_ADD_IMAGE','PRODUCT_SET_IMAGES') THEN RAISE EXCEPTION 'synthetic gallery failure'; END IF; RETURN NEW; END $$",
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_gallery_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_gallery_audit()',
+  );
+  const key = randomUUID(),
+    body = { version: g.product.version, image: await imageFile() };
+  try {
+    for (const imageIds of [[], [...g.images].reverse().map((i) => i.id)]) {
+      assert.equal(
+        (
+          await call(galleryRoute(g.product, 'set-images'), {
+            actor: 0,
+            body: { version: g.product.version, imageIds },
+          })
+        ).status,
+        500,
+      );
+      assert.deepEqual(await ok<ProductGallery>(galleryRoute(g.product)), before);
+    }
+    assert.equal(
+      (await call(galleryRoute(g.product, 'add-image'), { actor: 0, body, key })).status,
+      500,
+    );
+    assert.deepEqual(await ok<ProductGallery>(galleryRoute(g.product)), before);
+    assert.equal(await db.productImage.count({ where: { productId: g.product.id } }), 2);
+    assert.deepEqual((await readdir(`.local/test-images-${schema}`)).sort(), files.sort());
+  } finally {
+    await admin.query('DROP TRIGGER fail_gallery_audit ON business_audits');
+    await admin.query('DROP FUNCTION fail_gallery_audit()');
+  }
+  assert.equal(
+    (await ok<ProductGallery>(galleryRoute(g.product, 'add-image'), body, 0, key)).images.length,
+    3,
+  );
+  checks.push(
+    'gallery order/removal, ownership, cap, compatibility, concurrent/idempotent writes and late rollback passed',
+  );
+});
+
+test('gallery migration backfills only the current owned cover and leaves historical/unbound images inactive', async () => {
+  const scratch = schema + '_gallery_migration';
+  assert.match(scratch, /^s2_[a-f0-9]{32}_gallery_migration$/);
+  await admin.query('BEGIN');
+  try {
+    await admin.query(`CREATE SCHEMA ${scratch}`);
+    await admin.query("SELECT set_config('search_path',$1,true)", [scratch]);
+    await admin.query(
+      'CREATE TABLE products(id uuid PRIMARY KEY,image_id uuid); CREATE TABLE product_images(id uuid PRIMARY KEY,product_id uuid NOT NULL)',
+    );
+    const p = randomUUID(),
+      cover = randomUUID(),
+      historic = randomUUID(),
+      orphan = randomUUID();
+    await admin.query('INSERT INTO products VALUES ($1,$2)', [p, cover]);
+    for (const id of [cover, historic, orphan])
+      await admin.query('INSERT INTO product_images VALUES ($1,$2)', [id, p]);
+    await admin.query(
+      await readFile(
+        'packages/database/prisma/migrations/202610310002_product_gallery/migration.sql',
+        'utf8',
+      ),
+    );
+    const result = (await admin.query('SELECT id,sort_order FROM product_images')) as {
+      rows: { id: string; sort_order: number | null }[];
+    };
+    assert.equal(result.rows.find((i) => i.id === cover)!.sort_order, 0);
+    assert(result.rows.filter((i) => i.id !== cover).every((i) => i.sort_order === null));
+  } finally {
+    await admin.query('ROLLBACK');
+  }
+});
+
+test('public detail returns same-product enabled variants with each price and stock, GET changes no business facts', async () => {
+  let p = await ok<Product>('/admin/products', {
+    categoryId,
+    name: '多规格公开测试',
+    description: '合成资料',
+    skus: [
+      { code: `VAR-A-${run}`, spec: '单包装', unit: '包', priceCents: 450, expiryManaged: false },
+      { code: `VAR-B-${run}`, spec: '3包装', unit: '组', priceCents: 1299, expiryManaged: false },
+      {
+        code: `VAR-C-${run}`,
+        spec: '停用规格',
+        unit: '箱',
+        priceCents: 9900,
+        expiryManaged: false,
+      },
+    ],
+  });
+  const [a, b, c] = p.skus;
+  await post(await approve(await draft([line(a!.id, 3), line(b!.id, 7)])));
+  p = await ok<Product>(`/admin/products/${p.id}/skus/${c!.id}/disable`, { version: p.version });
+  p = await publish(p);
+  const before = {
+    balances: await db.stockBalance.findMany({ where: { skuId: { in: p.skus.map((s) => s.id) } } }),
+    audits: await db.businessAudit.count(),
+    keys: await db.idempotencyRecord.count(),
+  };
+  const r = await call<import('../packages/contracts/src/index.ts').SaleSkuDetail>(
+    `/products/${b!.id}`,
+  );
+  assert.equal(r.status, 200);
+  assert.equal(r.data.id, b!.id);
+  assert.equal(r.data.priceCents, 1299);
+  assert.equal(r.data.available, 7);
+  assert.deepEqual(r.data.variants.map((v) => v.id).sort(), [a!.id, b!.id].sort());
+  assert.equal(r.data.variants.find((v) => v.id === a!.id)!.available, 3);
+  assert(r.data.variants.every((v) => v.productId === p.id && !('barcode' in v) && !('code' in v)));
+  assert.deepEqual(
+    await db.stockBalance.findMany({ where: { skuId: { in: p.skus.map((s) => s.id) } } }),
+    before.balances,
+  );
+  assert.equal(await db.businessAudit.count(), before.audits);
+  assert.equal(await db.idempotencyRecord.count(), before.keys);
+  await db.stockBalance.update({
+    where: { warehouseId_skuId: { warehouseId: warehouses[0]!, skuId: a!.id } },
+    data: { inventoryHold: true },
+  });
+  const held = await call<import('../packages/contracts/src/index.ts').SaleSkuDetail>(
+    `/products/${a!.id}`,
+  );
+  assert.equal(held.status, 200);
+  assert.equal(held.data.available, 0);
+  assert.equal(held.data.variants.find((v) => v.id === b!.id)!.available, 7);
+  p = await ok<Product>(`/admin/products/${p.id}/skus/${b!.id}/set-price`, {
+    version: p.version,
+    priceCents: 1399,
+  });
+  const refreshed = await call<import('../packages/contracts/src/index.ts').SaleSkuDetail>(
+    `/products/${a!.id}`,
+  );
+  assert.equal(refreshed.data.variants.find((v) => v.id === b!.id)!.priceCents, 1399);
+});
+
+test('variant detail does not fall back from disabled/unpublished/category-hidden anchor and validates identity/query', async () => {
+  let p = await ok<Product>('/admin/products', {
+    categoryId,
+    name: '规格范围测试',
+    description: '合成范围验证',
+    skus: [0, 1].map((i) => ({
+      code: `V-SCOPE-${i}-${run}`,
+      spec: `${i + 1}包`,
+      unit: '包',
+      priceCents: 450,
+      expiryManaged: false,
+    })),
+  });
+  const [a, b] = p.skus;
+  p = await publish(p);
+  p = await ok<Product>(`/admin/products/${p.id}/skus/${a!.id}/disable`, { version: p.version });
+  assert.equal((await visible(a!.id)).status, 404);
+  assert.equal((await visible(b!.id)).status, 200);
+  assert.equal((await visible(randomUUID())).status, 404);
+  assert.equal((await visible('bad-id')).status, 400);
+  assert.equal((await visible(`${b!.id}?limit=1`)).status, 400);
+  await db.category.update({ where: { id: categoryId }, data: { enabled: false } });
+  try {
+    assert.equal((await visible(b!.id)).status, 404);
+  } finally {
+    await db.category.update({ where: { id: categoryId }, data: { enabled: true } });
+  }
+  await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: false } });
+  try {
+    assert.equal((await visible(b!.id)).status, 503);
+  } finally {
+    await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: true } });
+  }
+  await ok<Product>(`/admin/products/${p.id}/unpublish`, { version: p.version });
+  assert.equal((await visible(b!.id)).status, 404);
+});
+
+test('20-spec detail includes the selected last UUID and all enabled siblings without relying on catalog pagination', async () => {
+  let p = await ok<Product>('/admin/products', {
+    categoryId,
+    name: '完整20规格测试',
+    description: '合成边界验证',
+    skus: Array.from({ length: 20 }, (_, i) => ({
+      code: `V20-${i}-${run}`,
+      spec: `${i + 1}包装`,
+      unit: '包',
+      priceCents: 100 + i,
+      expiryManaged: false,
+    })),
+  });
+  p = (await addPhoto(p)).product;
+  p = await publish(p);
+  const anchor = [...p.skus].sort((a, b) => a.id.localeCompare(b.id)).at(-1)!;
+  const response = await call<import('../packages/contracts/src/index.ts').SaleSkuDetail>(
+    `/products/${anchor.id}`,
+  );
+  assert.equal(response.status, 200);
+  assert.equal(response.data.id, anchor.id);
+  assert.equal(response.data.variants.length, 20);
+  assert.deepEqual(
+    response.data.variants.map((v) => v.id),
+    p.skus.map((s) => s.id).sort(),
+  );
+  assert(
+    response.data.variants.every((v) => v.available === 0 && v.imageUrl === response.data.imageUrl),
+  );
+  const extra = randomUUID();
+  await db.sku.create({
+    data: {
+      id: extra,
+      productId: p.id,
+      code: `V21-${run}`,
+      spec: '异常导入第21规格',
+      unit: '包',
+      priceCents: 150,
+      expiryManaged: false,
+      enabled: true,
+    },
+  });
+  assert.equal(
+    (await visible(anchor.id)).status,
+    503,
+    'inconsistent over-limit data fails closed instead of truncation',
+  );
+  await db.sku.update({ where: { id: extra }, data: { enabled: false } });
+  assert.equal((await visible(anchor.id)).status, 200);
+  checks.push(
+    'public detail: all current enabled siblings, selected identity, stock/prices, hidden anchor and 20-spec boundary',
   );
 });

@@ -178,6 +178,7 @@ model ProductImage {
   id        String    @id @db.Uuid
   productId String    @map("product_id") @db.Uuid
   objectKey String    @unique @map("object_key") @db.VarChar(64)
+  sortOrder Int?      @map("sort_order")
   mime      String    @db.VarChar(32)
   bytes     Int
   width     Int
@@ -187,6 +188,7 @@ model ProductImage {
   covers    Product[] @relation("cover")
 
   @@unique([id, productId])
+  @@unique([productId, sortOrder])
   @@map("product_images")
 }
 
@@ -327,6 +329,7 @@ model BusinessAudit {
   actorId     String   @map("actor_id") @db.Uuid
   action      String   @db.VarChar(64)
   reason      String?  @db.VarChar(200)
+  details     Json?
   resourceId  String   @map("resource_id") @db.Uuid
   warehouseId String?  @map("warehouse_id") @db.Uuid
   requestId   String   @map("request_id") @db.Uuid

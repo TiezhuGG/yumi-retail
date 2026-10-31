@@ -552,7 +552,7 @@ export function CatalogWorkbench({
                                     setEditingImage(p.id);
                                   }}
                                 >
-                                  主图
+                                  图片
                                 </button>
                                 <button
                                   className="text-button"
@@ -884,13 +884,13 @@ export function CatalogWorkbench({
           onSaved={async () => {
             setEditingImage(null);
             setFailed(false);
-            setMessage('主图操作已确认，正在读取当前列表…');
+            setMessage('正在读取当前商品列表…');
             try {
               await productsPage();
-              setMessage('主图操作已确认，列表已读取当前资料。');
+              setMessage('商品列表已读取当前资料。');
             } catch {
               setFailed(true);
-              setMessage('主图操作已确认，但列表刷新失败，请刷新列表核对。');
+              setMessage('商品列表刷新失败，请刷新列表核对图片。');
             }
           }}
         />

@@ -783,3 +783,94 @@ button[disabled] {
   border-radius: 24px;
   font-size: 13px;
 }
+.detail-gallery {
+  height: 300px;
+}
+.detail-image-count {
+  display: block;
+  width: max-content;
+  margin: 10px auto 0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #dce9d4;
+  color: #3c6043;
+  font-size: 12px;
+}
+.detail-gallery-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #61715b;
+}
+.detail-gallery-controls button {
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12px;
+  line-height: 30px;
+  background: #fff;
+  color: #28623c;
+  border-radius: 16px;
+}
+.detail-gallery-controls button[disabled] {
+  color: #9ca595;
+}
+
+.detail-spec-help {
+  display: block;
+  color: #809079;
+  font-size: 11px;
+  line-height: 1.8;
+  margin-bottom: 12px;
+}
+.detail-spec-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.detail-spec-options .spec-choice {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 10px;
+  color: #687563;
+  background: #fafbf8;
+  border-color: #e1e9dc;
+  line-height: 1.6;
+  text-align: left;
+  white-space: normal;
+}
+.detail-spec-options .spec-choice.selected {
+  color: #28623c;
+  background: #f1f7e9;
+  border-color: #82ae68;
+}
+.spec-option-name {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.spec-option-price {
+  display: block;
+  margin-top: 8px;
+  font-size: 15px;
+  color: #d96442;
+}
+.spec-option-status {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+}
+.detail-refresh {
+  margin: 14px 0 26px;
+  font-size: 11px;
+  color: #43834c;
+  background: #f4f8f0;
+  line-height: 34px;
+}
+
+.detail-spec-options .spec-choice.wide {
+  grid-column: 1 / -1;
+}

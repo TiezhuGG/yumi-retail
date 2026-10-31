@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Product, StaffProfile } from '@yumi/contracts';
+import type { ProductGallery, StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
 import { Modal } from './modal.js';
 interface ImageFile {
@@ -18,7 +18,8 @@ export function ProductImageEditor({
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [product, setProduct] = useState<Product | null>(null),
+  const [gallery, setGallery] = useState<ProductGallery | null>(null),
+    [order, setOrder] = useState<string[]>([]),
     [selected, setSelected] = useState<ImageFile | null>(null),
     [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(true),
@@ -26,13 +27,15 @@ export function ProductImageEditor({
     [busy, setBusy] = useState(false),
     [unknown, setUnknown] = useState(false),
     [conflict, setConflict] = useState(false),
-    [error, setError] = useState('');
-  const intent = useRef<{ key: string; body: { version: number; image: ImageFile | null } } | null>(
-      null,
-    ),
+    [error, setError] = useState(''),
+    [message, setMessage] = useState('');
+  const intent = useRef<{ key: string; route: string; body: unknown } | null>(null),
     sequence = useRef(0),
     fileSequence = useRef(0),
     fileInput = useRef<HTMLInputElement>(null);
+  const dirty =
+    !!gallery && JSON.stringify(order) !== JSON.stringify(gallery.images.map((i) => i.id));
+  const locked = busy || unknown || conflict || reading || loading;
   function clear(resetInput = true) {
     fileSequence.current++;
     setSelected(null);
@@ -44,10 +47,12 @@ export function ProductImageEditor({
     const token = ++sequence.current;
     setLoading(true);
     setError('');
+    setMessage('');
     try {
-      const current = await staffRequest<Product>(`/admin/products/${id}`);
+      const current = await staffRequest<ProductGallery>(`/admin/products/${id}/images`);
       if (token !== sequence.current) return;
-      setProduct(current);
+      setGallery(current);
+      setOrder(current.images.map((i) => i.id));
       clear();
       intent.current = null;
       setUnknown(false);
@@ -68,6 +73,7 @@ export function ProductImageEditor({
   async function choose(file?: File) {
     clear(false);
     setError('');
+    setMessage('');
     intent.current = null;
     if (!file) return;
     if (!['image/png', 'image/jpeg'].includes(file.type) || !file.size || file.size > 2097152) {
@@ -96,17 +102,22 @@ export function ProductImageEditor({
       if (token === fileSequence.current) setReading(false);
     }
   }
-  async function save(image: ImageFile | null) {
-    if (!product || busy || reading) return;
+  async function save(kind: 'add-image' | 'set-images') {
+    if (!gallery || busy || reading) return;
     const attempt = intent.current ?? {
       key: crypto.randomUUID(),
-      body: { version: product.version, image },
+      route: kind,
+      body:
+        kind === 'add-image'
+          ? { version: gallery.product.version, image: selected }
+          : { version: gallery.product.version, imageIds: order },
     };
     intent.current = attempt;
     setBusy(true);
     setError('');
+    setMessage('');
     try {
-      await staffRequest(`/admin/products/${id}/set-image`, {
+      await staffRequest(`/admin/products/${id}/${attempt.route}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +126,20 @@ export function ProductImageEditor({
         },
         body: JSON.stringify(attempt.body),
       });
-      await onSaved();
+      // Idempotent replay can be historical: always reload the authoritative gallery.
+      intent.current = null;
+      setUnknown(false);
+      setConflict(true);
+      try {
+        const current = await staffRequest<ProductGallery>(`/admin/products/${id}/images`);
+        setGallery(current);
+        setOrder(current.images.map((i) => i.id));
+        clear();
+        setConflict(false);
+        setMessage('图片操作已确认，已读取当前图片集。');
+      } catch {
+        setError('图片操作已确认，但当前资料读取失败，请载入最新资料后继续。');
+      }
     } catch (e) {
       if (e instanceof StaffRequestError && e.status < 500) {
         intent.current = null;
@@ -124,19 +148,27 @@ export function ProductImageEditor({
         setError(e.message);
       } else {
         setUnknown(true);
-        setError('保存响应未能确认，原图片操作已保留。请使用原操作重试确认。');
+        setError('保存响应未能确认，原图片操作已保留，请使用原操作重试确认。');
       }
     } finally {
       setBusy(false);
     }
   }
+  function move(index: number, target: number) {
+    const next = [...order];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item!);
+    setOrder(next);
+    setMessage('');
+    setError('');
+  }
   return (
-    <Modal title="商品主图" busy={busy} onClose={onClose}>
+    <Modal title="商品图片" busy={busy} onClose={() => (gallery ? void onSaved() : onClose())}>
       {loading ? (
         <p className="empty-state" role="status">
-          正在读取商品主图…
+          正在读取商品图片…
         </p>
-      ) : !product ? (
+      ) : !gallery ? (
         <div className="notice error" role="alert">
           {error}
           <button className="secondary-button" onClick={() => void load()}>
@@ -144,104 +176,186 @@ export function ProductImageEditor({
           </button>
         </div>
       ) : (
-        <form
-          className="business-form product-image-editor"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (selected || unknown) void save(intent.current?.body.image ?? selected);
-          }}
-        >
-          <strong className="full" style={{ overflowWrap: 'anywhere' }}>
-            {product.name}
-          </strong>
-          <p className="notice full">
-            上传商品实物或包装照片，PNG/JPEG、2MB以内、边长16–4096像素且不超过900万像素。保存后替换主图；移除后恢复包装示意。商品状态、售价和库存保持原值。
+        <div className="product-image-editor gallery-editor">
+          <strong className="gallery-product-name">{gallery.product.name}</strong>
+          <p className="notice">
+            最多6张，第一张为主图。调整顺序或移除后需保存；添加一次上传一张并立即保存。PNG/JPEG、2MB以内、边长16–4096像素且不超过900万像素。
           </p>
-          <div className="full product-image-preview">
-            {preview || product.imageId ? (
-              <img
-                src={preview || `/api/v1/admin/products/${id}/image/${product.imageId}`}
-                alt={preview ? '待保存主图预览' : '当前商品主图'}
-                onError={() => setError('图片加载失败，可重新选图或关闭后重试')}
+          <p role="status">
+            {order.length} / 6 张{dirty ? ' · 顺序或移除尚未保存' : ''}
+          </p>
+          {!order.length && <p className="empty-state">暂无商品图片，顾客将看到包装示意。</p>}
+          <ol className="gallery-grid">
+            {order.map((imageId, index) => (
+              <li className="gallery-tile" key={imageId}>
+                <span className="gallery-badge">{index === 0 ? '主图' : `图片 ${index + 1}`}</span>
+                <GalleryPreview
+                  src={gallery.images.find((i) => i.id === imageId)!.url}
+                  label={`商品图片 ${index + 1}`}
+                />
+                <div className="gallery-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={locked || index === 0 || !!selected}
+                    onClick={() => move(index, 0)}
+                  >
+                    设为主图
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    aria-label={`图片${index + 1}前移`}
+                    disabled={locked || index === 0 || !!selected}
+                    onClick={() => move(index, index - 1)}
+                  >
+                    前移
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    aria-label={`图片${index + 1}后移`}
+                    disabled={locked || index === order.length - 1 || !!selected}
+                    onClick={() => move(index, index + 1)}
+                  >
+                    后移
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    aria-label={`移除图片${index + 1}`}
+                    disabled={locked || !!selected}
+                    onClick={() => {
+                      setOrder(order.filter((i) => i !== imageId));
+                      setMessage('');
+                    }}
+                  >
+                    移除
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+          {dirty && (
+            <div className="gallery-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={locked}
+                onClick={() => setOrder(gallery.images.map((i) => i.id))}
+              >
+                撤销顺序和移除
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={locked}
+                onClick={() => void save('set-images')}
+              >
+                保存顺序和移除
+              </button>
+            </div>
+          )}
+          <div className="gallery-upload">
+            <label>
+              添加商品图片
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                disabled={locked || dirty || order.length >= 6}
+                onChange={(e) => void choose(e.target.files?.[0])}
               />
-            ) : (
-              <p>尚未设置主图，顾客将看到明确标注的包装示意。</p>
+            </label>
+            {order.length >= 6 && <p className="notice">已达6张上限，保存移除后可继续添加。</p>}
+            {dirty && <p className="notice">请先保存或撤销顺序和移除，再添加图片。</p>}
+            {reading && <p role="status">正在读取所选文件…</p>}
+            {preview && (
+              <div className="product-image-preview">
+                <img src={preview} alt="待添加图片预览" />
+              </div>
+            )}
+            {selected && (
+              <div className="gallery-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={locked}
+                  onClick={() => clear()}
+                >
+                  取消选择
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={locked}
+                  onClick={() => void save('add-image')}
+                >
+                  上传并添加图片
+                </button>
+              </div>
             )}
           </div>
-          <label className="full">
-            选择主图
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,.png,.jpg,.jpeg"
-              disabled={busy || unknown || conflict || reading}
-              onChange={(e) => void choose(e.target.files?.[0])}
-            />
-          </label>
-          {reading && (
-            <p className="full" role="status">
-              正在读取所选文件…
+          {error && (
+            <p className="notice error" role="alert">
+              {error}
             </p>
           )}
-          {selected && (
-            <button
-              type="button"
-              className="secondary-button full"
-              disabled={busy || unknown || conflict}
-              onClick={() => clear()}
-            >
-              取消选择（保留当前主图）
-            </button>
-          )}
-          {error && (
-            <p className="notice error full" role="alert">
-              {error}
+          {message && (
+            <p className="notice" role="status">
+              {message}
             </p>
           )}
           {conflict && (
             <button
               type="button"
-              className="secondary-button full"
+              className="secondary-button"
               disabled={busy}
               onClick={() => void load()}
             >
               载入最新资料（替换当前选择）
             </button>
           )}
-          <footer>
-            <button type="button" className="secondary-button" disabled={busy} onClick={onClose}>
-              关闭
+          {unknown && (
+            <button
+              type="button"
+              className="primary-button"
+              disabled={busy}
+              onClick={() => void save('add-image')}
+            >
+              使用原操作重试确认
             </button>
-            {unknown ? (
-              <button
-                type="button"
-                className="primary-button"
-                disabled={busy}
-                onClick={() => void save(intent.current!.body.image)}
-              >
-                使用原操作重试确认
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  disabled={busy || reading || conflict || !!selected || !product.imageId}
-                  onClick={() => void save(null)}
-                >
-                  移除主图
-                </button>
-                <button
-                  className="primary-button"
-                  disabled={busy || reading || conflict || !selected}
-                >
-                  {busy ? '正在保存…' : '上传并保存主图'}
-                </button>
-              </>
-            )}
+          )}
+          <footer>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void onSaved()}
+            >
+              关闭并刷新列表
+            </button>
+            {dirty && <small>未保存的顺序和移除将在关闭后丢弃</small>}
           </footer>
-        </form>
+        </div>
       )}
     </Modal>
+  );
+}
+function GalleryPreview({ src, label }: { src: string; label: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="gallery-thumb">
+      {failed ? (
+        <span role="status">图片读取失败</span>
+      ) : (
+        <img src={src} alt={label} onError={() => setFailed(true)} />
+      )}
+      {failed && (
+        <button type="button" className="secondary-button" onClick={() => setFailed(false)}>
+          重试图片
+        </button>
+      )}
+    </div>
   );
 }

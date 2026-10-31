@@ -2,6 +2,7 @@ import Taro from '@tarojs/taro';
 declare const API_BASE_URL: string;
 export interface SaleSku {
   imageUrl?: string | null;
+  imageUrls?: string[];
   id: string;
   productId: string;
   name: string;
@@ -28,3 +29,7 @@ export async function request<T>(path: string): Promise<T> {
 }
 
 export const productImageUrl = (path: string) => API_BASE_URL.replace(/\/api\/v1\/?$/, '') + path;
+
+export interface SaleSkuDetail extends SaleSku {
+  variants: SaleSku[];
+}

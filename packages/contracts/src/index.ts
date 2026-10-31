@@ -110,6 +110,7 @@ export interface ReceiptDetail extends Receipt {
 
 export interface SaleSku {
   imageUrl?: string | null;
+  imageUrls?: string[];
   id: string;
   productId: string;
   name: string;
@@ -260,4 +261,13 @@ export interface StockCount {
   postedAt: string | null;
   cancelledAt: string | null;
   lines: StockCountLine[];
+}
+
+export interface ProductGallery {
+  product: Product;
+  images: { id: string; url: string }[];
+}
+
+export interface SaleSkuDetail extends SaleSku {
+  variants: SaleSku[];
 }

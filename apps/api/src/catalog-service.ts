@@ -30,6 +30,7 @@ export class CatalogService {
     resourceId: string,
     warehouseId: string | null = null,
     reason: string | null = null,
+    details?: Prisma.InputJsonValue,
   ) {
     await tx.businessAudit.create({
       data: {
@@ -39,6 +40,7 @@ export class CatalogService {
         resourceId,
         warehouseId,
         reason,
+        ...(details === undefined ? {} : { details }),
         requestId: request.requestId,
       },
     });
@@ -554,6 +556,7 @@ export class CatalogService {
     keyword: string;
     categoryId: string | null;
     skuId?: string;
+    relatedToSkuId?: string;
   }) {
     const warehouseId = this.publicWarehouseId;
     if (
@@ -569,13 +572,14 @@ export class CatalogService {
         description: string;
         categoryId: string;
         imageUrl: string | null;
+        imageUrls: string[];
         spec: string;
         unit: string;
         priceCents: bigint;
         available: number;
       }>
     >`
-      SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",CASE WHEN p.image_id IS NULL THEN NULL ELSE '/api/v1/product-images/'||p.id::text||'/'||p.image_id::text END AS "imageUrl",s.spec,s.unit,s.price_cents AS "priceCents",
+      SELECT s.id,p.id AS "productId",p.name,p.description,p.category_id AS "categoryId",CASE WHEN p.image_id IS NULL THEN NULL ELSE '/api/v1/product-images/'||p.id::text||'/'||p.image_id::text END AS "imageUrl",COALESCE((SELECT jsonb_agg('/api/v1/product-images/'||p.id::text||'/'||i.id::text ORDER BY i.sort_order) FROM product_images i WHERE i.product_id=p.id AND i.sort_order IS NOT NULL),'[]'::jsonb) AS "imageUrls",s.spec,s.unit,s.price_cents AS "priceCents",
         CASE WHEN COALESCE(b.inventory_hold,false) OR b.active_count_id IS NOT NULL THEN 0 ELSE LEAST(GREATEST(0,COALESCE(b.on_hand-b.reserved-b.blocked-b.safety,0)),COALESCE(SUM(GREATEST(0,sp.on_hand-sp.reserved-sp.blocked)) FILTER(WHERE loc.enabled AND (l.expires_at IS NULL OR l.expires_at>CURRENT_TIMESTAMP)),0))::int END AS available
       FROM skus s JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN categories parent ON parent.id=c.parent_id
       JOIN warehouses w ON w.id=${warehouseId}::uuid AND w.enabled
@@ -586,6 +590,7 @@ export class CatalogService {
       WHERE s.enabled AND p.status='PUBLISHED' AND c.enabled AND (parent.id IS NULL OR parent.enabled)
         AND (${query.cursor ?? null}::uuid IS NULL OR s.id>${query.cursor ?? null}::uuid)
         AND (${query.skuId ?? null}::uuid IS NULL OR s.id=${query.skuId ?? null}::uuid)
+        AND (${query.relatedToSkuId ?? null}::uuid IS NULL OR p.id=(SELECT anchor.product_id FROM skus anchor WHERE anchor.id=${query.relatedToSkuId ?? null}::uuid AND anchor.enabled))
         AND (${query.categoryId}::uuid IS NULL OR c.id=${query.categoryId}::uuid OR c.parent_id=${query.categoryId}::uuid)
         AND position(lower(${query.keyword}) IN lower(p.name||' '||s.spec))>0
       GROUP BY s.id,p.id,c.id,b.warehouse_id,b.sku_id ORDER BY s.id LIMIT ${query.limit + 1}`;

@@ -85,6 +85,7 @@ const receiptSchema = object({
   lines: { type: 'array', items: lineSchema },
 });
 const saleSchema = object({
+  imageUrls: { type: 'array', maxItems: 6, items: text },
   imageUrl: { type: 'string', nullable: true },
   id: text,
   productId: text,
@@ -766,16 +767,34 @@ export class PublicCatalogController {
   }
   @Get(':id')
   @Public()
-  @ApiOperation({ summary: '可展示SKU详情；id为SKU ID' })
-  @ApiResult(saleSchema, [400, 404, 503, 500])
-  async detail(@Param('id') id: string, @Req() request: ApiRequest) {
+  @ApiOperation({ summary: 'SKU详情及同商品全部启用规格（含缺货）；id为SKU ID' })
+  @ApiResult(
+    {
+      ...saleSchema,
+      properties: {
+        ...saleSchema.properties,
+        variants: { type: 'array', maxItems: 20, items: saleSchema },
+      },
+      required: [...(saleSchema.required ?? []), 'variants'],
+    },
+    [400, 404, 503, 500],
+  )
+  async detail(
+    @Param('id') id: string,
+    @Req() request: ApiRequest,
+    @Query() query: Record<string, unknown>,
+  ) {
+    fields(query, []);
+    const skuId = uuid(id);
     const result = await this.service.catalog({
-      limit: 1,
+      limit: 20,
       keyword: '',
       categoryId: null,
-      skuId: uuid(id),
+      relatedToSkuId: skuId,
     });
-    if (!result.items[0]) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不可用');
-    return success(request, result.items[0]);
+    if (result.hasMore) throw failure(503, 'STORE_UNAVAILABLE', '商品规格资料待核对');
+    const selected = result.items.find((row) => row.id === skuId);
+    if (!selected) throw failure(404, 'RESOURCE_NOT_FOUND', '商品不可用');
+    return success(request, { ...selected, variants: result.items });
   }
 }
