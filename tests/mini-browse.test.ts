@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createBrowseLoader, initialBrowseState } from '../apps/consumer-mini/src/browse-loader.ts';
 import type { BrowseState } from '../apps/consumer-mini/src/browse-loader.ts';
-import type { ProductPage, SaleSku } from '../apps/consumer-mini/src/api.ts';
-const row = (id: string) => ({ id }) as SaleSku;
-const page = (ids: string[], cursor: string | null = null): ProductPage => ({
+import type { ProductCardPage, ProductCard } from '../apps/consumer-mini/src/api.ts';
+const row = (id: string) => ({ id }) as ProductCard;
+const page = (ids: string[], cursor: string | null = null): ProductCardPage => ({
   items: ids.map(row),
   nextCursor: cursor,
   hasMore: !!cursor,
@@ -70,9 +70,9 @@ test('failed search labels the attempted keyword, clears the old cursor, and ret
 
 test('late success or failure cannot overwrite newer search or cancelled page', async () => {
   let state: BrowseState = initialBrowseState;
-  const pending: { resolve: (p: ProductPage) => void; reject: (e: Error) => void }[] = [];
+  const pending: { resolve: (p: ProductCardPage) => void; reject: (e: Error) => void }[] = [];
   const loader = createBrowseLoader(
-    () => new Promise<ProductPage>((resolve, reject) => pending.push({ resolve, reject })),
+    () => new Promise<ProductCardPage>((resolve, reject) => pending.push({ resolve, reject })),
     (next) => {
       state = next;
     },
@@ -99,12 +99,12 @@ test('late success or failure cannot overwrite newer search or cancelled page', 
 
 test('no next page or duplicate in-flight append cannot issue extra requests', async () => {
   let calls = 0;
-  let resolve!: (p: ProductPage) => void;
+  let resolve!: (p: ProductCardPage) => void;
   const loader = createBrowseLoader(
     async () => {
       calls++;
       if (calls === 1) return page(['one'], 'two');
-      return new Promise<ProductPage>((done) => {
+      return new Promise<ProductCardPage>((done) => {
         resolve = done;
       });
     },
@@ -155,7 +155,7 @@ test('category and keyword persist through append and exact retry, explicit null
 });
 test('category switch drops prior rows/cursor and late old append cannot restore them', async () => {
   let state: BrowseState = initialBrowseState;
-  let resolve!: (p: ProductPage) => void;
+  let resolve!: (p: ProductCardPage) => void;
   const loader = createBrowseLoader(
     async (path) =>
       path.includes('cursor=')
@@ -196,4 +196,28 @@ test('append with a changed filter is refused and refresh retains current scope'
   await loader.load();
   assert(path.includes('keyword=x'));
   assert(path.includes('categoryId=cat'));
+});
+
+test('card loader uses product endpoint and product identity even when entry SKU changes on a later page', async () => {
+  let state: BrowseState = initialBrowseState;
+  const paths: string[] = [];
+  const loader = createBrowseLoader(
+    async (path) => {
+      paths.push(path);
+      return path.includes('cursor=')
+        ? { ...page(['p', 'q']), items: [{ ...row('p'), entrySkuId: 'new-sku' }, row('q')] }
+        : { ...page(['p'], 'next-product'), items: [{ ...row('p'), entrySkuId: 'old-sku' }] };
+    },
+    (s) => {
+      state = s;
+    },
+  );
+  await loader.load();
+  await loader.load('', true);
+  assert(paths.every((p) => p.startsWith('/storefront/products?')));
+  assert.deepEqual(
+    state.rows.map((r) => r.id),
+    ['p', 'q'],
+  );
+  assert.equal(state.rows[0]!.entrySkuId, 'new-sku');
 });

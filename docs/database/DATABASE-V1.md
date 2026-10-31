@@ -305,3 +305,8 @@ products.image_id可空，旧行NULL；product_images保存id/product_id/object_
 ## 公开分类读取增量（2026-10-31）
 
 无DDL/新迁移。复用categories父关联及UUID游标，条件enabled且父enabled，投影id/name/parent_id与父name；公开分类和商品共享经营仓可用性检查。读取不写分类版本、审计、幂等、库存/成本。商品筛选继续本级或直接子级，并按既有公开目录条件过滤。见[验证记录](../verification/S2-CONSUMER-CATEGORIES-2026-10-31.md)。
+
+
+## 商品聚合列表读取（2026-10-31）
+
+无新表/DDL/迁移。提取既有公开SKU SQL供SKU列表/详情与商品卡片共用；以匹配SKU窗口计数/BOOL_OR有货及ROW_NUMBER选最低有货价（否则最低参考价，UUID打破同价），随后以product_id做游标和limit。价格/有货/入口同语句快照，金额仍整数分，混合单位不相加库存；不写业务数据/审计/幂等。旧SKU接口身份和分页不变。见[验证记录](../verification/S3-PRODUCT-CARDS-2026-10-31.md)。

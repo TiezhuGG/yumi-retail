@@ -2,7 +2,7 @@ import { View, Text, Button, Input, ScrollView } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import { useState, useRef, useEffect } from 'react';
 import { request } from '../../api';
-import type { ProductPage, PublicCategory, PublicCategoryPage } from '../../api';
+import type { ProductCardPage, PublicCategory, PublicCategoryPage } from '../../api';
 import { createBrowseLoader, initialBrowseState } from '../../browse-loader';
 import { createCategoryLoader, initialCategoryState } from '../../category-loader';
 import { ProductVisual } from '../../components/ProductVisual';
@@ -25,7 +25,7 @@ export default function Index() {
     );
   const loader = useRef<ReturnType<typeof createBrowseLoader> | null>(null);
   if (!loader.current)
-    loader.current = createBrowseLoader((path) => request<ProductPage>(path), setBrowse);
+    loader.current = createBrowseLoader((path) => request<ProductCardPage>(path), setBrowse);
   const { rows, keyword: activeKeyword, cursor, busy, error } = browse;
   const load = (search?: string, more = false) => loader.current!.load(search, more);
   useEffect(
@@ -228,21 +228,33 @@ export default function Index() {
             <View
               key={row.id}
               className="product-card"
-              onClick={() => void Taro.navigateTo({ url: `/pages/product/index?id=${row.id}` })}
+              onClick={() =>
+                void Taro.navigateTo({ url: `/pages/product/index?id=${row.entrySkuId}` })
+              }
             >
               <ProductVisual name={row.name} imageUrl={row.imageUrl} />
               <View className="product-info">
                 <Text className="product-title">{row.name}</Text>
                 <Text className="product-spec">
-                  {row.spec} / {row.unit}
+                  {row.variantCount > 1
+                    ? `${row.variantCount}${activeKeyword ? '个匹配规格' : '种规格'} · 进入选择`
+                    : `${row.spec} / ${row.unit}`}
+                </Text>
+                <Text className="product-price-note">
+                  {row.hasStock
+                    ? row.variantCount > 1
+                      ? '有货规格起价'
+                      : '当前规格售价'
+                    : '缺货参考价'}
                 </Text>
                 <View className="product-bottom">
                   <Text className="product-price">
                     <Text>¥</Text>
                     {(row.priceCents / 100).toFixed(2)}
+                    {row.variantCount > 1 && <Text className="price-from">起</Text>}
                   </Text>
-                  <Text className={row.available > 0 ? 'product-open' : 'product-out'}>
-                    {row.available > 0 ? '›' : '缺货'}
+                  <Text className={row.hasStock ? 'product-open' : 'product-out'}>
+                    {row.hasStock ? (row.variantCount > 1 ? '选规格' : '查看') : '缺货'}
                   </Text>
                 </View>
               </View>

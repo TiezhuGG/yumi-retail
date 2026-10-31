@@ -357,3 +357,8 @@ GET /api/v1/products/:id保留SaleSku字段，新增variants: SaleSku[]（1–20
 ## 公开分类接口（2026-10-31已实现）
 
 GET /api/v1/categories公开分页读取，参数仅limit（默认20，1–50）/cursor（UUID），返回 {items:[{id,name,parentId,parentName}],hasMore,nextCursor}，UUID升序。只返回enabled分类且父节点启用，根parent字段null，子项附父名称，含空分类，无内部维护字段或统计；参数400、经营仓未配置/停用503。GET无业务写入。原GET /products?categoryId=UUID继续父级含直接子级、子级仅自身，可同时keyword/cursor；未知/停用分类返回空商品页。实际契约与功能/UI分离证据见[报告](../verification/S2-CONSUMER-CATEGORIES-2026-10-31.md)和openapi.json。
+
+
+## 商品聚合卡片接口（2026-10-31）
+
+GET /api/v1/storefront/products公开，严格limit/cursor/keyword/categoryId；默认20、最多50，cursor为商品UUID。返回items的id=商品ID、entrySkuId=价格入口SKU，并含name/categoryId/imageUrl/spec/unit/priceCents/variantCount/hasStock。先筛可展示且匹配的SKU，按商品计数，优先available>0、再priceCents、SKU UUID选代表行；全缺货仍保留最低价参考；按商品游标分页，不返回库存总和。参数400、经营仓不可用503。原/products SKU列表/详情保留，新客户端需新版API，不用旧页前端去重降级。见[兼容性/验证](../verification/S3-PRODUCT-CARDS-2026-10-31.md)与实际OpenAPI。

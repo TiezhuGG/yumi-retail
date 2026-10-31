@@ -846,3 +846,43 @@ export class PublicCategoryController {
     );
   }
 }
+
+@ApiTags('消费者商品卡片')
+@Controller('storefront/products')
+export class PublicProductCardController {
+  constructor(@Inject(CatalogService) private readonly service: CatalogService) {}
+  @Get()
+  @Public()
+  @paging()
+  @ApiQuery({ name: 'keyword', required: false, type: String })
+  @ApiQuery({ name: 'categoryId', required: false, type: String })
+  @ApiOperation({ summary: '按商品分页合并匹配启用规格；优先最低有货规格，否则最低缺货参考价' })
+  @ApiResult(
+    paged(
+      object({
+        id: text,
+        entrySkuId: text,
+        name: text,
+        categoryId: text,
+        imageUrl: { type: 'string', nullable: true },
+        spec: text,
+        unit: text,
+        priceCents: int,
+        variantCount: { type: 'integer', minimum: 1 },
+        hasStock: bool,
+      }),
+    ),
+    [400, 503, 500],
+  )
+  async list(@Req() request: ApiRequest, @Query() query: Record<string, unknown>) {
+    fields(query, ['limit', 'cursor', 'keyword', 'categoryId']);
+    return success(
+      request,
+      await this.service.productCards({
+        ...page(query),
+        keyword: query.keyword === undefined ? '' : str(query.keyword, 80, true),
+        categoryId: query.categoryId === undefined ? null : uuid(query.categoryId),
+      }),
+    );
+  }
+}

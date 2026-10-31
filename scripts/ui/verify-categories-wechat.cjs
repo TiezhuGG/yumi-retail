@@ -84,14 +84,14 @@ if (
       products.push(p.id);
       await call(`/admin/products/${p.id}/publish`, { version: p.version });
     }
-    const getList = async (q) => call('/products?limit=1' + q);
+    const getList = async (q) => call('/storefront/products?limit=1' + q);
     const rootFirst = await getList(`&categoryId=${root.id}`),
       rootNext = await getList(`&categoryId=${root.id}&cursor=${rootFirst.nextCursor}`);
     assert.equal(rootFirst.items.length, 1);
     assert(rootFirst.nextCursor);
     assert.equal(rootNext.items.length, 1);
-    const childList = await call(`/products?categoryId=${child.id}`),
-      emptyList = await call(`/products?categoryId=${empty.id}`);
+    const childList = await call(`/storefront/products?categoryId=${child.id}`),
+      emptyList = await call(`/storefront/products?categoryId=${empty.id}`);
     assert.equal(childList.items.length, 1);
     assert.equal(emptyList.items.length, 0);
     let allCategories = [],

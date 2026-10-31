@@ -1,7 +1,7 @@
-import type { ProductPage, SaleSku } from './api';
+import type { ProductCardPage, ProductCard } from './api';
 
 export interface BrowseState {
-  rows: SaleSku[];
+  rows: ProductCard[];
   keyword: string;
   categoryId: string | null;
   cursor: string | null;
@@ -25,7 +25,7 @@ interface Intent {
 
 // A retry belongs to the failed query/page, not to text edited after that request.
 export function createBrowseLoader(
-  fetchPage: (path: string) => Promise<ProductPage>,
+  fetchPage: (path: string) => Promise<ProductCardPage>,
   changed: (state: BrowseState) => void,
 ) {
   let state = initialBrowseState;
@@ -49,7 +49,7 @@ export function createBrowseLoader(
     });
     try {
       const result = await fetchPage(
-        `/products?limit=20${intent.keyword ? `&keyword=${encodeURIComponent(intent.keyword)}` : ''}${intent.categoryId ? `&categoryId=${encodeURIComponent(intent.categoryId)}` : ''}${intent.cursor ? `&cursor=${encodeURIComponent(intent.cursor)}` : ''}`,
+        `/storefront/products?limit=20${intent.keyword ? `&keyword=${encodeURIComponent(intent.keyword)}` : ''}${intent.categoryId ? `&categoryId=${encodeURIComponent(intent.categoryId)}` : ''}${intent.cursor ? `&cursor=${encodeURIComponent(intent.cursor)}` : ''}`,
       );
       if (token !== sequence) return;
       const rows = intent.append ? [...state.rows, ...result.items] : result.items;

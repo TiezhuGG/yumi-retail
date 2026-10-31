@@ -345,6 +345,8 @@ button[disabled] {
   justify-content: space-between;
   align-items: center;
   margin-top: 14px;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .product-price {
   font-size: 18px;
@@ -356,14 +358,14 @@ button[disabled] {
   margin-right: 2px;
 }
 .product-open {
-  border-radius: 100%;
+  border-radius: 6px;
   background: #f0f8e9;
   color: #44975b;
-  width: 25px;
-  height: 25px;
+  padding: 4px 7px;
   text-align: center;
-  line-height: 23px;
-  font-size: 23px;
+  line-height: 1.5;
+  font-size: 10px;
+  white-space: nowrap;
 }
 .product-out {
   font-size: 9px;
@@ -958,4 +960,16 @@ button[disabled] {
 }
 .category-more {
   margin-top: 10px;
+}
+
+.product-price-note {
+  display: block;
+  margin-top: 9px;
+  font-size: 9px;
+  color: #8b9b80;
+}
+.product-price .price-from {
+  font-size: 10px;
+  margin-left: 3px;
+  color: #cf744f;
 }

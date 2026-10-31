@@ -2710,3 +2710,162 @@ test('real category browsing combines parent/child scope, keyword and cursor wit
     'public categories: enabled parent scope, paging/names/empty nodes, strict query, read-only and actual category+keyword+cursor',
   );
 });
+
+async function cards(query = '') {
+  return ok<Page<import('../packages/contracts/src/index.ts').ProductCard>>(
+    '/storefront/products' + query,
+  );
+}
+test('product cards choose lowest in-stock matching SKU, never sum unlike units and keep truthful out-of-stock reference', async () => {
+  let p = await ok<Product>('/admin/products', {
+    categoryId,
+    name: `卡片价格-${run}`,
+    description: '合成资料',
+    skus: [
+      {
+        code: `CARD-CHEAP-${run}`,
+        spec: '单包缺货',
+        unit: '包',
+        priceCents: 100,
+        expiryManaged: false,
+      },
+      {
+        code: `CARD-STOCK-${run}`,
+        spec: '三包装有货',
+        unit: '组',
+        priceCents: 450,
+        expiryManaged: false,
+      },
+      {
+        code: `CARD-TIE-${run}`,
+        spec: '同价有货',
+        unit: '箱',
+        priceCents: 450,
+        expiryManaged: false,
+      },
+      {
+        code: `CARD-OFF-${run}`,
+        spec: '停用低价',
+        unit: '包',
+        priceCents: 1,
+        expiryManaged: false,
+      },
+    ],
+  });
+  const stock = p.skus.find((s) => s.code.startsWith('CARD-STOCK-'))!,
+    tie = p.skus.find((s) => s.code.startsWith('CARD-TIE-'))!,
+    cheap = p.skus.find((s) => s.code.startsWith('CARD-CHEAP-'))!,
+    off = p.skus.find((s) => s.code.startsWith('CARD-OFF-'))!;
+  await post(await approve(await draft([line(stock.id, 3), line(tie.id, 2)])));
+  p = await ok<Product>(`/admin/products/${p.id}/skus/${off.id}/disable`, { version: p.version });
+  p = await publish(p);
+  const before = {
+    balances: await db.stockBalance.findMany({ where: { skuId: { in: p.skus.map((s) => s.id) } } }),
+    audits: await db.businessAudit.count(),
+    keys: await db.idempotencyRecord.count(),
+  };
+  const card = (await cards(`?keyword=${encodeURIComponent(p.name)}`)).items[0]!;
+  assert.equal(card.id, p.id);
+  assert.equal(card.priceCents, 450);
+  assert.equal(card.hasStock, true);
+  assert.equal(card.variantCount, 3);
+  assert.equal(card.entrySkuId, [stock.id, tie.id].sort()[0]);
+  assert(!('available' in card));
+  assert(!('barcode' in card));
+  assert.equal((await visible(card.entrySkuId)).data.priceCents, card.priceCents);
+  assert.deepEqual(
+    {
+      balances: await db.stockBalance.findMany({
+        where: { skuId: { in: p.skus.map((s) => s.id) } },
+      }),
+      audits: await db.businessAudit.count(),
+      keys: await db.idempotencyRecord.count(),
+    },
+    before,
+  );
+  await db.stockBalance.updateMany({
+    where: { skuId: { in: [stock.id, tie.id] } },
+    data: { inventoryHold: true },
+  });
+  const held = (await cards(`?keyword=${encodeURIComponent(p.name)}`)).items[0]!;
+  assert.equal(held.hasStock, false);
+  assert.equal(held.priceCents, 100);
+  assert.equal(held.entrySkuId, cheap.id);
+});
+
+test('product cursor pagination happens after grouping and search summarizes only matching variants', async () => {
+  const root = await ok<Category>('/admin/categories', { name: '商品卡片分类' }),
+    child = await ok<Category>('/admin/categories', { name: '商品卡片子类', parentId: root.id });
+  const created: Product[] = [];
+  for (const [i, size] of [20, 2, 1].entries()) {
+    let p = await ok<Product>('/admin/products', {
+      categoryId: i === 0 ? child.id : root.id,
+      name: `聚合商品${i}-${run}`,
+      description: '合成资料',
+      skus: Array.from({ length: size }, (_, j) => ({
+        code: `GROUP-${i}-${j}-${run}`,
+        spec: j === 0 ? '目标规格' : `${j + 1}包装`,
+        unit: '包',
+        priceCents: 100 + j,
+        expiryManaged: false,
+      })),
+    });
+    p = await publish(p);
+    created.push(p);
+  }
+  const all: import('../packages/contracts/src/index.ts').ProductCard[] = [];
+  let cursor: string | null = null;
+  do {
+    const p: Page<import('../packages/contracts/src/index.ts').ProductCard> = await cards(
+      `?categoryId=${root.id}&limit=1${cursor ? `&cursor=${cursor}` : ''}`,
+    );
+    all.push(...p.items);
+    cursor = p.nextCursor;
+  } while (cursor);
+  assert.deepEqual(
+    all.map((c) => c.id),
+    created.map((p) => p.id).sort(),
+  );
+  assert.equal(all.find((c) => c.id === created[0]!.id)!.variantCount, 20);
+  const filtered = await cards(`?categoryId=${child.id}&keyword=${encodeURIComponent('目标规格')}`);
+  assert.equal(filtered.items.length, 1);
+  assert.equal(filtered.items[0]!.variantCount, 1);
+  assert.equal(filtered.items[0]!.spec, '目标规格');
+  const legacy = await ok<Page<SaleSku>>(`/products?categoryId=${child.id}&limit=50`);
+  assert.equal(legacy.items.length, 20);
+  const detail = await ok<import('../packages/contracts/src/index.ts').SaleSkuDetail>(
+    `/products/${filtered.items[0]!.entrySkuId}`,
+  );
+  assert.equal(detail.variants.length, 20);
+  const image = await addPhoto(created[0]!);
+  const photographed = (await cards(`?categoryId=${child.id}`)).items[0]!;
+  assert.equal(
+    photographed.imageUrl,
+    `/api/v1/product-images/${image.product.id}/${image.product.imageId}`,
+  );
+});
+
+test('product cards retain public visibility/store checks and strictly validate product cursor filters', async () => {
+  let p = await product();
+  const q = `?keyword=${encodeURIComponent(p.name)}`;
+  assert(!(await cards(q)).items.some((c) => c.id === p.id));
+  p = await publish(p);
+  assert((await cards(q)).items.some((c) => c.id === p.id));
+  for (const query of ['?limit=0', '?limit=51', '?cursor=bad', '?categoryId=bad', '?skuId=x'])
+    assert.equal((await call('/storefront/products' + query)).status, 400);
+  await db.category.update({ where: { id: p.categoryId }, data: { enabled: false } });
+  try {
+    assert(!(await cards(q)).items.some((c) => c.id === p.id));
+  } finally {
+    await db.category.update({ where: { id: p.categoryId }, data: { enabled: true } });
+  }
+  await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: false } });
+  try {
+    assert.equal((await call('/storefront/products')).status, 503);
+  } finally {
+    await db.warehouse.update({ where: { id: warehouses[0]! }, data: { enabled: true } });
+  }
+  checks.push(
+    'product card grouping: price/availability basis, matching variants, entry identity, product cursor, legacy API and read-only/public scope',
+  );
+});

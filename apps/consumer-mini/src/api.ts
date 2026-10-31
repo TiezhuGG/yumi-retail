@@ -45,3 +45,21 @@ export interface PublicCategoryPage {
   hasMore: boolean;
   nextCursor: string | null;
 }
+
+export interface ProductCard {
+  id: string;
+  entrySkuId: string;
+  name: string;
+  categoryId: string;
+  imageUrl: string | null;
+  spec: string;
+  unit: string;
+  priceCents: number;
+  variantCount: number;
+  hasStock: boolean;
+}
+export interface ProductCardPage {
+  items: ProductCard[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
