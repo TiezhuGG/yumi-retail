@@ -669,3 +669,37 @@ export interface PaymentEvidenceTimeline {
   focusedRef: string | null;
   syntheticOnly: true;
 }
+
+export interface PickingReadinessSummary {
+  id: string;
+  orderNo: string;
+  status: string;
+  paymentState: string;
+  fulfillmentState: string;
+  createdAt: string;
+  itemCount: number;
+  totalQuantity: number;
+}
+export interface PickingReadinessDetail extends PickingReadinessSummary {
+  checkedAt: string;
+  claimEnabled: false;
+  blockers: string[];
+  items: Array<{
+    skuId: string;
+    name: string;
+    spec: string;
+    unit: string;
+    quantity: number;
+    activeReserved: number;
+    allocations: Array<{
+      id: string;
+      quantity: number;
+      batchNo: string;
+      expiresAt: string | null;
+      locationCode: string;
+      locationName: string;
+      released: boolean;
+      issues: string[];
+    }>;
+  }>;
+}

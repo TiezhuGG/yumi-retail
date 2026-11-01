@@ -105,7 +105,9 @@
     "pretest:payment-evidence-timeline": "npm run build:server",
     "test:payment-evidence-timeline": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-evidence-timeline.integration.test.ts",
     "pretest:payment-review-summary": "npm run build:server",
-    "test:payment-review-summary": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-review-summary.integration.test.ts"
+    "test:payment-review-summary": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-review-summary.integration.test.ts",
+    "pretest:picking-readiness": "npm run build:server",
+    "test:picking-readiness": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-readiness.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

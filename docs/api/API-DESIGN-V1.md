@@ -616,3 +616,14 @@ GET失败保留来源返回路径，不显示上一个目标详情。备注保�
 返回warehouseId、generatedAt（数据库统计语句开始时刻）、syntheticOnly=true、enabled（既有实验写入开关）和counts={ALL,UNKNOWN,CONFLICT,EXHAUSTED,REVIEW}非负整数。ALL按尝试对四种原因取并集去重，其余按当前证据/任务状态独立计数，已知结果仍可能EXHAUSTED/REVIEW；不把四分类相加。空仓五项均0。
 
 单条SQL从当前仓库尝试LEFT JOIN唯一attempt_id任务并执行COUNT FILTER，所有分类共享语句MVCC快照，统计全量而非20条列表投影；没有事件/备注JOIN导致计数放大。统计不读取报文、凭据、备注正文或顾客资料，不写入审计、尝试、任务、订单或库存。概览和列表为独立实时请求，可在并发更新期间不同时刻；不承诺冻结一致。旧端点响应兼容不变。
+
+
+## 2026-11-01 S6拣货准备只读核验
+
+新增只读GET `/api/v1/warehouse/picking-readiness?warehouseId=UUID&q=订单号前缀&cursor=UUID`，每页20条；q为1–40个英文字母/数字，统一大写，按订单创建时间/UUID倒序，游标须匹配仓库与当前搜索。列表仅含订单号、三个状态维度、创建时间、规格种数及总件数，不返回顾客/地址/支付金额。
+
+GET `/api/v1/warehouse/picking-readiness/:id?warehouseId=UUID`，返回上述摘要、checkedAt、claimEnabled=false、去重blockers、商品快照及分配明细。明细含批次、效期、库位、原分配数量、released及issues；activeReserved是本订单该SKU未释放分配总量，不是全仓余量。核对订单需求/当前SKU预占、库位和批次预占/可承载预占数量、库存冻结、库位启用、批次到期；不暴露余额明细、流水内部编号、报价/请求/幂等键、密文、联系人、资金与合成支付事实。
+
+阻挡码：READ_ONLY_PHASE（始终包含）、ORDER_CANCELED或ORDER_NOT_ACTIVE、PAYMENT_UNCONFIRMED、FULFILLMENT_NOT_READY、RESERVATION_RELEASED、RESERVATION_MISMATCH、LOCATION_DISABLED、LOT_EXPIRED、STOCK_FROZEN。已释放分配不再展示针对当前库位的可作业判断。所有核验仅诊断，未开放真正资格通过/领取动作。
+
+权限picking.read只授予SUPER_ADMIN/WAREHOUSE_MANAGER/PICKER，不授予运营或骑手；不向拣货员开放order.read。匿名401、角色/仓库归属/启用失败403，严格参数400，未找到本仓订单/无效游标404。列表/详情均RepeatableRead，仓库校验沿用已有锁；不写审计/订单/库存，无POST领取、实拣或出库。OpenAPI0.27.0，旧接口兼容。

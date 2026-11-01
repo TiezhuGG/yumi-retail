@@ -2647,3 +2647,57 @@ small {
     grid-column: 1 / -1;
   }
 }
+
+.picking-order-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.picking-order-card h3 {
+  overflow-wrap: anywhere;
+}
+.picking-order-card > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.picking-result {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid #eedcaf;
+  background: #fffbf2;
+  border-radius: 14px;
+}
+.picking-result li {
+  margin: 8px 0;
+}
+.picking-line {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 20px;
+  margin-top: 20px;
+}
+.picking-allocation {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 680px) {
+  .picking-order-grid {
+    grid-template-columns: 1fr;
+  }
+  .picking-allocation {
+    flex-direction: column;
+  }
+  .picking-line {
+    padding: 14px;
+  }
+}
+.picking-result h3,
+.picking-line h3 {
+  overflow-wrap: anywhere;
+}

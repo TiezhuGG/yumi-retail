@@ -475,3 +475,12 @@ cursor/focus重新从同范围来源查询锚点；同刻权重NOTE4、NOTIFICAT
 ## 2026-11-01 合成核查只读概览
 
 无模型、迁移或回填变化。只读统计沿用payment_attempt_labs.warehouse_id索引与payment_query_lab_jobs.attempt_id唯一约束，一条聚合语句按尝试计数，不关联不可变事件/备注明细。所有分类使用同一MVCC语句快照；generatedAt来自statement_timestamp，不将读取作为业务事件或创建统计缓存真相。复用既有仓库启用锁与归属权限校验，不锁定/更改支付尝试或任务。不新增资金、库存、订单状态。
+
+
+## 2026-11-01 S6拣货准备只读核验
+
+本轮无迁移、新表、回填或库存写入。复用consumer_orders/order_items/order_allocations与stock_positions/stock_lots/stock_balances/warehouse_locations做最小只读投影，未修改订单状态约束、付款证据、预占流水或资金模型。
+
+列表和详情分别使用REPEATABLE READ；详情在同一事务核对订单/原分配/未释放数量及当时库存条件，避免并发取消时拼接出“取消但仍有旧预占”的跨时刻响应。checkedAt为事务内数据库读取时刻，不承诺刷新后仍成立。按本单同SKU/批次汇总核查当前预占承载量，不将其他订单预占当成本单新分配，不修改库存或建立新的预占真相。当前正式订单仍不能转为已付/可领取状态。
+
+新picking.read为代码内角色权限，无数据库角色种子更新；API每请求重新核对角色与范围，前端重新进入会读取新权限。未来任务持久化、领取竞争、行核对及幂等出库需要独立模型和增量迁移，本轮没有冒充实现。

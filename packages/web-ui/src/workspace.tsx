@@ -1,3 +1,4 @@
+import { PickingReadinessWorkbench } from './picking-readiness.js';
 import type { PaymentReviewDestination, OpenPaymentReview } from './payment-navigation.js';
 import { PaymentAdapterLabWorkbench } from './payment-adapter-lab.js';
 import { useEffect, useRef, useState } from 'react';
@@ -15,6 +16,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'picking-readiness'
   | 'overview'
   | 'products'
   | 'categories'
@@ -133,6 +135,13 @@ const routes: Array<{
     permission: 'payment-readiness.read',
   },
   {
+    id: 'picking-readiness',
+    name: '拣货准备',
+    glyph: '▤',
+    hint: '核验订单资格与已分配批次库位',
+    permission: 'picking.read',
+  },
+  {
     id: 'stock',
     name: '库存总览',
     glyph: '▦',
@@ -200,8 +209,17 @@ function WorkspaceSession({
     mobile && profile.roles.includes('PICKER') && !profile.permissions.includes('stock.transfer');
   const mobileViews = new Set<WorkspaceView>(
     pickerOnly
-      ? ['stock', 'locations']
-      : ['overview', 'stock', 'receipts', 'locations', 'counts', 'dispositions', 'reversals'],
+      ? ['picking-readiness', 'stock', 'locations']
+      : [
+          'picking-readiness',
+          'overview',
+          'stock',
+          'receipts',
+          'locations',
+          'counts',
+          'dispositions',
+          'reversals',
+        ],
   );
   const allowed = routes.filter(
     (r) => profile.permissions.includes(r.permission) && (!mobile || mobileViews.has(r.id)),
@@ -285,7 +303,7 @@ function WorkspaceSession({
       <aside className="sidebar">
         <Brand />
         <div className="nav-label">
-          {mobile ? (pickerOnly ? '拣货查询' : '仓库作业') : '运营管理'}
+          {mobile ? (pickerOnly ? '拣货作业' : '仓库作业') : '运营管理'}
         </div>
         <nav aria-label="主导航">
           {allowed.map((r) => (
@@ -378,6 +396,8 @@ function WorkspaceSession({
             <NotificationLabWorkbench profile={profile} />
           ) : activeView === 'payment-readiness' ? (
             <PaymentReadinessWorkbench />
+          ) : activeView === 'picking-readiness' ? (
+            <PickingReadinessWorkbench />
           ) : activeView === 'orders' ? (
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
