@@ -17,11 +17,17 @@ export function PaymentEvidenceTimelinePanel({
   snapshot,
   refresh,
   disabled,
+  initialFocus,
+  onFocusHandled,
+  active: visible = true,
 }: {
   warehouseId: string;
   snapshot: PaymentReviewCase;
   refresh: () => void;
   disabled: boolean;
+  initialFocus?: string;
+  onFocusHandled?: () => void;
+  active?: boolean;
 }) {
   const [page, setPage] = useState<PaymentEvidenceTimeline | null>(null),
     [filter, setFilter] = useState<PaymentEvidenceTimeline['filter']>('ALL'),
@@ -88,18 +94,19 @@ export function PaymentEvidenceTimelinePanel({
     }
   }
   useEffect(() => {
-    void load('ALL');
+    void load('ALL', undefined, initialFocus);
+    onFocusHandled?.();
     return () => {
       seq.current++;
       active.current = false;
     };
   }, [warehouseId, snapshot.id]);
   useEffect(() => {
-    if (!page?.focusedRef) return;
+    if (!visible || !page?.focusedRef) return;
     const row = container.current?.querySelector<HTMLElement>('[aria-current="true"]');
     row?.focus({ preventScroll: true });
     row?.scrollIntoView({ block: 'start' });
-  }, [page?.focusedRef]);
+  }, [page?.focusedRef, visible]);
   function locate(ref: string) {
     void load('ALL', undefined, ref);
   }

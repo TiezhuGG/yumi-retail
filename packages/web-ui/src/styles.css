@@ -2569,3 +2569,17 @@ small {
     scroll-margin-top: 144px;
   }
 }
+
+.retained-payment-view[hidden] {
+  display: none !important;
+}
+.payment-return-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.payment-return-bar button {
+  flex-shrink: 0;
+}

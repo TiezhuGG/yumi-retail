@@ -1,3 +1,4 @@
+import type { OpenPaymentReview } from './payment-navigation.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
   NotificationRecords,
@@ -8,7 +9,13 @@ import type {
   WarehouseSummary,
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
-export function NotificationRecordsWorkbench({ profile }: { profile: StaffProfile }) {
+export function NotificationRecordsWorkbench({
+  profile,
+  onOpenReview,
+}: {
+  profile: StaffProfile;
+  onOpenReview?: OpenPaymentReview;
+}) {
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]),
     [warehouseId, setWarehouseId] = useState(''),
     [loading, setLoading] = useState(true),
@@ -70,13 +77,26 @@ export function NotificationRecordsWorkbench({ profile }: { profile: StaffProfil
               </select>
             </label>
           </div>
-          <RecordsPanel key={warehouseId} warehouseId={warehouseId} profile={profile} />
+          <RecordsPanel
+            key={warehouseId}
+            warehouseId={warehouseId}
+            profile={profile}
+            onOpenReview={onOpenReview}
+          />
         </>
       )}
     </div>
   );
 }
-function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: StaffProfile }) {
+function RecordsPanel({
+  warehouseId,
+  profile,
+  onOpenReview,
+}: {
+  warehouseId: string;
+  profile: StaffProfile;
+  onOpenReview?: OpenPaymentReview;
+}) {
   const [data, setData] = useState<NotificationRecords | null>(null),
     [selected, setSelected] = useState<NotificationRecord | null>(null),
     [busy, setBusy] = useState(false),
@@ -344,6 +364,24 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
                   ¥{(selected.amountCents / 100).toFixed(2)} {selected.currency}
                 </dd>
               </dl>
+              {selected.application && onOpenReview && (
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={(e) =>
+                    onOpenReview(
+                      {
+                        warehouseId,
+                        attemptId: selected.application!.attemptId,
+                        focus: 'NOTIFICATION:' + selected.id,
+                      },
+                      e.currentTarget,
+                    )
+                  }
+                >
+                  查看关联核查时间线
+                </button>
+              )}
               <p>重放会重新生成签名与密文，以已验证事实识别重复，不推进支付或履约。</p>
               <button
                 className="secondary-button"

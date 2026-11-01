@@ -600,3 +600,10 @@ filter为ALL(默认)、ATTEMPT、QUERY、NOTIFICATION、NOTE。cursor和focus为
 响应item是同次锁定读取的当前核查摘要，items最多20，nextCursor可空，filter/focusedRef/syntheticOnly如实返回。行包含id/ref/source/createdAt/title、只读entries(label/value)和最多2个related(ref/label)。字段为核查展示投影，不作为状态写入参数。无leaseToken、事件幂等键、原始报文、付款人或密钥；接口通用requestId元数据保持原样。
 
 旧核查详情及notesCursor接口保持兼容，新UI用统一时间线及NOTE筛选呈现历史，不改变POST备注的CSRF/Origin、幂等和版本校验。分页是实时keyset读取，新增事实需刷新；不提供跨请求冻结快照。
+
+
+## 2026-11-01 核查跨页入口与返回定位
+
+本轮仅客户端导航，沿用OpenAPI0.25.0，没有新增接口或参数。来源将实际warehouseId/attemptId及NOTIFICATION:记录UUID或ATTEMPT:事件UUID交给核查详情/时间线；目标继续调用既有详情与timeline的focus参数，服务端重新检查权限、仓库与尝试归属，不能凭来源快照越权。目标可以不在当前异常筛选中；备注写入资格、版本校验、幂等和审计不变。
+
+GET失败保留来源返回路径，不显示上一个目标详情。备注保存响应丢失后的未确认键/文本/快照仅存当前会话内存，切换目标后按原内容恢复原键；不新增任何资金或任务动作。

@@ -1,3 +1,4 @@
+import type { PaymentReviewDestination, OpenPaymentReview } from './payment-navigation.js';
 import { PaymentAdapterLabWorkbench } from './payment-adapter-lab.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -174,7 +175,19 @@ const routes: Array<{
     permission: 'stock.read',
   },
 ];
-export function Workspace({
+type WorkspaceProps = { profile: StaffProfile; sessionControl: ReactNode; mobile?: boolean };
+export function Workspace(props: WorkspaceProps) {
+  const p = props.profile;
+  const scope = JSON.stringify([
+    p.id,
+    p.csrfToken,
+    [...p.permissions].sort(),
+    [...p.warehouseIds].sort(),
+    [...p.roles].sort(),
+  ]);
+  return <WorkspaceSession key={scope} {...props} />;
+}
+function WorkspaceSession({
   profile,
   sessionControl,
   mobile = false,
@@ -195,6 +208,13 @@ export function Workspace({
   );
   const [view, setView] = useState<WorkspaceView>(allowed[0]?.id ?? 'overview');
   const activeNav = useRef<HTMLButtonElement>(null);
+  const [retained, setRetained] = useState<WorkspaceView[]>([]),
+    [reviewDestination, setReviewDestination] = useState<PaymentReviewDestination>(),
+    [returned, setReturned] = useState(false);
+  const token = useRef(0),
+    origin = useRef<{ view: WorkspaceView; element: HTMLButtonElement; top: number }>(),
+    restore = useRef<{ view: WorkspaceView; element: HTMLButtonElement; top: number }>();
+
   useEffect(() => {
     const mobileWidth = window.matchMedia('(max-width: 680px)');
     const reveal = () => {
@@ -212,8 +232,53 @@ export function Workspace({
   }, [view]);
   const activeView = allowed.some((r) => r.id === view) ? view : (allowed[0]?.id ?? 'overview');
   const navigate = (next: WorkspaceView) => {
-    if (allowed.some((r) => r.id === next)) setView(next);
+    if (allowed.some((r) => r.id === next)) {
+      restore.current = undefined;
+      setReturned(false);
+      setView(next);
+    }
   };
+  const paymentViews: WorkspaceView[] = [
+    'notification-records',
+    'payment-review-lab',
+    'payment-attempt-lab',
+  ];
+  useEffect(() => {
+    if (paymentViews.includes(activeView))
+      setRetained((old) => (old.includes(activeView) ? old : [...old, activeView]));
+  }, [activeView]);
+  const shown = [
+    ...new Set([...retained, ...(paymentViews.includes(activeView) ? [activeView] : [])]),
+  ].filter((v) => allowed.some((r) => r.id === v));
+  const openReview =
+    (from: WorkspaceView): OpenPaymentReview =>
+    (target, element) => {
+      if (!allowed.some((r) => r.id === 'payment-review-lab')) return;
+      origin.current = { view: from, element, top: window.scrollY };
+      setReviewDestination({ ...target, token: ++token.current });
+      setReturned(false);
+      setView('payment-review-lab');
+    };
+  function backFromReview() {
+    const prior = origin.current;
+    if (!prior || !allowed.some((r) => r.id === prior.view)) return;
+    restore.current = prior;
+    origin.current = undefined;
+    setReturned(true);
+    setView(prior.view);
+  }
+  useEffect(() => {
+    const prior = restore.current;
+    if (!prior || prior.view !== activeView) return;
+    const frame = requestAnimationFrame(() => {
+      restore.current = undefined;
+      (prior.element.isConnected ? prior.element : activeNav.current)?.focus({
+        preventScroll: true,
+      });
+      window.scrollTo({ top: prior.top, left: 0 });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeView]);
   const route = allowed.find((r) => r.id === activeView);
   return (
     <div className={`workspace ${mobile ? 'mobile-workspace' : ''}`}>
@@ -229,7 +294,7 @@ export function Workspace({
               ref={activeView === r.id ? activeNav : undefined}
               className={activeView === r.id ? 'nav-item active' : 'nav-item'}
               aria-current={activeView === r.id ? 'page' : undefined}
-              onClick={() => setView(r.id)}
+              onClick={() => navigate(r.id)}
             >
               <span aria-hidden="true">{r.glyph}</span>
               {r.name}
@@ -269,18 +334,43 @@ export function Workspace({
               })}
             </span>
           </div>
+          {returned && paymentViews.includes(activeView) && (
+            <div className="notice" role="status">
+              已返回原记录，列表与选择已保留；信息可能有更新，可刷新读取。
+            </div>
+          )}
+          {shown.map((v) => (
+            <div
+              key={v}
+              hidden={v !== activeView}
+              className="retained-payment-view"
+              data-payment-view={v}
+            >
+              {v === 'notification-records' ? (
+                <NotificationRecordsWorkbench profile={profile} onOpenReview={openReview(v)} />
+              ) : v === 'payment-attempt-lab' ? (
+                <PaymentAttemptLabWorkbench profile={profile} onOpenReview={openReview(v)} />
+              ) : (
+                <PaymentReviewLabWorkbench
+                  profile={profile}
+                  destination={reviewDestination}
+                  active={v === activeView}
+                  onReturn={origin.current ? backFromReview : undefined}
+                  returnLabel={
+                    origin.current?.view === 'notification-records'
+                      ? '返回通知记录'
+                      : '返回支付尝试'
+                  }
+                />
+              )}
+            </div>
+          ))}
           {!allowed.length ? (
             <div className="surface empty-state">
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
-          ) : activeView === 'notification-records' ? (
-            <NotificationRecordsWorkbench profile={profile} />
-          ) : activeView === 'payment-review-lab' ? (
-            <PaymentReviewLabWorkbench profile={profile} />
-          ) : activeView === 'payment-attempt-lab' ? (
-            <PaymentAttemptLabWorkbench profile={profile} />
-          ) : activeView === 'payment-adapter-lab' ? (
+          ) : paymentViews.includes(activeView) ? null : activeView === 'payment-adapter-lab' ? (
             <PaymentAdapterLabWorkbench profile={profile} />
           ) : activeView === 'payment-close-lab' ? (
             <PaymentCloseLabWorkbench profile={profile} />

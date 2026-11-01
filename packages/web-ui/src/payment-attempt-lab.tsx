@@ -1,3 +1,4 @@
+import type { OpenPaymentReview } from './payment-navigation.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PaymentAttemptLabList,
@@ -7,7 +8,13 @@ import type {
   WarehouseSummary,
 } from '@yumi/contracts';
 import { staffRequest } from './index.js';
-export function PaymentAttemptLabWorkbench({ profile }: { profile: StaffProfile }) {
+export function PaymentAttemptLabWorkbench({
+  profile,
+  onOpenReview,
+}: {
+  profile: StaffProfile;
+  onOpenReview?: OpenPaymentReview;
+}) {
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]),
     [warehouseId, setWarehouseId] = useState(''),
     [loading, setLoading] = useState(true),
@@ -69,7 +76,12 @@ export function PaymentAttemptLabWorkbench({ profile }: { profile: StaffProfile 
               </select>
             </label>
           </div>
-          <AttemptsPanel key={warehouseId} warehouseId={warehouseId} profile={profile} />
+          <AttemptsPanel
+            key={warehouseId}
+            warehouseId={warehouseId}
+            profile={profile}
+            onOpenReview={onOpenReview}
+          />
         </>
       )}
     </div>
@@ -95,7 +107,15 @@ const planLabel: Record<string, string> = {
   RECONCILE_PAYMENT: '后续须事务核对支付结果；本页不入账。',
   REVIEW_CONFLICT: '成功与关闭结果矛盾，保留证据等待核查。',
 };
-function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile: StaffProfile }) {
+function AttemptsPanel({
+  warehouseId,
+  profile,
+  onOpenReview,
+}: {
+  warehouseId: string;
+  profile: StaffProfile;
+  onOpenReview?: OpenPaymentReview;
+}) {
   const [data, setData] = useState<PaymentAttemptLabList | null>(null),
     [selected, setSelected] = useState<PaymentAttemptLabDetail | null>(null),
     [busy, setBusy] = useState(false),
@@ -558,6 +578,26 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                   <p>旧合成尝试没有通知绑定，请新建合成尝试后验证；历史不自动补造绑定。</p>
                 )}
               </section>
+              {onOpenReview && (
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={(e) =>
+                    onOpenReview(
+                      {
+                        warehouseId,
+                        attemptId: selected.id,
+                        focus: selected.events.length
+                          ? 'ATTEMPT:' + selected.events[selected.events.length - 1]!.id
+                          : undefined,
+                      },
+                      e.currentTarget,
+                    )
+                  }
+                >
+                  查看本次尝试核查时间线
+                </button>
+              )}
               <h3>不可变事件历史</h3>
               <div className="readiness-checks">
                 {selected.events.map((e) => (

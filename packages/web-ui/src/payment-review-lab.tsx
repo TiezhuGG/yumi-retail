@@ -1,3 +1,4 @@
+import type { PaymentReviewDestination } from './payment-navigation.js';
 import { PaymentEvidenceTimelinePanel } from './payment-evidence-timeline.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -8,12 +9,35 @@ import type {
   WarehouseSummary,
 } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
-export function PaymentReviewLabWorkbench({ profile }: { profile: StaffProfile }) {
+type PendingReviewNote = {
+  id: string;
+  key: string;
+  note: string;
+  attemptVersion: number;
+  jobVersion: number | null;
+};
+type ReviewDraft = { draft: string; pending: PendingReviewNote | null };
+export function PaymentReviewLabWorkbench({
+  profile,
+  destination,
+  onReturn,
+  returnLabel,
+  active = true,
+}: {
+  profile: StaffProfile;
+  destination?: PaymentReviewDestination;
+  onReturn?: () => void;
+  returnLabel?: string;
+  active?: boolean;
+}) {
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]),
     [warehouseId, setWarehouseId] = useState(''),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState('');
-  const seq = useRef(0);
+    [error, setError] = useState(''),
+    [routeError, setRouteError] = useState(''),
+    [applied, setApplied] = useState(0);
+  const seq = useRef(0),
+    drafts = useRef(new Map<string, ReviewDraft>());
   async function load() {
     const n = ++seq.current;
     setLoading(true);
@@ -36,8 +60,26 @@ export function PaymentReviewLabWorkbench({ profile }: { profile: StaffProfile }
       seq.current++;
     };
   }, []);
+  useEffect(() => {
+    if (!destination || loading) return;
+    setApplied(destination.token);
+    if (!warehouses.some((w) => w.id === destination.warehouseId)) {
+      setRouteError('目标仓库不在当前授权列表中，不能打开关联记录。');
+      return;
+    }
+    setRouteError('');
+    setWarehouseId(destination.warehouseId);
+  }, [destination?.token, loading, warehouses]);
   return (
     <div className="payment-readiness-workbench">
+      {onReturn && (
+        <div className="notice payment-return-bar">
+          <span>从关联记录进入；当前记录可能不在列表筛选范围内。草稿仅在当前会话内保留。</span>
+          <button className="secondary-button" onClick={onReturn}>
+            {returnLabel ?? '返回来源记录'}
+          </button>
+        </div>
+      )}
       <div className="notice">
         仅核查合成未知、冲突或查询耗尽记录。备注只保留核查过程，不改变证据、任务或真实支付状态。
       </div>
@@ -60,7 +102,10 @@ export function PaymentReviewLabWorkbench({ profile }: { profile: StaffProfile }
               <select
                 aria-label="验证仓库"
                 value={warehouseId}
-                onChange={(e) => setWarehouseId(e.target.value)}
+                onChange={(e) => {
+                  setRouteError('');
+                  setWarehouseId(e.target.value);
+                }}
               >
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
@@ -70,7 +115,29 @@ export function PaymentReviewLabWorkbench({ profile }: { profile: StaffProfile }
               </select>
             </label>
           </div>
-          <ReviewsPanel key={warehouseId} warehouseId={warehouseId} profile={profile} />
+          {routeError ? (
+            <div className="notice task-error" role="alert">
+              {routeError}
+            </div>
+          ) : (
+            <>
+              {destination && applied !== destination.token && (
+                <div className="surface empty-state" role="status">
+                  正在切换到目标仓库…
+                </div>
+              )}
+              <div hidden={!!destination && applied !== destination.token}>
+                <ReviewsPanel
+                  key={warehouseId}
+                  warehouseId={warehouseId}
+                  profile={profile}
+                  destination={destination?.warehouseId === warehouseId ? destination : undefined}
+                  draftCache={drafts.current}
+                  active={active && (!destination || applied === destination.token)}
+                />
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -90,7 +157,19 @@ const taskLabel: Record<string, string> = {
   EXHAUSTED: '查询已耗尽',
   REVIEW: '分类要求人工核查',
 };
-function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: StaffProfile }) {
+function ReviewsPanel({
+  warehouseId,
+  profile,
+  destination,
+  draftCache,
+  active: visible,
+}: {
+  warehouseId: string;
+  profile: StaffProfile;
+  destination?: PaymentReviewDestination;
+  draftCache: Map<string, ReviewDraft>;
+  active: boolean;
+}) {
   const [data, setData] = useState<PaymentReviewList | null>(null),
     [filter, setFilter] = useState('ALL'),
     [detail, setDetail] = useState<PaymentReviewDetail | null>(null),
@@ -98,16 +177,21 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
-    [stale, setStale] = useState(false);
+    [stale, setStale] = useState(false),
+    [initialFocus, setInitialFocus] = useState<string>(),
+    [openNonce, setOpenNonce] = useState(0);
   const seq = useRef(0),
     active = useRef(false),
-    pending = useRef<{
-      id: string;
-      key: string;
-      note: string;
-      attemptVersion: number;
-      jobVersion: number | null;
-    } | null>(null);
+    pending = useRef<PendingReviewNote | null>(null),
+    handled = useRef(0),
+    latest = useRef<{ id?: string; draft: string }>({ draft: '' });
+  latest.current = { id: detail?.item.id, draft };
+  function remember() {
+    const v = latest.current;
+    if (v.id)
+      draftCache.set(warehouseId + ':' + v.id, { draft: v.draft, pending: pending.current });
+  }
+  useEffect(() => () => remember(), [warehouseId]);
   const base = '/admin/payment-review-lab',
     query = '?warehouseId=' + warehouseId;
   async function load(cursor?: string) {
@@ -132,6 +216,7 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     }
   }
   useEffect(() => {
+    remember();
     setData(null);
     setDetail(null);
     setDraft('');
@@ -144,7 +229,7 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
       active.current = false;
     };
   }, [warehouseId, filter]);
-  async function open(id: string, cursor?: string) {
+  async function open(id: string, cursor?: string, focus?: string) {
     if (active.current) return;
     active.current = true;
     setBusy(true);
@@ -152,10 +237,12 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     setMessage('');
     const n = ++seq.current;
     const same = detail?.item.id === id;
+    if (!same || focus) remember();
+    if (!same || focus) setDetail(null);
     if (!same) {
-      setDetail(null);
-      setDraft('');
-      pending.current = null;
+      const saved = draftCache.get(warehouseId + ':' + id);
+      setDraft(saved?.draft ?? '');
+      pending.current = saved?.pending ?? null;
     }
     try {
       const r = await staffRequest<PaymentReviewDetail>(
@@ -166,6 +253,10 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
           cursor && old?.item.id === id ? { ...r, notes: [...old.notes, ...r.notes] } : r,
         );
         setStale(false);
+        if (!cursor) {
+          setInitialFocus(focus);
+          setOpenNonce((v) => v + 1);
+        }
       }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '核查详情读取失败');
@@ -176,6 +267,12 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
       }
     }
   }
+  useEffect(() => {
+    if (!destination || !data || busy || handled.current === destination.token) return;
+    handled.current = destination.token;
+    void open(destination.attemptId, undefined, destination.focus);
+  }, [destination?.token, data, busy]);
+  const routePending = !!destination && handled.current !== destination.token;
   async function save() {
     if (active.current || !data?.enabled || !detail?.item.needsReview || !draft.trim() || stale)
       return;
@@ -342,7 +439,20 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
               </button>
             )}
           </section>
-          {detail && (
+          {(routePending || (busy && !detail)) && (
+            <div className="surface empty-state" role="status">
+              正在读取目标核查详情…
+            </div>
+          )}
+          {!detail && !busy && destination && error && (
+            <button
+              className="secondary-button"
+              onClick={() => void open(destination.attemptId, undefined, destination.focus)}
+            >
+              重试打开关联核查
+            </button>
+          )}
+          {detail && !routePending && (
             <section className="surface readiness-summary payment-review-detail">
               <div className="readiness-heading">
                 <div>
@@ -402,12 +512,17 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
                   ':' +
                   detail.item.jobVersion +
                   ':' +
-                  detail.item.noteCount
+                  detail.item.noteCount +
+                  ':' +
+                  openNonce
                 }
                 warehouseId={warehouseId}
                 snapshot={detail.item}
                 refresh={() => void open(detail.item.id)}
                 disabled={busy}
+                active={visible}
+                initialFocus={initialFocus}
+                onFocusHandled={() => setInitialFocus(undefined)}
               />
             </section>
           )}
