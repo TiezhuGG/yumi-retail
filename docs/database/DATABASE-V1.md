@@ -372,3 +372,12 @@ stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；
 本轮无表结构或数据迁移，复用consumer_orders、order_items、order_allocations及order_events。按warehouse_id与不可变created_at/id进行20笔游标分页，订单号前缀/状态由服务端筛选；游标锚点限定同仓库且匹配筛选。详情通过原分配关联StockPosition→批次/库位及预占/释放流水时间，不使用当前汇总reserved冒充本单数量。
 
 读取事务采用RepeatableRead，订单、分配与事件处在同一快照。取消并发时，返回取消前的一致预占记录或取消后的一致释放记录，不混合两者。显式字段白名单不读取联系密文和消费者身份，查询不更改订单/两级库存账/事件；原有取消、超时、不可变约束和加密密钥不变。员工权限使用代码中的order.read及现有StaffWarehouse范围，每请求重新验证，无权限数据回填。
+
+
+## 2026-11-01 支付准备单增量
+
+迁移202611010002_payment_preparation新增payment_preparations与payment_preparation_events，无历史数据回填。order_id唯一并外键绑定订单，(user_id,key)唯一；记录订单归属/仓库与金额快照、CNY、DISABLED渠道、PREPARED/CLOSED及建立/关闭时间和原因。重复的归属/仓库字段通过延迟约束与原订单核对，金额严格等于payable_cents，建立时间须在订单创建与预占截止之间。SQL CHECK拒绝其他币种/真实渠道/成功等状态，关闭时间与原因不可缺失。
+
+快照不可改，只能首次PREPARED→CLOSED；准备记录不可删除，事件追加后不可改删，(preparation_id,type)唯一。延迟一致性触发器挂在准备记录、事件及原订单更新上，验证金额/归属、NOT_STARTED及订单状态、关闭原因和相应CONSUMER/SYSTEM事件；直接改原订单不能遗留打开的准备记录。查询不读取密钥或顾客联系密文，事件不存用户提供的备注/请求体。
+
+准备事务按用户幂等键串行化后锁订单，与取消/超时共享订单行锁。库存释放内核同事务关闭准备、追加关闭事件再取消订单；准备关闭失败时库存计数/两级流水/订单/事件一并回滚。历史无准备记录的订单仍按原逻辑释放。没有更改订单NOT_STARTED约束，PREPARED不能进入渠道处理中或履约；未来真实支付接入必须另行迁移和实现渠道事实核验。

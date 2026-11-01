@@ -5,6 +5,7 @@ import type { ConsumerOrder } from '../../../../../packages/contracts/src/index'
 import { cartIdentity } from '../../account-cart';
 import type { CartIdentity } from '../../account-cart';
 import { addressRequest } from '../../address-api';
+import { PaymentPreparationCard } from '../../components/PaymentPreparation';
 import { acknowledgeOrder } from '../../order-storage';
 export default function OrderDetail() {
   const id = useRouter().params.id;
@@ -154,6 +155,11 @@ export default function OrderDetail() {
                 <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
               </View>
             </View>
+            <PaymentPreparationCard
+              identity={identity}
+              orderId={order.id}
+              canceled={order.status === 'CANCELED'}
+            />
             {order.status === 'AWAITING_PAYMENT' && (
               <>
                 <Button disabled className="checkout-order-disabled">

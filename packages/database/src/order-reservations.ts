@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { closePaymentPreparation } from './payment-preparation.js';
 import type { Prisma } from './generated/prisma/client.js';
 import type { createDatabase } from './index.js';
 type Tx = Prisma.TransactionClient;
@@ -88,6 +89,7 @@ export async function releaseUnpaidOrder(
     );
     await tx.orderAllocation.update({ where: { id: a.id }, data: { releaseLedgerId: id } });
   }
+  await closePaymentPreparation(tx, order.id, reason, requestId);
   await tx.consumerOrder.update({
     where: { id: order.id },
     data: { status: 'CANCELED', cancelReason: reason, version: { increment: 1 } },

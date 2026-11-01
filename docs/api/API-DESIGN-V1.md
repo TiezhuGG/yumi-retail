@@ -462,3 +462,19 @@ preview逐行status为AVAILABLE/UNAVAILABLE/EXCESS，无有效售价为null；�
 按createdAt/id倒序，以同仓库且匹配当前筛选的订单作游标锚点；跨筛选/不存在游标404，未授权或停用仓库403，仓库内不存在订单404，额外字段/重复参数/无效格式400，未登录401。没有limit、客户姓名/电话检索或批量导出参数。查询事务使用RepeatableRead，避免取消期间混合旧订单状态与新释放记录。
 
 列表和详情显式选择字段，不查询/解密address_payload，不返回用户ID、联系人、电话、门牌、地址/订单备注、原报价ID、幂等键/摘要、请求编号、事件payload或库存操作人的内部ID。金额为整数分；预占展示商品、规格、数量、批次、效期、库位code/name和reserve/release时间，表示该单分配记录，不是当前库位库存。库位名称是当前主数据。订单事件仅返回动作类型/来源类别/时间。查询不追加业务事件或修改订单/库存；拒绝访问仍沿用员工权限审计。
+
+
+## 2026-11-01 本机支付准备单
+
+本轮只实现渠道调用前的准备记录，非微信预支付单。paymentState仍为NOT_STARTED，实际PAYMENT_MODE=disabled；不接收回调，不提供支付成功/退款入口或支付参数。复用ORDER_DEV_SUBMIT_ENABLED作为本机开发准备开关，默认关闭；其生产/非本地数据库限制沿用订单基础。
+
+| 接口（/api/v1下） | 契约 |
+|---|---|
+| GET /consumer/orders/:id/payment-preparation | 本人Bearer；无查询参数；{enabled,intent:null或准备记录}，enabled仅表示允许保存开发准备记录 |
+| POST /consumer/orders/:id/payment-preparation | 本人Bearer、UUID Idempotency-Key、空对象；成功仅{id}，不接受金额/状态/渠道/用户ID |
+
+服务端锁定本人订单，金额仅取不可变payableCents、币种CNY、渠道DISABLED；仅待支付且未开始支付、预占未到期订单可准备。同用户同键同订单重放原ID，即使记录后来已关闭；同键另一订单409；同订单换键不产生第二记录，409后应GET核实。创建准备不改订单版本/支付状态、不增加或延长库存预占。新准备需要仍启用开发开关；关闭后仍可读取本人已有记录。
+
+状态仅PREPARED→CLOSED，关闭原因CONSUMER_CANCEL/PAYMENT_TIMEOUT。取消与超时复用订单锁和释放事务，同时关闭记录、写审计事件，任一步失败整体回滚；从未向渠道发起请求，因此此处关闭不是渠道关单或退款。未来任何外部渠道请求必须新增支付状态与查单/关单/验签设计后再开放，不能把PREPARED解释为渠道处理中。
+
+公开准备字段仅id/state/channel/amountCents/currency/preparedAt/closedAt/closeReason，不返回幂等键、消费者/仓库内部ID、请求编号、密钥或联系资料。后台GET /admin/orders/:id新增可空paymentPreparation，仍按order.read和仓库范围限制且只读，不在列表附加敏感信息。输入400、身份401、非本人订单404、旧键冲突/已有记录/订单不可准备409、开发关闭或可重试竞争503。

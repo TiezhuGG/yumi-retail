@@ -790,6 +790,7 @@ model CheckoutQuote {
 }
 
 model ConsumerOrder {
+ paymentPreparation PaymentPreparation?
  id String @id @db.Uuid
  userId String @map("user_id") @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
@@ -862,4 +863,34 @@ model OrderEvent {
  order ConsumerOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([orderId,type])
  @@map("order_events")
+}
+
+model PaymentPreparation {
+ id String @id @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ key String @db.Uuid
+ amountCents BigInt @map("amount_cents")
+ currency String @default("CNY") @db.VarChar(3)
+ channel String @default("DISABLED") @db.VarChar(16)
+ state String @default("PREPARED") @db.VarChar(16)
+ preparedAt DateTime @default(now()) @map("prepared_at") @db.Timestamptz(3)
+ closedAt DateTime? @map("closed_at") @db.Timestamptz(3)
+ closeReason String? @map("close_reason") @db.VarChar(24)
+ order ConsumerOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events PaymentPreparationEvent[]
+ @@unique([userId,key])
+ @@map("payment_preparations")
+}
+model PaymentPreparationEvent {
+ id String @id @db.Uuid
+ preparationId String @map("preparation_id") @db.Uuid
+ type String @db.VarChar(16)
+ actorKind String @map("actor_kind") @db.VarChar(16)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ preparation PaymentPreparation @relation(fields:[preparationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([preparationId,type])
+ @@map("payment_preparation_events")
 }

@@ -349,6 +349,32 @@ function OrderDetail({
               </div>
             </div>
           </section>
+          <section className="surface payment-preparation-summary">
+            <div className="service-area-list-heading">
+              <div>
+                <h2>支付准备记录</h2>
+                <p>渠道未接入，本记录不代表已向渠道下单或扣款。</p>
+              </div>
+            </div>
+            <div className="order-items">
+              <strong>
+                {row.paymentPreparation
+                  ? row.paymentPreparation.state === 'CLOSED'
+                    ? '准备记录已关闭'
+                    : '准备记录已建立 · 尚未扣款'
+                  : '尚无支付准备记录'}
+              </strong>
+              {row.paymentPreparation && (
+                <p>
+                  准备金额 {money(row.paymentPreparation.amountCents)} · 建立于{' '}
+                  {time(row.paymentPreparation.preparedAt)}
+                  {row.paymentPreparation.closedAt
+                    ? ' · 关闭于 ' + time(row.paymentPreparation.closedAt)
+                    : ''}
+                </p>
+              )}
+            </div>
+          </section>
           <section className="surface">
             <div className="service-area-list-heading">
               <div>

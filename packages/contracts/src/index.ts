@@ -458,6 +458,7 @@ export type AdminOrderSummary = Pick<
   | 'items'
 >;
 export interface AdminOrderDetail extends AdminOrderSummary {
+  paymentPreparation: PaymentPreparation | null;
   allocations: Array<{
     id: string;
     skuId: string;
@@ -470,4 +471,19 @@ export interface AdminOrderDetail extends AdminOrderSummary {
     releasedAt: string | null;
   }>;
   events: Array<{ type: string; actorKind: string; createdAt: string }>;
+}
+
+export interface PaymentPreparation {
+  id: string;
+  state: 'PREPARED' | 'CLOSED';
+  channel: 'DISABLED';
+  amountCents: number;
+  currency: 'CNY';
+  preparedAt: string;
+  closedAt: string | null;
+  closeReason: 'CONSUMER_CANCEL' | 'PAYMENT_TIMEOUT' | null;
+}
+export interface PaymentPreparationView {
+  enabled: boolean;
+  intent: PaymentPreparation | null;
 }

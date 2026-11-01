@@ -2,6 +2,7 @@ import { Controller, Get, Inject, Param, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@yumi/database';
 import type { AdminOrderSummary, AdminOrderDetail } from '@yumi/contracts';
+import { preparationSelect, preparationDto, preparationSchema } from './payment-preparation.js';
 import { CatalogService } from './catalog-service.js';
 import { fields, str, uuid } from './catalog-input.js';
 import { Permissions } from './staff-guard.js';
@@ -113,6 +114,7 @@ export class AdminOrderService {
           where: { id, warehouseId },
           select: {
             ...summarySelect,
+            paymentPreparation: { select: preparationSelect },
             allocations: {
               orderBy: [{ skuId: 'asc' }, { lotId: 'asc' }, { positionId: 'asc' }],
               select: {
@@ -138,6 +140,9 @@ export class AdminOrderService {
         if (!row) throw failure(404, 'ORDER_NOT_FOUND', '未找到该仓库订单');
         return {
           ...dto(row),
+          paymentPreparation: row.paymentPreparation
+            ? preparationDto(row.paymentPreparation)
+            : null,
           allocations: row.allocations.map((a) => ({
             id: a.id,
             skuId: a.skuId,
@@ -233,6 +238,7 @@ export class AdminOrderController {
   @ApiResult(
     object({
       ...summary.properties,
+      paymentPreparation: { ...preparationSchema, nullable: true },
       allocations: {
         type: 'array',
         maxItems: 200,
