@@ -607,3 +607,12 @@ filter为ALL(默认)、ATTEMPT、QUERY、NOTIFICATION、NOTE。cursor和focus为
 本轮仅客户端导航，沿用OpenAPI0.25.0，没有新增接口或参数。来源将实际warehouseId/attemptId及NOTIFICATION:记录UUID或ATTEMPT:事件UUID交给核查详情/时间线；目标继续调用既有详情与timeline的focus参数，服务端重新检查权限、仓库与尝试归属，不能凭来源快照越权。目标可以不在当前异常筛选中；备注写入资格、版本校验、幂等和审计不变。
 
 GET失败保留来源返回路径，不显示上一个目标详情。备注保存响应丢失后的未确认键/文本/快照仅存当前会话内存，切换目标后按原内容恢复原键；不新增任何资金或任务动作。
+
+
+## 2026-11-01 合成核查只读概览
+
+新增GET `/api/v1/admin/payment-review-lab/summary?warehouseId=UUID`，OpenAPI0.26.0。仅允许warehouseId，未知字段/数组/缺失或非法UUID400；匿名401、无角色权限/未分配仓库/停用仓库403。沿用payment-readiness.read（当前SUPER_ADMIN）与仓库范围校验；默认实验关闭可读取既有数据。
+
+返回warehouseId、generatedAt（数据库统计语句开始时刻）、syntheticOnly=true、enabled（既有实验写入开关）和counts={ALL,UNKNOWN,CONFLICT,EXHAUSTED,REVIEW}非负整数。ALL按尝试对四种原因取并集去重，其余按当前证据/任务状态独立计数，已知结果仍可能EXHAUSTED/REVIEW；不把四分类相加。空仓五项均0。
+
+单条SQL从当前仓库尝试LEFT JOIN唯一attempt_id任务并执行COUNT FILTER，所有分类共享语句MVCC快照，统计全量而非20条列表投影；没有事件/备注JOIN导致计数放大。统计不读取报文、凭据、备注正文或顾客资料，不写入审计、尝试、任务、订单或库存。概览和列表为独立实时请求，可在并发更新期间不同时刻；不承诺冻结一致。旧端点响应兼容不变。

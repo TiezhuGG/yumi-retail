@@ -628,6 +628,14 @@ export interface PaymentReviewList {
   items: PaymentReviewCase[];
   nextCursor: string | null;
 }
+export type PaymentReviewFilter = 'ALL' | 'UNKNOWN' | 'CONFLICT' | 'EXHAUSTED' | 'REVIEW';
+export interface PaymentReviewSummary {
+  warehouseId: string;
+  generatedAt: string;
+  syntheticOnly: true;
+  enabled: boolean;
+  counts: Record<PaymentReviewFilter, number>;
+}
 export interface PaymentReviewDetail {
   item: PaymentReviewCase;
   notes: PaymentReviewNote[];

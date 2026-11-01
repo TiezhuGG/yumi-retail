@@ -1,8 +1,10 @@
+import { PaymentReviewSummaryPanel, reviewFilters } from './payment-review-summary.js';
 import type { PaymentReviewDestination } from './payment-navigation.js';
 import { PaymentEvidenceTimelinePanel } from './payment-evidence-timeline.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PaymentReviewList,
+  PaymentReviewFilter,
   PaymentReviewDetail,
   PaymentReviewNote,
   StaffProfile,
@@ -171,7 +173,7 @@ function ReviewsPanel({
   active: boolean;
 }) {
   const [data, setData] = useState<PaymentReviewList | null>(null),
-    [filter, setFilter] = useState('ALL'),
+    [filter, setFilter] = useState<PaymentReviewFilter>('ALL'),
     [detail, setDetail] = useState<PaymentReviewDetail | null>(null),
     [draft, setDraft] = useState(''),
     [busy, setBusy] = useState(false),
@@ -339,6 +341,12 @@ function ReviewsPanel({
   }
   return (
     <>
+      <PaymentReviewSummaryPanel
+        warehouseId={warehouseId}
+        filter={filter}
+        disabled={busy}
+        onSelect={setFilter}
+      />
       <div className="readiness-heading">
         <div>
           <h2>补偿异常核查</h2>
@@ -355,15 +363,9 @@ function ReviewsPanel({
             aria-label="核查筛选"
             value={filter}
             disabled={busy}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value as PaymentReviewFilter)}
           >
-            {[
-              ['ALL', '全部待核查'],
-              ['UNKNOWN', '结果未知'],
-              ['CONFLICT', '结果冲突'],
-              ['EXHAUSTED', '查询耗尽'],
-              ['REVIEW', '分类待核查'],
-            ].map(([value, title]) => (
+            {reviewFilters.map(([value, title]) => (
               <option key={value} value={value}>
                 {title}
               </option>
@@ -397,7 +399,7 @@ function ReviewsPanel({
           {!data.enabled && (
             <div className="notice">本机合成核查写入尚未开启，可只读查看；不能保存备注。</div>
           )}
-          <section className="surface">
+          <section className="surface" id="payment-review-list">
             <div className="service-area-list-heading">
               <h2>待核查列表</h2>
               <small>合成材料 · 非真实支付</small>

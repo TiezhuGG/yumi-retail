@@ -2583,3 +2583,67 @@ small {
 .payment-return-bar button {
   flex-shrink: 0;
 }
+
+.review-overview {
+  margin-bottom: 28px;
+}
+.review-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.review-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  color: #23362e;
+  cursor: pointer;
+}
+.review-overview-card:hover:not(:disabled),
+.review-overview-card.is-selected {
+  background: #eff9f3;
+  border-color: #078847;
+}
+.review-overview-card:focus-visible {
+  outline: 3px solid #078847;
+  outline-offset: 3px;
+}
+.review-overview-card:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.review-overview-card strong {
+  font-size: 30px;
+  overflow-wrap: anywhere;
+}
+.review-overview-card small {
+  font-size: 13px;
+  font-weight: normal;
+}
+.review-overview-action {
+  font-size: 12px;
+  color: #078847;
+}
+.review-overview-caption {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+@media (max-width: 1100px) {
+  .review-overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .review-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .review-overview-card:first-child {
+    grid-column: 1 / -1;
+  }
+}

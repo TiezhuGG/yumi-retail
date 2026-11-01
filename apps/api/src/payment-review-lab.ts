@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Prisma } from '@yumi/database';
-import type { PaymentReviewCase, PaymentReviewNote } from '@yumi/contracts';
+import type { PaymentReviewCase, PaymentReviewNote, PaymentReviewSummary } from '@yumi/contracts';
 import { CatalogService } from './catalog-service.js';
 import { fields, uuid, integer, str } from './catalog-input.js';
 import { Permissions } from './staff-guard.js';
@@ -58,6 +58,44 @@ export class PaymentReviewLabService {
     readonly catalog: CatalogService,
     readonly enabled = false,
   ) {}
+  async summary(r: ApiRequest, w: string): Promise<PaymentReviewSummary> {
+    return this.catalog.db.$transaction(async (tx) => {
+      await this.catalog.warehouse(tx, r, w);
+      // One aggregate statement gives every overlapping category the same MVCC snapshot.
+      const [row] = await tx.$queryRaw<
+        {
+          ALL: number;
+          UNKNOWN: number;
+          CONFLICT: number;
+          EXHAUSTED: number;
+          REVIEW: number;
+          at: Date;
+        }[]
+      >`SELECT
+        COUNT(*) FILTER (WHERE a.evidence IN ('UNKNOWN','CONFLICT') OR j.state IN ('EXHAUSTED','REVIEW'))::int AS "ALL",
+        COUNT(*) FILTER (WHERE a.evidence='UNKNOWN')::int AS "UNKNOWN",
+        COUNT(*) FILTER (WHERE a.evidence='CONFLICT')::int AS "CONFLICT",
+        COUNT(*) FILTER (WHERE j.state='EXHAUSTED')::int AS "EXHAUSTED",
+        COUNT(*) FILTER (WHERE j.state='REVIEW')::int AS "REVIEW",
+        statement_timestamp() AS at
+        FROM payment_attempt_labs a
+        LEFT JOIN payment_query_lab_jobs j ON j.attempt_id=a.id
+        WHERE a.warehouse_id=${w}::uuid`;
+      return {
+        warehouseId: w,
+        generatedAt: row!.at.toISOString(),
+        syntheticOnly: true,
+        enabled: this.enabled,
+        counts: {
+          ALL: row!.ALL,
+          UNKNOWN: row!.UNKNOWN,
+          CONFLICT: row!.CONFLICT,
+          EXHAUSTED: row!.EXHAUSTED,
+          REVIEW: row!.REVIEW,
+        },
+      };
+    });
+  }
   private async locked(tx: Tx, r: ApiRequest, w: string, id: string, write = false) {
     await this.catalog.warehouse(tx, r, w);
     if (write)
@@ -260,6 +298,22 @@ function query(q: unknown, detail = false) {
 @Controller('admin/payment-review-lab')
 export class PaymentReviewLabController {
   constructor(@Inject(PaymentReviewLabService) private readonly service: PaymentReviewLabService) {}
+  @Get('summary')
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiResult(
+    object({
+      warehouseId: text,
+      generatedAt: { type: 'string', format: 'date-time' },
+      syntheticOnly: { type: 'boolean', enum: [true] },
+      enabled: { type: 'boolean' },
+      counts: object(Object.fromEntries(filters.map((f) => [f, { type: 'integer', minimum: 0 }]))),
+    }),
+    [400, 401, 403, 500],
+  )
+  async summary(@Req() r: ApiRequest, @Query() q: unknown) {
+    const b = fields(q, ['warehouseId']);
+    return success(r, await this.service.summary(r, uuid(b.warehouseId)));
+  }
   @Get()
   @ApiQuery({ name: 'warehouseId', required: true, type: String })
   @ApiQuery({ name: 'filter', required: false, enum: filters })
