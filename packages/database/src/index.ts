@@ -28,3 +28,11 @@ export {
 } from './order-reservations.js';
 
 export { mergePaymentEvidence, paymentCloseDecision } from './payment-close-policy.js';
+export {
+  paymentQueryLabWorkerEnabled,
+  schedulePaymentQueryLab,
+  claimPaymentQueryLab,
+  finishPaymentQueryLab,
+  runPaymentQueryLabOnce,
+  retryPaymentQueryLab,
+} from './payment-query-lab.js';

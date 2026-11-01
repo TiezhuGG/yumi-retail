@@ -543,3 +543,11 @@ GET /api/v1/admin/payment-close-lab?warehouseId=UUID返回enabled、syntheticOnl
 | POST /:id/actions/success-result | 仅{key:UUID}；保存SUCCESS_RESULT合成观察 |
 
 不接受订单号、任意状态、凭据或报文。证据NONE/UNKNOWN/CLOSED/SUCCEEDED/CONFLICT与paymentCloseDecision处理预案同查；releaseAllowed始终false。详情锁定同一尝试，避免读取旧汇总配新事件；按createdAt/id稳定降序分页。未登录401，无权限/范围403，非法UUID/动作/额外字段400，不存在记录或游标404，同键动作冲突/100次结果上限409，默认关闭503。同键重试返回当前详情，不承诺重放旧响应快照；幂等保证副作用只发生一次。
+
+## 2026-11-01 查询任务接口增量（0.20.0）
+
+GET /api/v1/admin/payment-attempt-lab/:id详情新增queryJob（可空），含state、attempts、nextRunAt、leaseUntil及按版本排序的任务历史（reason/state/attempts/createdAt）。不返回租约令牌、内部操作键或凭据。任务RETRY/LEASED/DONE/EXHAUSTED表示调度状态，DONE只是停止自动查询，不代表支付入账。
+
+POST /api/v1/admin/payment-attempt-lab/run-query-cycle?warehouseId=UUID仅body{}，处理本仓至多一个到期合成任务，返回processed及syntheticOnly=true；不是所选详情的强制执行接口。没有到期任务时processed=false；第三次租约过期可将任务标耗尽而不再执行查询。该调度动作可重复检查，并不承诺原请求响应重放，任务副作用由租约和操作键保证有效完成一次。
+
+POST /api/v1/admin/payment-attempt-lab/:id/retry-query?warehouseId=UUID仅body{key:UUID}，只允许仍UNKNOWN的耗尽任务重新安排，原键重试返回当前详情且不重复审计/任务事件。不满足条件或键已用于其他任务动作409。沿用员工Cookie、payment-readiness.read、启用仓库范围、Origin/CSRF与默认关闭的PAYMENT_NOTIFICATION_LAB_ENABLED；未登录401、无权403、非法输入400、未知记录404、实验关闭503。所有观察仍来自明确的合成适配器，没有微信查单入口。

@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { mergePaymentEvidence, paymentCloseDecision } from '@yumi/database';
+import {
+  mergePaymentEvidence,
+  paymentCloseDecision,
+  schedulePaymentQueryLab,
+  retryPaymentQueryLab,
+  runPaymentQueryLabOnce,
+} from '@yumi/database';
 import type { Prisma } from '@yumi/database';
 import type { PaymentAttemptLabSummary } from '@yumi/contracts';
 import { CatalogService } from './catalog-service.js';
@@ -48,6 +54,7 @@ export class PaymentAttemptLabService {
   private async view(tx: Tx, row: Row) {
     return {
       ...summary(row),
+      queryJob: await this.queryView(tx, row.id),
       events: (
         await tx.paymentAttemptLabEvent.findMany({
           where: { attemptId: row.id },
@@ -62,6 +69,53 @@ export class PaymentAttemptLabService {
         createdAt: e.createdAt.toISOString(),
       })),
     };
+  }
+  private async queryView(tx: Tx, id: string) {
+    await tx.$queryRaw`SELECT id FROM payment_query_lab_jobs WHERE attempt_id=${id}::uuid FOR SHARE`;
+    const job = await tx.paymentQueryLabJob.findUnique({
+      where: { attemptId: id },
+      include: { events: { orderBy: { version: 'asc' } } },
+    });
+    if (!job) return null;
+    return {
+      state: job.state,
+      attempts: job.attempts,
+      nextRunAt: job.nextRunAt.toISOString(),
+      leaseUntil: job.leaseUntil?.toISOString() ?? null,
+      events: job.events.map((e) => ({
+        id: e.id,
+        reason: e.reason,
+        state: e.state,
+        attempts: e.attempts,
+        createdAt: e.createdAt.toISOString(),
+      })),
+    };
+  }
+  async retryQuery(r: ApiRequest, w: string, id: string, key: string) {
+    this.writable();
+    return this.catalog.db.$transaction(async (tx) => {
+      const attempt = await this.find(tx, r, w, id, true);
+      try {
+        const changed = await retryPaymentQueryLab(tx, attempt, key);
+        if (changed)
+          await this.catalog.audit(tx, r, 'PAYMENT_QUERY_LAB_RETRY', id, w, null, {
+            syntheticOnly: true,
+          });
+      } catch (e) {
+        if (
+          e instanceof Error &&
+          ['QUERY_RETRY_NOT_ALLOWED', 'QUERY_KEY_CONFLICT'].includes(e.message)
+        )
+          throw failure(409, e.message, '只有未知且已耗尽的任务可重新安排查询');
+        throw e;
+      }
+      return this.view(tx, attempt);
+    });
+  }
+  async runQuery(r: ApiRequest, w: string) {
+    this.writable();
+    await this.catalog.warehouse(this.catalog.db, r, w);
+    return { ...(await runPaymentQueryLabOnce(this.catalog.db, w)), syntheticOnly: true as const };
   }
   async list(r: ApiRequest, w: string, cursor?: string) {
     return this.catalog.db.$transaction(async (tx) => {
@@ -157,6 +211,7 @@ export class PaymentAttemptLabService {
       await tx.paymentAttemptLabEvent.create({
         data: { id: randomUUID(), attemptId: id, key, ...input, evidence, version },
       });
+      await schedulePaymentQueryLab(tx, updated);
       await this.catalog.audit(tx, r, 'PAYMENT_ATTEMPT_LAB_RESULT', id, w, null, {
         syntheticOnly: true,
         action: input.action,
@@ -177,8 +232,25 @@ const props = {
   plan: text,
   releaseAllowed: { type: 'boolean' as const, enum: [false] },
 };
+const querySchema = object({
+  state: text,
+  attempts: { type: 'integer' },
+  nextRunAt: text,
+  leaseUntil: { type: 'string', nullable: true },
+  events: {
+    type: 'array',
+    items: object({
+      id: text,
+      reason: text,
+      state: text,
+      attempts: { type: 'integer' },
+      createdAt: text,
+    }),
+  },
+});
 const detail = object({
   ...props,
+  queryJob: { ...querySchema, nullable: true },
   events: {
     type: 'array',
     maxItems: 101,
@@ -231,6 +303,37 @@ export class PaymentAttemptLabController {
   async detail(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string) {
     const b = fields(q, ['warehouseId']);
     return success(r, await this.service.detail(r, uuid(b.warehouseId), uuid(id)));
+  }
+  @Post('run-query-cycle')
+  @HttpCode(200)
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({ schema: object({}) })
+  @ApiResult(
+    object({ processed: { type: 'boolean' }, syntheticOnly: { type: 'boolean', enum: [true] } }),
+    [400, 401, 403, 503, 500],
+  )
+  async runQuery(@Req() r: ApiRequest, @Query() q: unknown, @Body() body: unknown) {
+    const b = fields(q, ['warehouseId']);
+    fields(body, []);
+    return success(r, await this.service.runQuery(r, uuid(b.warehouseId)));
+  }
+  @Post(':id/retry-query')
+  @HttpCode(200)
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiParam({ name: 'id', type: String })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({ schema: object({ key: { type: 'string', format: 'uuid' } }) })
+  @ApiResult(detail, [400, 401, 403, 404, 409, 503, 500])
+  async retryQuery(
+    @Req() r: ApiRequest,
+    @Query() q: unknown,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const b = fields(q, ['warehouseId']),
+      v = fields(body, ['key']);
+    return success(r, await this.service.retryQuery(r, uuid(b.warehouseId), uuid(id), uuid(v.key)));
   }
   @Post()
   @HttpCode(200)

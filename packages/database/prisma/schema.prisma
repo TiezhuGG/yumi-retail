@@ -923,6 +923,8 @@ model PaymentAttemptLab {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  events PaymentAttemptLabEvent[]
+ queryJob PaymentQueryLabJob?
+ @@unique([id,warehouseId])
  @@unique([warehouseId,key])
  @@index([warehouseId,createdAt,id],map:"payment_attempt_labs_warehouse_created_idx")
  @@map("payment_attempt_labs")
@@ -937,7 +939,42 @@ model PaymentAttemptLabEvent {
  version Int
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  attempt PaymentAttemptLab @relation(fields:[attemptId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ queryEvents PaymentQueryLabEvent[]
  @@unique([attemptId,key])
  @@unique([attemptId,version])
  @@map("payment_attempt_lab_events")
+}
+
+model PaymentQueryLabJob {
+ id String @id @db.Uuid
+ attemptId String @unique @map("attempt_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ state String @default("RETRY") @db.VarChar(16)
+ attempts Int @default(0)
+ version Int @default(0)
+ nextRunAt DateTime @default(now()) @map("next_run_at") @db.Timestamptz(3)
+ leaseToken String? @map("lease_token") @db.Uuid
+ leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ attempt PaymentAttemptLab @relation(fields:[attemptId,warehouseId],references:[id,warehouseId],onDelete:Restrict,onUpdate:NoAction)
+ events PaymentQueryLabEvent[]
+ @@unique([attemptId,warehouseId])
+ @@index([state,nextRunAt],map:"payment_query_lab_due_idx")
+ @@map("payment_query_lab_jobs")
+}
+model PaymentQueryLabEvent {
+ id String @id @db.Uuid
+ jobId String @map("job_id") @db.Uuid
+ key String @db.Uuid
+ reason String @db.VarChar(32)
+ state String @db.VarChar(16)
+ attempts Int
+ version Int
+ attemptEventId String? @unique @map("attempt_event_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ job PaymentQueryLabJob @relation(fields:[jobId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ attemptEvent PaymentAttemptLabEvent? @relation(fields:[attemptEventId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([jobId,key])
+ @@unique([jobId,version])
+ @@map("payment_query_lab_events")
 }

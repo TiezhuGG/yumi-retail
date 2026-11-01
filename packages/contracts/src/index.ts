@@ -550,6 +550,19 @@ export interface PaymentAttemptLabSummary {
   releaseAllowed: false;
 }
 export interface PaymentAttemptLabDetail extends PaymentAttemptLabSummary {
+  queryJob: {
+    state: string;
+    attempts: number;
+    nextRunAt: string;
+    leaseUntil: string | null;
+    events: Array<{
+      id: string;
+      reason: string;
+      state: string;
+      attempts: number;
+      createdAt: string;
+    }>;
+  } | null;
   events: Array<{
     id: string;
     action: string;

@@ -225,6 +225,49 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
       }
     }
   }
+  async function queryAction(retry = false) {
+    if (active.current || !data?.enabled || (retry && !selected)) return;
+    active.current = true;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    const n = ++seq.current,
+      op = selected?.id + ':retry-query';
+    try {
+      await staffRequest(
+        base + (retry ? '/' + selected!.id + '/retry-query' : '/run-query-cycle') + query,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify(retry ? { key: keyFor(op) } : {}),
+        },
+      );
+      if (retry) clearKey(op);
+      if (n !== seq.current) return;
+      setMessage(
+        retry
+          ? '合成查询已重新安排，仍未调用真实渠道。'
+          : '本仓一轮合成查询已检查，请查看任务状态及历史。',
+      );
+      if (selected) {
+        const detail = await staffRequest<PaymentAttemptLabDetail>(
+          base + '/' + selected.id + query,
+        );
+        if (n === seq.current) setSelected(detail);
+      }
+      const list = await staffRequest<PaymentAttemptLabList>(base + query);
+      if (n === seq.current) setData(list);
+    } catch (e) {
+      if (n === seq.current)
+        setError((e instanceof Error ? e.message : '执行结果未确认') + '；请刷新查询任务状态。');
+    } finally {
+      if (n === seq.current) {
+        active.current = false;
+        setBusy(false);
+      }
+    }
+  }
+
   return (
     <>
       <div className="readiness-heading">
@@ -337,6 +380,108 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                   </button>
                 ))}
               </div>
+              <section className="readiness-help query-lab-panel">
+                <h3>合成查询补偿任务</h3>
+                <p>
+                  适配器只返回合成未知结果，不访问微信。自动 Worker
+                  默认关闭；手动运行只处理本仓一个到期任务，未到期时不会执行。
+                </p>
+                {selected.queryJob ? (
+                  <>
+                    <span
+                      className={
+                        'badge ' + (selected.queryJob.state === 'EXHAUSTED' ? 'red' : 'amber')
+                      }
+                    >
+                      {
+                        (
+                          {
+                            RETRY: '等待到期重试',
+                            LEASED: '已领取，租约执行中',
+                            DONE: '任务已停止，仍需核对结果',
+                            EXHAUSTED: '已耗尽，等待核查',
+                          } as Record<string, string>
+                        )[selected.queryJob.state]
+                      }
+                    </span>
+                    <p>
+                      本轮已领取 {selected.queryJob.attempts} / 3 次；到期时间{' '}
+                      {new Date(selected.queryJob.nextRunAt).toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                        hour12: false,
+                      })}
+                    </p>
+                    {selected.queryJob.leaseUntil && (
+                      <p>
+                        租约截止{' '}
+                        {new Date(selected.queryJob.leaseUntil).toLocaleString('zh-CN', {
+                          timeZone: 'Asia/Shanghai',
+                          hour12: false,
+                        })}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p>尚无查询任务；记录未知结果后会自动安排。</p>
+                )}
+                <div className="toolbar">
+                  <button
+                    className="secondary-button"
+                    disabled={busy || !data.enabled}
+                    onClick={() => void queryAction()}
+                  >
+                    运行本仓一轮合成查询
+                  </button>
+                  <button
+                    className="secondary-button"
+                    disabled={
+                      busy ||
+                      !data.enabled ||
+                      selected.evidence !== 'UNKNOWN' ||
+                      selected.queryJob?.state !== 'EXHAUSTED'
+                    }
+                    onClick={() => void queryAction(true)}
+                  >
+                    重新安排合成查询
+                  </button>
+                </div>
+                {selected.queryJob && (
+                  <>
+                    <h3>任务历史（系统合成操作）</h3>
+                    <div className="readiness-checks">
+                      {selected.queryJob.events.map((e) => (
+                        <article className="readiness-check" key={e.id}>
+                          <div>
+                            <h3>
+                              {
+                                (
+                                  {
+                                    SCHEDULED: '已安排查询',
+                                    CLAIMED: '已领取任务',
+                                    LEASE_RECOVERED: '已回收过期租约',
+                                    RETRY_UNKNOWN: '仍未知，已安排重试',
+                                    EXHAUSTED_UNKNOWN: '仍未知，本轮已耗尽',
+                                    STOPPED_KNOWN: '结果已变化，停止自动查询',
+                                    EVENT_LIMIT: '证据记录已达上限，停止查询',
+                                    MANUAL_RETRY: '负责人重新安排查询',
+                                    LEASE_EXHAUSTED: '租约多次中断，等待核查',
+                                  } as Record<string, string>
+                                )[e.reason]
+                              }
+                            </h3>
+                          </div>
+                          <p>
+                            {new Date(e.createdAt).toLocaleString('zh-CN', {
+                              timeZone: 'Asia/Shanghai',
+                              hour12: false,
+                            })}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </section>
               <h3>不可变事件历史</h3>
               <div className="readiness-checks">
                 {selected.events.map((e) => (
