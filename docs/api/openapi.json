@@ -14377,6 +14377,8 @@
                               "label",
                               "state",
                               "version",
+                              "exceptionVersion",
+                              "shortages",
                               "ownerId",
                               "ownerName",
                               "createdAt",
@@ -14403,6 +14405,98 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 3
+                              },
+                              "exceptionVersion": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100
+                              },
+                              "shortages": {
+                                "type": "array",
+                                "maxItems": 50,
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "lineId",
+                                    "missingQuantity",
+                                    "reason",
+                                    "state",
+                                    "version",
+                                    "reporterName",
+                                    "resolverName",
+                                    "createdAt",
+                                    "resolvedAt",
+                                    "events"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "lineId": {
+                                      "type": "string"
+                                    },
+                                    "missingQuantity": {
+                                      "type": "integer"
+                                    },
+                                    "reason": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string",
+                                      "enum": [
+                                        "OPEN",
+                                        "RESOLVED"
+                                      ]
+                                    },
+                                    "version": {
+                                      "type": "integer"
+                                    },
+                                    "reporterName": {
+                                      "type": "string"
+                                    },
+                                    "resolverName": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "createdAt": {
+                                      "type": "string"
+                                    },
+                                    "resolvedAt": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "events": {
+                                      "type": "array",
+                                      "maxItems": 2,
+                                      "items": {
+                                        "type": "object",
+                                        "required": [
+                                          "action",
+                                          "actorName",
+                                          "quantity",
+                                          "createdAt"
+                                        ],
+                                        "properties": {
+                                          "action": {
+                                            "type": "string"
+                                          },
+                                          "actorName": {
+                                            "type": "string"
+                                          },
+                                          "quantity": {
+                                            "type": "integer"
+                                          },
+                                          "createdAt": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
                               },
                               "ownerId": {
                                 "type": "string",
@@ -14782,6 +14876,8 @@
                             "label",
                             "state",
                             "version",
+                            "exceptionVersion",
+                            "shortages",
                             "ownerId",
                             "ownerName",
                             "createdAt",
@@ -14808,6 +14904,98 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "ownerId": {
                               "type": "string",
@@ -15170,6 +15358,8 @@
                             "label",
                             "state",
                             "version",
+                            "exceptionVersion",
+                            "shortages",
                             "ownerId",
                             "ownerName",
                             "createdAt",
@@ -15196,6 +15386,98 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "ownerId": {
                               "type": "string",
@@ -15553,6 +15835,11 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 3
+                  },
+                  "exceptionVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
                 "additionalProperties": false
@@ -15586,6 +15873,8 @@
                             "label",
                             "state",
                             "version",
+                            "exceptionVersion",
+                            "shortages",
                             "ownerId",
                             "ownerName",
                             "createdAt",
@@ -15612,6 +15901,98 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "ownerId": {
                               "type": "string",
@@ -16060,6 +16441,11 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 200
+                  },
+                  "exceptionVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
                   }
                 },
                 "additionalProperties": false
@@ -16093,6 +16479,8 @@
                             "label",
                             "state",
                             "version",
+                            "exceptionVersion",
+                            "shortages",
                             "ownerId",
                             "ownerName",
                             "createdAt",
@@ -16119,6 +16507,98 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "ownerId": {
                               "type": "string",
@@ -16502,6 +16982,1234 @@
         ],
         "tags": [
           "拣货隔离演练"
+        ]
+      }
+    },
+    "/api/v1/warehouse/picking-lab/{id}/shortages": {
+      "post": {
+        "operationId": "PickingShortageController_report",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "version",
+                  "exceptionVersion",
+                  "lineId",
+                  "missingQuantity",
+                  "reason"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "exceptionVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "lineId": {
+                    "type": "string",
+                    "enum": [
+                      "PAPER_SINGLE",
+                      "PAPER_TRIPLE"
+                    ]
+                  },
+                  "missingQuantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "MISSING",
+                      "DAMAGED"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "task",
+                        "duplicate"
+                      ],
+                      "properties": {
+                        "task": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "label",
+                            "state",
+                            "version",
+                            "exceptionVersion",
+                            "shortages",
+                            "ownerId",
+                            "ownerName",
+                            "createdAt",
+                            "syntheticOnly",
+                            "lines",
+                            "events"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "READY",
+                                "PICKING",
+                                "CHECKED"
+                              ]
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "ownerId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "ownerName": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "syntheticOnly": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "spec",
+                                  "unit",
+                                  "batchNo",
+                                  "location",
+                                  "required",
+                                  "checked"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "spec": {
+                                    "type": "string"
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "batchNo": {
+                                    "type": "string"
+                                  },
+                                  "location": {
+                                    "type": "string"
+                                  },
+                                  "required": {
+                                    "type": "integer"
+                                  },
+                                  "checked": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "events": {
+                              "type": "array",
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "action",
+                                  "actorName",
+                                  "lineId",
+                                  "quantity",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "action": {
+                                    "type": "string"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "quantity": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "duplicate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "拣货合成缺货隔离处理"
+        ]
+      }
+    },
+    "/api/v1/warehouse/picking-lab/{id}/shortages/{shortageId}/restore": {
+      "post": {
+        "operationId": "PickingShortageController_restore",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "shortageId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "version",
+                  "exceptionVersion",
+                  "shortageVersion",
+                  "confirmedQuantity"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3
+                  },
+                  "exceptionVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "shortageVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "confirmedQuantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "task",
+                        "duplicate"
+                      ],
+                      "properties": {
+                        "task": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "label",
+                            "state",
+                            "version",
+                            "exceptionVersion",
+                            "shortages",
+                            "ownerId",
+                            "ownerName",
+                            "createdAt",
+                            "syntheticOnly",
+                            "lines",
+                            "events"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "READY",
+                                "PICKING",
+                                "CHECKED"
+                              ]
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 3
+                            },
+                            "exceptionVersion": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 100
+                            },
+                            "shortages": {
+                              "type": "array",
+                              "maxItems": 50,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "lineId",
+                                  "missingQuantity",
+                                  "reason",
+                                  "state",
+                                  "version",
+                                  "reporterName",
+                                  "resolverName",
+                                  "createdAt",
+                                  "resolvedAt",
+                                  "events"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string"
+                                  },
+                                  "missingQuantity": {
+                                    "type": "integer"
+                                  },
+                                  "reason": {
+                                    "type": "string"
+                                  },
+                                  "state": {
+                                    "type": "string",
+                                    "enum": [
+                                      "OPEN",
+                                      "RESOLVED"
+                                    ]
+                                  },
+                                  "version": {
+                                    "type": "integer"
+                                  },
+                                  "reporterName": {
+                                    "type": "string"
+                                  },
+                                  "resolverName": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  },
+                                  "resolvedAt": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "maxItems": 2,
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "action",
+                                        "actorName",
+                                        "quantity",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "action": {
+                                          "type": "string"
+                                        },
+                                        "actorName": {
+                                          "type": "string"
+                                        },
+                                        "quantity": {
+                                          "type": "integer"
+                                        },
+                                        "createdAt": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "ownerId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "ownerName": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "syntheticOnly": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "lines": {
+                              "type": "array",
+                              "minItems": 2,
+                              "maxItems": 2,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "spec",
+                                  "unit",
+                                  "batchNo",
+                                  "location",
+                                  "required",
+                                  "checked"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "spec": {
+                                    "type": "string"
+                                  },
+                                  "unit": {
+                                    "type": "string"
+                                  },
+                                  "batchNo": {
+                                    "type": "string"
+                                  },
+                                  "location": {
+                                    "type": "string"
+                                  },
+                                  "required": {
+                                    "type": "integer"
+                                  },
+                                  "checked": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "events": {
+                              "type": "array",
+                              "maxItems": 4,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "action",
+                                  "actorName",
+                                  "lineId",
+                                  "quantity",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "action": {
+                                    "type": "string"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "lineId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "quantity": {
+                                    "type": "integer",
+                                    "nullable": true
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "duplicate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "拣货合成缺货隔离处理"
         ]
       }
     },
@@ -51116,7 +52824,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.28.0",
+    "version": "0.29.0",
     "contact": {}
   },
   "tags": [],

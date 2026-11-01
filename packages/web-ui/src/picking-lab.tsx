@@ -1,3 +1,4 @@
+import { PickingShortagesPanel } from './picking-shortages.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PickingLabTask,
@@ -7,9 +8,19 @@ import type {
   WarehouseSummary,
 } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
-type Operation = {
+export type Operation = {
   path: string;
-  body: { key: string; version: number; lineId?: string; quantity?: number };
+  body: {
+    key: string;
+    version: number;
+    exceptionVersion?: number;
+    lineId?: string;
+    quantity?: number;
+    missingQuantity?: number;
+    reason?: string;
+    shortageVersion?: number;
+    confirmedQuantity?: number;
+  };
   label: string;
 };
 const states = { READY: '待领取', PICKING: '本人逐行核对中', CHECKED: '演练核对完成' };
@@ -297,7 +308,11 @@ function LabPanel({
                 <article className="readiness-check picking-order-card" key={t.id}>
                   <h3>{t.label}</h3>
                   <span className="badge amber">
-                    {t.state === 'PICKING' ? '已领取，核对中' : states[t.state]}
+                    {t.shortages.some((s) => s.state === 'OPEN')
+                      ? '有未决缺货，暂停核对'
+                      : t.state === 'PICKING'
+                        ? '已领取，核对中'
+                        : states[t.state]}
                   </span>
                   <p>
                     领取人：{t.ownerName ?? '尚未领取'} · 已核对{' '}
@@ -353,19 +368,30 @@ function LabPanel({
               <>
                 <h3>{detail.label}</h3>
                 <span className="badge amber">
-                  {detail.state === 'PICKING' && detail.ownerId !== profile.id
-                    ? '由其他人员领取，核对中'
-                    : states[detail.state]}
+                  {detail.shortages.some((s) => s.state === 'OPEN')
+                    ? '有未决缺货，暂停核对'
+                    : detail.state === 'PICKING' && detail.ownerId !== profile.id
+                      ? '由其他人员领取，核对中'
+                      : states[detail.state]}
                 </span>
                 <p>领取人：{detail.ownerName ?? '尚未领取'}</p>
                 {detail.state === 'READY' && profile.permissions.includes('picking-lab.work') && (
                   <button
                     className="primary-button"
-                    disabled={busy || !enabled || !!op}
+                    disabled={
+                      busy ||
+                      !enabled ||
+                      !!op ||
+                      (detail?.shortages.some((s) => s.state === 'OPEN') ?? false)
+                    }
                     onClick={() =>
                       void execute({
                         path: base + '/' + detail.id + '/claim',
-                        body: { key: crypto.randomUUID(), version: detail.version },
+                        body: {
+                          key: crypto.randomUUID(),
+                          version: detail.version,
+                          exceptionVersion: detail.exceptionVersion,
+                        },
                         label: '领取演练任务',
                       })
                     }
@@ -376,6 +402,12 @@ function LabPanel({
                 {detail.state === 'CHECKED' && (
                   <div className="notice">全部演练明细已核对；未打包、未出库、未交接骑手。</div>
                 )}
+                <PickingShortagesPanel
+                  task={detail}
+                  profile={profile}
+                  disabled={busy || !enabled || !!op}
+                  onExecute={execute}
+                />
                 {detail.lines.map((i) => (
                   <article className="picking-line" key={i.id}>
                     <h3>
@@ -401,6 +433,7 @@ function LabPanel({
                             body: {
                               key: crypto.randomUUID(),
                               version: detail.version,
+                              exceptionVersion: detail.exceptionVersion,
                               lineId: i.id,
                               quantity: Number(quantities[i.id]),
                             },
@@ -417,7 +450,12 @@ function LabPanel({
                             max="200"
                             step="1"
                             required
-                            disabled={busy || !enabled || !!op}
+                            disabled={
+                              busy ||
+                              !enabled ||
+                              !!op ||
+                              (detail?.shortages.some((s) => s.state === 'OPEN') ?? false)
+                            }
                             value={quantities[i.id] ?? ''}
                             onChange={(e) =>
                               setQuantities({ ...quantities, [i.id]: e.target.value })
@@ -426,7 +464,12 @@ function LabPanel({
                         </label>
                         <button
                           className="primary-button"
-                          disabled={busy || !enabled || !!op}
+                          disabled={
+                            busy ||
+                            !enabled ||
+                            !!op ||
+                            (detail?.shortages.some((s) => s.state === 'OPEN') ?? false)
+                          }
                           type="submit"
                         >
                           确认{i.spec}核对

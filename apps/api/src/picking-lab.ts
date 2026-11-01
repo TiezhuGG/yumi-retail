@@ -8,7 +8,7 @@ import { fields, uuid, integer } from './catalog-input.js';
 import { Permissions } from './staff-guard.js';
 import { failure, success, type ApiRequest } from './http.js';
 import { object, text, ApiResult } from './api-result.js';
-const fixture = [
+export const fixture = [
   {
     id: 'PAPER_SINGLE',
     name: '合成纸巾',
@@ -28,16 +28,43 @@ const fixture = [
     required: 1,
   },
 ];
-const include = {
+export const include = {
   owner: { select: { displayName: true } },
   events: { orderBy: { version: 'asc' as const } },
+  shortages: {
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+    include: {
+      reporter: { select: { displayName: true } },
+      resolver: { select: { displayName: true } },
+      events: { orderBy: { revision: 'asc' as const } },
+    },
+  },
 };
 type Row = Prisma.PickingLabTaskGetPayload<{ include: typeof include }>;
-const dto = (t: Row): PickingLabTask => ({
+export const dto = (t: Row): PickingLabTask => ({
   id: t.id,
   label: '演练任务 · ' + t.id.slice(-8),
   state: t.state as PickingLabTask['state'],
   version: t.version,
+  exceptionVersion: t.exceptionVersion,
+  shortages: t.shortages.map((s) => ({
+    id: s.id,
+    lineId: s.lineId,
+    missingQuantity: s.missingQuantity,
+    reason: s.reason,
+    state: s.state,
+    version: s.version,
+    reporterName: s.reporter.displayName,
+    resolverName: s.resolver?.displayName ?? null,
+    createdAt: s.createdAt.toISOString(),
+    resolvedAt: s.resolvedAt?.toISOString() ?? null,
+    events: s.events.map((e) => ({
+      action: e.action,
+      actorName: e.actorName,
+      quantity: e.quantity,
+      createdAt: e.createdAt.toISOString(),
+    })),
+  })),
   ownerId: t.ownerId,
   ownerName: t.owner?.displayName ?? null,
   createdAt: t.createdAt.toISOString(),
@@ -148,7 +175,13 @@ export class PickingLabService {
     w: string,
     id: string,
     action: 'CLAIM' | 'CHECK',
-    input: { key: string; version: number; lineId?: string; quantity?: number },
+    input: {
+      key: string;
+      version: number;
+      exceptionVersion?: number;
+      lineId?: string;
+      quantity?: number;
+    },
   ) {
     this.assertEnabled();
     return this.catalog.db.$transaction(async (tx) => {
@@ -164,13 +197,14 @@ export class PickingLabService {
         if (
           old.action !== action ||
           old.expectedVersion !== input.version ||
+          old.exceptionVersion !== (input.exceptionVersion ?? 0) ||
           old.lineId !== (input.lineId ?? null) ||
           old.quantity !== (input.quantity ?? null)
         )
           throw failure(409, 'IDEMPOTENCY_CONFLICT', '原操作键的动作或核对内容已改变');
         return { task: dto(t), duplicate: true };
       }
-      if (t.version !== input.version)
+      if (t.version !== input.version || t.exceptionVersion !== (input.exceptionVersion ?? 0))
         throw failure(409, 'PICKING_VERSION_STALE', '演练任务已变化，请刷新后核对');
       if (action === 'CLAIM') {
         if (t.state !== 'READY')
@@ -178,6 +212,8 @@ export class PickingLabService {
       } else {
         if (t.ownerId !== actor.staffId)
           throw failure(403, 'PICKING_NOT_OWNER', '只能核对本人领取的演练任务');
+        if (t.shortages.some((s) => s.state === 'OPEN'))
+          throw failure(409, 'PICKING_SHORTAGE_OPEN', '有未决缺货记录，整项演练暂停核对');
         if (t.state !== 'PICKING') throw failure(409, 'PICKING_NOT_OPEN', '当前任务不能继续核对');
         const line = fixture.find((l) => l.id === input.lineId)!;
         if (input.quantity !== line.required)
@@ -204,6 +240,7 @@ export class PickingLabService {
           key: input.key,
           action,
           expectedVersion: input.version,
+          exceptionVersion: input.exceptionVersion ?? 0,
           version: updated.version,
           lineId: input.lineId,
           quantity: input.quantity,
@@ -223,11 +260,38 @@ export class PickingLabService {
     });
   }
 }
-const taskSchema = object({
+export const taskSchema = object({
   id: text,
   label: text,
   state: { type: 'string', enum: ['READY', 'PICKING', 'CHECKED'] },
   version: { type: 'integer', minimum: 0, maximum: 3 },
+  exceptionVersion: { type: 'integer', minimum: 0, maximum: 100 },
+  shortages: {
+    type: 'array',
+    maxItems: 50,
+    items: object({
+      id: text,
+      lineId: text,
+      missingQuantity: { type: 'integer' },
+      reason: text,
+      state: { type: 'string', enum: ['OPEN', 'RESOLVED'] },
+      version: { type: 'integer' },
+      reporterName: text,
+      resolverName: { ...text, nullable: true },
+      createdAt: text,
+      resolvedAt: { ...text, nullable: true },
+      events: {
+        type: 'array',
+        maxItems: 2,
+        items: object({
+          action: text,
+          actorName: text,
+          quantity: { type: 'integer' },
+          createdAt: text,
+        }),
+      },
+    }),
+  },
   ownerId: { ...text, nullable: true },
   ownerName: { ...text, nullable: true },
   createdAt: text,
@@ -316,10 +380,14 @@ export class PickingLabController {
   @ApiParam({ name: 'id', type: String })
   @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiBody({
-    schema: object({
-      key: { type: 'string', format: 'uuid' },
-      version: { type: 'integer', minimum: 0, maximum: 3 },
-    }),
+    schema: object(
+      {
+        key: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 0, maximum: 3 },
+        exceptionVersion: { type: 'integer', minimum: 0, maximum: 100 },
+      },
+      ['key', 'version'],
+    ),
   })
   @ApiResult(writeSchema, [400, 401, 403, 404, 409, 503, 500])
   async claim(
@@ -329,12 +397,14 @@ export class PickingLabController {
     @Body() body: unknown,
   ) {
     const b = fields(q, ['warehouseId']),
-      v = fields(body, ['key', 'version']);
+      v = fields(body, ['key', 'version', 'exceptionVersion']);
     return success(
       r,
       await this.service.act(r, uuid(b.warehouseId), uuid(id), 'CLAIM', {
         key: uuid(v.key),
         version: integer(v.version, 0, 3),
+        exceptionVersion:
+          v.exceptionVersion === undefined ? 0 : integer(v.exceptionVersion, 0, 100),
       }),
     );
   }
@@ -345,12 +415,16 @@ export class PickingLabController {
   @ApiParam({ name: 'id', type: String })
   @ApiHeader({ name: 'X-CSRF-Token', required: true })
   @ApiBody({
-    schema: object({
-      key: { type: 'string', format: 'uuid' },
-      version: { type: 'integer', minimum: 0, maximum: 3 },
-      lineId: { type: 'string', enum: fixture.map((l) => l.id) },
-      quantity: { type: 'integer', minimum: 0, maximum: 200 },
-    }),
+    schema: object(
+      {
+        key: { type: 'string', format: 'uuid' },
+        version: { type: 'integer', minimum: 0, maximum: 3 },
+        lineId: { type: 'string', enum: fixture.map((l) => l.id) },
+        quantity: { type: 'integer', minimum: 0, maximum: 200 },
+        exceptionVersion: { type: 'integer', minimum: 0, maximum: 100 },
+      },
+      ['key', 'version', 'lineId', 'quantity'],
+    ),
   })
   @ApiResult(writeSchema, [400, 401, 403, 404, 409, 503, 500])
   async check(
@@ -360,7 +434,7 @@ export class PickingLabController {
     @Body() body: unknown,
   ) {
     const b = fields(q, ['warehouseId']),
-      v = fields(body, ['key', 'version', 'lineId', 'quantity']);
+      v = fields(body, ['key', 'version', 'exceptionVersion', 'lineId', 'quantity']);
     if (typeof v.lineId !== 'string' || !fixture.some((l) => l.id === v.lineId))
       throw failure(400, 'VALIDATION_ERROR', '演练明细无效');
     return success(
@@ -368,6 +442,8 @@ export class PickingLabController {
       await this.service.act(r, uuid(b.warehouseId), uuid(id), 'CHECK', {
         key: uuid(v.key),
         version: integer(v.version, 0, 3),
+        exceptionVersion:
+          v.exceptionVersion === undefined ? 0 : integer(v.exceptionVersion, 0, 100),
         lineId: v.lineId,
         quantity: integer(v.quantity, 0, 200),
       }),

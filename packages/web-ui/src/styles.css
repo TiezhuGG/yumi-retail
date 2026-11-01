@@ -2715,3 +2715,43 @@ small {
 .picking-check-form input {
   max-width: 160px;
 }
+.picking-shortages {
+  margin: 24px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fafcfb;
+}
+.shortage-report {
+  border-top: 1px solid var(--line);
+  padding: 14px 0;
+}
+.shortage-report summary {
+  cursor: pointer;
+  color: var(--deep);
+  margin-bottom: 12px;
+}
+.picking-shortages h4 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 680px) {
+  .picking-shortages {
+    padding: 12px;
+  }
+}
+.picking-check-form input,
+.picking-check-form select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: #23362e;
+  padding: 10px 12px;
+  min-height: 44px;
+  width: 160px;
+  max-width: 100%;
+}
+.picking-check-form input:disabled,
+.picking-check-form select:disabled {
+  background: #f3f5f4;
+  color: var(--muted);
+}

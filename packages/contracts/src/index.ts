@@ -709,6 +709,20 @@ export interface PickingLabTask {
   label: string;
   state: 'READY' | 'PICKING' | 'CHECKED';
   version: number;
+  exceptionVersion: number;
+  shortages: Array<{
+    id: string;
+    lineId: string;
+    missingQuantity: number;
+    reason: string;
+    state: string;
+    version: number;
+    reporterName: string;
+    resolverName: string | null;
+    createdAt: string;
+    resolvedAt: string | null;
+    events: Array<{ action: string; actorName: string; quantity: number; createdAt: string }>;
+  }>;
   ownerId: string | null;
   ownerName: string | null;
   createdAt: string;

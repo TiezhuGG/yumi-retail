@@ -109,7 +109,9 @@
     "pretest:picking-readiness": "npm run build:server",
     "test:picking-readiness": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-readiness.integration.test.ts",
     "pretest:picking-lab": "npm run build:server",
-    "test:picking-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-lab.integration.test.ts tests/picking-lab-config.test.ts"
+    "test:picking-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-lab.integration.test.ts tests/picking-lab-config.test.ts",
+    "pretest:picking-shortage": "npm run build:server",
+    "test:picking-shortage": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-shortage.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

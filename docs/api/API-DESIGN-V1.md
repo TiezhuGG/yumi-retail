@@ -638,3 +638,16 @@ OpenAPI0.28.0新增`/api/v1/warehouse/picking-lab`（所有端点须warehouseId�
 读返回enabled及task或分页items；任务投影含合成标识/短标签、state/version、ownerId/name、固定两行需求/checked、最多4条操作历史。写返回{task,duplicate}；同键精确恢复返回当前完整投影，不重复事件/审计。投影不含请求键、expectedVersion、真实订单/SKU、凭据或顾客资料。创建键按仓库+创建者隔离，动作键按任务+操作者隔离并绑定全部输入；原键先于版本/终态判定恢复，禁止抢占。
 
 同任务写入锁定任务行；创建唯一键竞争只建一次；读取使用RepeatableRead，创建重复响应加共享锁保持事件快照一致。任务、事件、业务审计原子提交，失败均回滚。前端5xx/网络未知结果保留原操作；重试不是新意图，刷新不会确认写入结果。无正式订单领取、部分实拣、异常处置、出库或配送端点。
+
+
+## 2026-11-01 合成缺货上报与未决阻断
+
+OpenAPI0.29.0新增POST `/api/v1/warehouse/picking-lab/:id/shortages?warehouseId=UUID`：体{key,version,exceptionVersion,lineId,missingQuantity,reason}。领取人且具picking-lab.read/work可上报，行仅PAPER_SINGLE/PAPER_TRIPLE、原因仅MISSING/DAMAGED，正整数数量不超过原固定需求，拒绝已核对/重复未决明细。
+
+POST `/:id/shortages/:shortageId/restore?warehouseId=UUID`：体{key,version,exceptionVersion,shortageVersion,confirmedQuantity}；picking-lab.resolve仅SUPER_ADMIN/WAREHOUSE_MANAGER，当前仓库重新鉴权，拣货员403。确认数量必须等于原需求2/1；只将该记录置RESOLVED，不改checkedLines。两端点严格Origin/CSRF和字段校验，400参数/401匿名/403权限归属/404本任务记录不存在/409版本、数量、未决冲突或上限/503默认关闭/500事务失败。
+
+任务投影新增exceptionVersion和shortages（最多50条，每条最多2条不可变事件），含合成行、上报数量/原因、OPEN/RESOLVED、版本、上报/处理姓名、时间及动作历史；不含内部操作键、期望版本、凭据、顾客或真实库存引用。GET旧列表/详情接口仍使用原路径，读取同一RepeatableRead快照。
+
+CLAIM/CHECK新增可选exceptionVersion，省略按0解释，旧无缺货任务/原键保持兼容；出现缺货变化后旧版本0请求409，需要刷新并提交新版本。原领取/核对事件保存缺货快照，原请求键绑定该字段；已成功原键仍先恢复再判断新状态。上报/处理幂等键按任务+操作者隔离，绑定动作、任务版本、缺货版本、明细或记录、数量/原因及记录版本，变更409。
+
+所有新动作与CHECK锁定同一任务，序列化缺货/核对竞争。OPEN时任何CHECK均被服务端和数据库阻止；上报与处理的任务/缺货/事件/业务审计原子提交。未知网络/5xx保留原操作，明确4xx拒绝后可刷新修正；无通用改状态、部分放行或真实出库接口。

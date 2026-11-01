@@ -66,6 +66,9 @@ model Warehouse {
 }
 
 model Staff {
+ pickingShortageReports PickingLabShortage[] @relation("shortageReporter")
+ pickingShortageResolutions PickingLabShortage[] @relation("shortageResolver")
+ pickingShortageActions PickingLabShortageEvent[] @relation("shortageActor")
  pickingLabCreated PickingLabTask[] @relation("pickingCreator")
  pickingLabOwned PickingLabTask[] @relation("pickingOwner")
  pickingLabEvents PickingLabEvent[] @relation("pickingActor")
@@ -1046,6 +1049,8 @@ model PaymentNotificationLabApplication {
 }
 
 model PickingLabTask {
+ exceptionVersion Int @default(0) @map("exception_version")
+ shortages PickingLabShortage[]
  id String @id @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
  creatorId String @map("creator_id") @db.Uuid
@@ -1066,6 +1071,7 @@ model PickingLabTask {
  @@map("picking_lab_tasks")
 }
 model PickingLabEvent {
+ exceptionVersion Int @default(0) @map("exception_version")
  id String @id @db.Uuid
  taskId String @map("task_id") @db.Uuid
  actorId String @map("actor_id") @db.Uuid
@@ -1086,4 +1092,48 @@ model PickingLabEvent {
  @@unique([taskId,actorId,key])
  @@unique([taskId,version])
  @@map("picking_lab_events")
+}
+
+model PickingLabShortage {
+ id String @id @db.Uuid
+ taskId String @map("task_id") @db.Uuid
+ lineId String @map("line_id") @db.VarChar(24)
+ missingQuantity Int @map("missing_quantity")
+ reason String @db.VarChar(16)
+ reporterId String @map("reporter_id") @db.Uuid
+ state String @default("OPEN") @db.VarChar(16)
+ version Int @default(0)
+ resolverId String? @map("resolver_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(3)
+ task PickingLabTask @relation(fields:[taskId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ reporter Staff @relation("shortageReporter",fields:[reporterId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ resolver Staff? @relation("shortageResolver",fields:[resolverId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events PickingLabShortageEvent[]
+ @@unique([id,taskId])
+ @@index([taskId,createdAt,id],map:"picking_lab_shortages_task_idx")
+ @@map("picking_lab_shortages")
+}
+model PickingLabShortageEvent {
+ id String @id @db.Uuid
+ taskId String @map("task_id") @db.Uuid
+ shortageId String @map("shortage_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ action String @db.VarChar(16)
+ lineId String @map("line_id") @db.VarChar(24)
+ quantity Int
+ reason String? @db.VarChar(16)
+ taskVersion Int @map("task_version")
+ expectedRevision Int @map("expected_revision")
+ expectedShortageVersion Int? @map("expected_shortage_version")
+ revision Int
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ shortage PickingLabShortage @relation(fields:[shortageId,taskId],references:[id,taskId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation("shortageActor",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([taskId,actorId,key])
+ @@unique([taskId,revision])
+ @@unique([shortageId,action])
+ @@map("picking_lab_shortage_events")
 }
