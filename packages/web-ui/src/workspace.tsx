@@ -4,6 +4,7 @@ import type { StaffProfile } from '@yumi/contracts';
 import { CheckoutPolicyWorkbench } from './checkout-policy.js';
 import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
+import { PaymentReadinessWorkbench } from './payment-readiness.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
@@ -18,7 +19,8 @@ export type WorkspaceView =
   | 'reversals'
   | 'service-area'
   | 'checkout-policy'
-  | 'orders';
+  | 'orders'
+  | 'payment-readiness';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -67,6 +69,13 @@ const routes: Array<{
     glyph: '▤',
     hint: '查看订单与批次库位预占记录',
     permission: 'order.read',
+  },
+  {
+    id: 'payment-readiness',
+    name: '支付接入检查',
+    glyph: '◇',
+    hint: '核对配置与接入条件，真实渠道保持禁用',
+    permission: 'payment-readiness.read',
   },
   {
     id: 'stock',
@@ -211,6 +220,8 @@ export function Workspace({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
+          ) : activeView === 'payment-readiness' ? (
+            <PaymentReadinessWorkbench />
           ) : activeView === 'orders' ? (
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
@@ -226,8 +237,14 @@ export function Workspace({
                 .filter(
                   (
                     id,
-                  ): id is Exclude<WorkspaceView, 'service-area' | 'checkout-policy' | 'orders'> =>
-                    id !== 'service-area' && id !== 'checkout-policy' && id !== 'orders',
+                  ): id is Exclude<
+                    WorkspaceView,
+                    'service-area' | 'checkout-policy' | 'orders' | 'payment-readiness'
+                  > =>
+                    id !== 'service-area' &&
+                    id !== 'checkout-policy' &&
+                    id !== 'orders' &&
+                    id !== 'payment-readiness',
                 )}
               onNavigate={navigate}
             />

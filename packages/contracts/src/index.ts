@@ -487,3 +487,18 @@ export interface PaymentPreparationView {
   enabled: boolean;
   intent: PaymentPreparation | null;
 }
+
+export interface PaymentReadinessCheck {
+  code: string;
+  title: string;
+  group: 'CONFIGURATION' | 'OPERATIONS' | 'IMPLEMENTATION' | 'ACCEPTANCE';
+  status: 'MISSING' | 'INVALID' | 'FORMAT_OK' | 'CONFIGURED' | 'UNVERIFIED' | 'BLOCKED';
+  detail: string;
+}
+export interface PaymentReadiness {
+  checkedAt: string;
+  channel: 'DISABLED';
+  canStartPayment: false;
+  warehouse: { id: string; name: string };
+  checks: PaymentReadinessCheck[];
+}

@@ -478,3 +478,16 @@ preview逐行status为AVAILABLE/UNAVAILABLE/EXCESS，无有效售价为null；�
 状态仅PREPARED→CLOSED，关闭原因CONSUMER_CANCEL/PAYMENT_TIMEOUT。取消与超时复用订单锁和释放事务，同时关闭记录、写审计事件，任一步失败整体回滚；从未向渠道发起请求，因此此处关闭不是渠道关单或退款。未来任何外部渠道请求必须新增支付状态与查单/关单/验签设计后再开放，不能把PREPARED解释为渠道处理中。
 
 公开准备字段仅id/state/channel/amountCents/currency/preparedAt/closedAt/closeReason，不返回幂等键、消费者/仓库内部ID、请求编号、密钥或联系资料。后台GET /admin/orders/:id新增可空paymentPreparation，仍按order.read和仓库范围限制且只读，不在列表附加敏感信息。输入400、身份401、非本人订单404、旧键冲突/已有记录/订单不可准备409、开发关闭或可重试竞争503。
+
+
+## 2026-11-01 支付接入检查（只读、离线）
+
+GET /api/v1/admin/payment-readiness?warehouseId=UUID。新增payment-readiness.read，仅SUPER_ADMIN默认拥有；每请求仍复验员工角色、显式仓库范围及仓库启用。运营/仓管/骑手/消费者无此权限。缺失/额外/重复或格式错误参数400，未登录401，角色/范围/停用仓库403，无写入/启用/上传凭据接口。
+
+返回{checkedAt,channel:DISABLED,canStartPayment:false,warehouse:{id,name},checks}。11项检查分CONFIGURATION/OPERATIONS/IMPLEMENTATION/ACCEPTANCE，状态为MISSING/INVALID/FORMAT_OK/CONFIGURED/UNVERIFIED/BLOCKED。前三项只检查部署时非敏感WECHAT_PAY_APP_ID、WECHAT_PAY_MCH_ID、WECHAT_PAY_NOTIFY_URL的本地格式；启动后修改需重启生效。API只返回固定状态/说明，不回显原值、配置路径、密钥或用户数据。
+
+本地规则：AppID为wx加16位小写字母数字，商户号8–32位数字；通知地址限512字符内HTTPS域名、标准端口和非根路径，拒绝空白/控制字符/反斜线、IP/本地域名、账号、查询串及片段。这是项目预检策略，FORMAT_OK不代表官方验证、DNS公网解析或地址可达。未配置允许应用保持禁用运行，格式错误报告INVALID，不自动填样例或联网。
+
+经营项从同仓库真实规则与范围读取，存在/开放仅标CONFIGURED或暂停BLOCKED，不冒充负责人经营验收。渠道下单/查单/关闭及通知验签解密/补偿尚未实现，固定BLOCKED；绑定、凭据、微信身份和HTTPS/真机固定UNVERIFIED。因此无论字段是否格式通过，canStartPayment始终false。准备/订单/库存不受检查动作改变，查询使用RepeatableRead。
+
+applicationConfig集中拒绝除disabled外的PAYMENT_MODE（含mock），API/worker现有启动禁用保护保持。离线命令npm run check:payment-config只输出前三项脱敏格式报告和禁止支付标志；缺字段时退出0，字段INVALID或模式不支持退出1。退出0不是可部署/可支付证明。

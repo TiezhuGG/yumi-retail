@@ -75,7 +75,12 @@
     "pretest:admin-orders": "npm run build:server",
     "test:admin-orders": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/admin-orders.integration.test.ts",
     "pretest:payment-preparation": "npm run build:server",
-    "test:payment-preparation": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-preparation.integration.test.ts"
+    "test:payment-preparation": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-preparation.integration.test.ts",
+    "test:payment-config": "node --import tsx tests/payment-config.test.ts",
+    "pretest:payment-readiness": "npm run build:server",
+    "test:payment-readiness": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-readiness.integration.test.ts",
+    "precheck:payment-config": "npm run build:server",
+    "check:payment-config": "node --env-file=.env scripts/check-payment-config.mjs"
   },
   "pnpm": {
     "overrides": {

@@ -1,4 +1,7 @@
+import { assertDisabledPaymentMode, paymentConfiguration } from './payment-config.js';
+import type { PaymentReadinessCheck } from '@yumi/contracts';
 export interface ApplicationConfig {
+  paymentConfiguration?: PaymentReadinessCheck[];
   environment: 'development' | 'test' | 'production';
   staffOrigins: string[];
   staffSessionSeconds: number;
@@ -13,6 +16,7 @@ export interface ApplicationConfig {
 }
 
 export function applicationConfig(env: NodeJS.ProcessEnv = process.env): ApplicationConfig {
+  assertDisabledPaymentMode(env);
   const environment = env.NODE_ENV ?? 'development';
   if (!['development', 'test', 'production'].includes(environment))
     throw new Error('Invalid NODE_ENV.');
@@ -80,6 +84,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
   )
     throw new Error('Invalid ORDER_DEV_HOLD_SECONDS.');
   return {
+    paymentConfiguration: paymentConfiguration(env),
     orderDevHoldSeconds: Number(env.ORDER_DEV_HOLD_SECONDS ?? 900),
     orderDevSubmit,
     addressEncryptionKey: env.ADDRESS_ENCRYPTION_KEY || undefined,

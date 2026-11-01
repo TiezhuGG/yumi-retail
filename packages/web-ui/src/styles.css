@@ -2289,3 +2289,88 @@ small {
     justify-content: flex-start;
   }
 }
+.payment-readiness-workbench {
+  display: grid;
+  gap: 20px;
+}
+.readiness-warehouse {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+.readiness-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.readiness-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.readiness-heading p,
+.readiness-summary p,
+.readiness-check p,
+.readiness-help p {
+  color: var(--muted);
+  line-height: 1.8;
+  font-size: 14px;
+}
+.readiness-summary,
+.readiness-help {
+  padding: 24px;
+}
+.readiness-summary h2 {
+  margin: 16px 0 8px;
+}
+.readiness-summary small {
+  color: var(--muted);
+}
+.readiness-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0 24px 24px;
+}
+.readiness-check {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+}
+.readiness-check > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.readiness-check h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.readiness-check p {
+  margin: 14px 0 0;
+}
+.readiness-help a {
+  color: var(--green);
+}
+@media (max-width: 680px) {
+  .readiness-checks {
+    grid-template-columns: 1fr;
+    padding: 0 16px 16px;
+  }
+  .readiness-heading {
+    align-items: flex-start;
+  }
+  .readiness-heading button {
+    flex-shrink: 0;
+  }
+  .readiness-summary,
+  .readiness-help {
+    padding: 18px;
+  }
+  .readiness-warehouse {
+    width: 100%;
+    min-width: 0;
+  }
+}

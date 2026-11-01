@@ -16,6 +16,8 @@ import { StaffAuthService } from './staff-auth.js';
 import { ConsumerAuthService, validateConsumerEnvironment } from './consumer-auth.js';
 import { ConsumerController } from './consumer-controller.js';
 import { PaymentPreparationService, PaymentPreparationController } from './payment-preparation.js';
+import { PaymentReadinessController, PaymentReadinessService } from './payment-readiness.js';
+import { paymentConfiguration } from './payment-config.js';
 import { OrderService } from './orders.js';
 import { AdminOrderController, AdminOrderService } from './admin-orders.js';
 import { OrderController } from './order-controller.js';
@@ -121,6 +123,7 @@ export async function createApplication(
       ConsumerController,
       ConsumerCartController,
       OrderController,
+      PaymentReadinessController,
       PaymentPreparationController,
       AdminOrderController,
       ConsumerAddressController,
@@ -159,6 +162,13 @@ export async function createApplication(
           addresses,
           config.addressEncryptionKey,
           config.orderDevHoldSeconds,
+        ),
+      },
+      {
+        provide: PaymentReadinessService,
+        useValue: new PaymentReadinessService(
+          catalog,
+          config.paymentConfiguration ?? paymentConfiguration({}),
         ),
       },
       { provide: PaymentPreparationService, useValue: new PaymentPreparationService(checkout) },
@@ -223,7 +233,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.14.0')
+      .setVersion('0.15.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
