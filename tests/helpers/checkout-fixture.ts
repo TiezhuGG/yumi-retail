@@ -4,7 +4,12 @@ import { hashPassword } from '../../packages/database/dist/index.js';
 import { addressFixture } from './address-fixture.ts';
 import { seedCartCatalog } from './cart-catalog.ts';
 export async function checkoutFixture(
-  options: { orders?: boolean; holdSeconds?: number; notificationLab?: boolean } = {},
+  options: {
+    orders?: boolean;
+    holdSeconds?: number;
+    pickingLab?: boolean;
+    notificationLab?: boolean;
+  } = {},
 ) {
   const fixture = await addressFixture(options);
   try {

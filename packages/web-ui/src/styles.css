@@ -2701,3 +2701,17 @@ small {
 .picking-line h3 {
   overflow-wrap: anywhere;
 }
+.picking-check-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.picking-check-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.picking-check-form input {
+  max-width: 160px;
+}

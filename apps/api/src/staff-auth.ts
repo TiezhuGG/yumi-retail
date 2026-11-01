@@ -9,6 +9,9 @@ export const STAFF_COOKIE = 'yumi_staff_session';
 export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
     'picking.read',
+    'picking-lab.read',
+    'picking-lab.create',
+    'picking-lab.work',
     'payment-readiness.read',
     'order.read',
     'checkout-policy.read',
@@ -51,6 +54,9 @@ export const rolePermissions: Record<string, readonly string[]> = {
   ],
   WAREHOUSE_MANAGER: [
     'picking.read',
+    'picking-lab.read',
+    'picking-lab.create',
+    'picking-lab.work',
     'warehouse.read',
     'catalog.read',
     'stock.read',
@@ -73,7 +79,14 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'reversal.approve',
     'reversal.post',
   ],
-  PICKER: ['picking.read', 'warehouse.read', 'catalog.read', 'stock.read'],
+  PICKER: [
+    'picking-lab.read',
+    'picking-lab.work',
+    'picking.read',
+    'warehouse.read',
+    'catalog.read',
+    'stock.read',
+  ],
   DISPATCHER: ['warehouse.read'],
   RIDER: ['rider.tasks.self'],
   CUSTOMER_SERVICE: [],

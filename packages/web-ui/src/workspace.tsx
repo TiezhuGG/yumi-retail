@@ -1,3 +1,4 @@
+import { PickingLabWorkbench } from './picking-lab.js';
 import { PickingReadinessWorkbench } from './picking-readiness.js';
 import type { PaymentReviewDestination, OpenPaymentReview } from './payment-navigation.js';
 import { PaymentAdapterLabWorkbench } from './payment-adapter-lab.js';
@@ -16,6 +17,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'picking-lab'
   | 'picking-readiness'
   | 'overview'
   | 'products'
@@ -135,6 +137,13 @@ const routes: Array<{
     permission: 'payment-readiness.read',
   },
   {
+    id: 'picking-lab',
+    name: '拣货演练',
+    glyph: '◇',
+    hint: '合成任务领取与逐行核对，独立于真实库存',
+    permission: 'picking-lab.read',
+  },
+  {
     id: 'picking-readiness',
     name: '拣货准备',
     glyph: '▤',
@@ -209,9 +218,10 @@ function WorkspaceSession({
     mobile && profile.roles.includes('PICKER') && !profile.permissions.includes('stock.transfer');
   const mobileViews = new Set<WorkspaceView>(
     pickerOnly
-      ? ['picking-readiness', 'stock', 'locations']
+      ? ['picking-readiness', 'picking-lab', 'stock', 'locations']
       : [
           'picking-readiness',
+          'picking-lab',
           'overview',
           'stock',
           'receipts',
@@ -256,17 +266,18 @@ function WorkspaceSession({
       setView(next);
     }
   };
-  const paymentViews: WorkspaceView[] = [
+  const retainedViews: WorkspaceView[] = [
+    'picking-lab',
     'notification-records',
     'payment-review-lab',
     'payment-attempt-lab',
   ];
   useEffect(() => {
-    if (paymentViews.includes(activeView))
+    if (retainedViews.includes(activeView))
       setRetained((old) => (old.includes(activeView) ? old : [...old, activeView]));
   }, [activeView]);
   const shown = [
-    ...new Set([...retained, ...(paymentViews.includes(activeView) ? [activeView] : [])]),
+    ...new Set([...retained, ...(retainedViews.includes(activeView) ? [activeView] : [])]),
   ].filter((v) => allowed.some((r) => r.id === v));
   const openReview =
     (from: WorkspaceView): OpenPaymentReview =>
@@ -352,7 +363,7 @@ function WorkspaceSession({
               })}
             </span>
           </div>
-          {returned && paymentViews.includes(activeView) && (
+          {returned && retainedViews.includes(activeView) && (
             <div className="notice" role="status">
               已返回原记录，列表与选择已保留；信息可能有更新，可刷新读取。
             </div>
@@ -364,7 +375,9 @@ function WorkspaceSession({
               className="retained-payment-view"
               data-payment-view={v}
             >
-              {v === 'notification-records' ? (
+              {v === 'picking-lab' ? (
+                <PickingLabWorkbench profile={profile} />
+              ) : v === 'notification-records' ? (
                 <NotificationRecordsWorkbench profile={profile} onOpenReview={openReview(v)} />
               ) : v === 'payment-attempt-lab' ? (
                 <PaymentAttemptLabWorkbench profile={profile} onOpenReview={openReview(v)} />
@@ -388,7 +401,7 @@ function WorkspaceSession({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
-          ) : paymentViews.includes(activeView) ? null : activeView === 'payment-adapter-lab' ? (
+          ) : retainedViews.includes(activeView) ? null : activeView === 'payment-adapter-lab' ? (
             <PaymentAdapterLabWorkbench profile={profile} />
           ) : activeView === 'payment-close-lab' ? (
             <PaymentCloseLabWorkbench profile={profile} />

@@ -47,6 +47,7 @@ model ValidationLedger {
 }
 
 model Warehouse {
+  pickingLabTasks PickingLabTask[]
   id          String              @id @db.Uuid
   code        String              @unique
   name        String
@@ -65,6 +66,10 @@ model Warehouse {
 }
 
 model Staff {
+ pickingLabCreated PickingLabTask[] @relation("pickingCreator")
+ pickingLabOwned PickingLabTask[] @relation("pickingOwner")
+ pickingLabEvents PickingLabEvent[] @relation("pickingActor")
+ pickingLabOwnerEvents PickingLabEvent[] @relation("pickingEventOwner")
   id                   String             @id @db.Uuid
   loginName            String             @unique @map("login_name")
   displayName          String             @map("display_name")
@@ -1038,4 +1043,47 @@ model PaymentNotificationLabApplication {
  @@unique([attemptId,warehouseId])
  @@unique([warehouseId,transactionId])
  @@map("payment_notification_lab_applications")
+}
+
+model PickingLabTask {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ creatorId String @map("creator_id") @db.Uuid
+ key String @db.Uuid
+ fixture String @default("FIXED_V1") @db.VarChar(16)
+ state String @default("READY") @db.VarChar(16)
+ ownerId String? @map("owner_id") @db.Uuid
+ checkedLines String[] @default([]) @map("checked_lines")
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ creator Staff @relation("pickingCreator",fields:[creatorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ owner Staff? @relation("pickingOwner",fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events PickingLabEvent[]
+ @@unique([warehouseId,creatorId,key])
+ @@unique([id,warehouseId])
+ @@index([warehouseId,createdAt,id],map:"picking_lab_tasks_warehouse_created_idx")
+ @@map("picking_lab_tasks")
+}
+model PickingLabEvent {
+ id String @id @db.Uuid
+ taskId String @map("task_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ action String @db.VarChar(16)
+ expectedVersion Int? @map("expected_version")
+ version Int
+ lineId String? @map("line_id") @db.VarChar(24)
+ quantity Int?
+ state String @db.VarChar(16)
+ ownerId String? @map("owner_id") @db.Uuid
+ checkedLines String[] @map("checked_lines")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ task PickingLabTask @relation(fields:[taskId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation("pickingActor",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ owner Staff? @relation("pickingEventOwner",fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([taskId,actorId,key])
+ @@unique([taskId,version])
+ @@map("picking_lab_events")
 }

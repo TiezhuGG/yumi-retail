@@ -107,7 +107,9 @@
     "pretest:payment-review-summary": "npm run build:server",
     "test:payment-review-summary": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-review-summary.integration.test.ts",
     "pretest:picking-readiness": "npm run build:server",
-    "test:picking-readiness": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-readiness.integration.test.ts"
+    "test:picking-readiness": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-readiness.integration.test.ts",
+    "pretest:picking-lab": "npm run build:server",
+    "test:picking-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-lab.integration.test.ts tests/picking-lab-config.test.ts"
   },
   "pnpm": {
     "overrides": {

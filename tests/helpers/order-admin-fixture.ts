@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { hashPassword } from '../../packages/database/dist/index.js';
 import { checkoutFixture } from './checkout-fixture.ts';
 export async function orderAdminFixture(
-  options: { holdSeconds?: number; notificationLab?: boolean } = {},
+  options: { holdSeconds?: number; pickingLab?: boolean; notificationLab?: boolean } = {},
 ) {
   const f = await checkoutFixture({ orders: true, ...options });
   try {

@@ -627,3 +627,14 @@ GET `/api/v1/warehouse/picking-readiness/:id?warehouseId=UUID`，返回上述摘
 阻挡码：READ_ONLY_PHASE（始终包含）、ORDER_CANCELED或ORDER_NOT_ACTIVE、PAYMENT_UNCONFIRMED、FULFILLMENT_NOT_READY、RESERVATION_RELEASED、RESERVATION_MISMATCH、LOCATION_DISABLED、LOT_EXPIRED、STOCK_FROZEN。已释放分配不再展示针对当前库位的可作业判断。所有核验仅诊断，未开放真正资格通过/领取动作。
 
 权限picking.read只授予SUPER_ADMIN/WAREHOUSE_MANAGER/PICKER，不授予运营或骑手；不向拣货员开放order.read。匿名401、角色/仓库归属/启用失败403，严格参数400，未找到本仓订单/无效游标404。列表/详情均RepeatableRead，仓库校验沿用已有锁；不写审计/订单/库存，无POST领取、实拣或出库。OpenAPI0.27.0，旧接口兼容。
+
+
+## 2026-11-01 拣货领取与逐行核对隔离演练
+
+OpenAPI0.28.0新增`/api/v1/warehouse/picking-lab`（所有端点须warehouseId）：GET列表（cursor可选，20条）、GET `/:id`、POST创建、POST `/:id/claim`、POST `/:id/check`。创建体仅{key:UUID}；领取{key,version:0..3}；核对{key,version,lineId,quantity:0..200整数}，lineId仅PAPER_SINGLE/PAPER_TRIPLE，数量必须分别2/1。严格拒绝额外字段、真实订单/SKU或通用状态输入。
+
+读权限picking-lab.read、作业picking-lab.work授予SUPER_ADMIN/WAREHOUSE_MANAGER/PICKER；创建picking-lab.create仅前两者。所有写入Origin/CSRF检查；当前仓库范围和启用重新校验。核对只能任务owner本人，读本仓任务不等于能改他人任务。匿名401、权限/非本人/仓库范围403、参数400、本仓任务/游标404、版本/数量/竞争/幂等内容冲突409、默认关闭503。生产配置拒启，关闭后已有合成历史仍可只读。
+
+读返回enabled及task或分页items；任务投影含合成标识/短标签、state/version、ownerId/name、固定两行需求/checked、最多4条操作历史。写返回{task,duplicate}；同键精确恢复返回当前完整投影，不重复事件/审计。投影不含请求键、expectedVersion、真实订单/SKU、凭据或顾客资料。创建键按仓库+创建者隔离，动作键按任务+操作者隔离并绑定全部输入；原键先于版本/终态判定恢复，禁止抢占。
+
+同任务写入锁定任务行；创建唯一键竞争只建一次；读取使用RepeatableRead，创建重复响应加共享锁保持事件快照一致。任务、事件、业务审计原子提交，失败均回滚。前端5xx/网络未知结果保留原操作；重试不是新意图，刷新不会确认写入结果。无正式订单领取、部分实拣、异常处置、出库或配送端点。

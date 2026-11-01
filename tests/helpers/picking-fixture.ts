@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { orderAdminFixture } from './order-admin-fixture.ts';
-export async function pickingFixture() {
-  const f = await orderAdminFixture({ notificationLab: true });
+export async function pickingFixture(options: { pickingLab?: boolean } = {}) {
+  const f = await orderAdminFixture({ notificationLab: true, ...options });
   try {
     const pickerId = randomUUID(),
       source = await f.runtime.db.staff.findUniqueOrThrow({ where: { id: f.staffIds[0] } });

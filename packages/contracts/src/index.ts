@@ -703,3 +703,41 @@ export interface PickingReadinessDetail extends PickingReadinessSummary {
     }>;
   }>;
 }
+
+export interface PickingLabTask {
+  id: string;
+  label: string;
+  state: 'READY' | 'PICKING' | 'CHECKED';
+  version: number;
+  ownerId: string | null;
+  ownerName: string | null;
+  createdAt: string;
+  syntheticOnly: true;
+  lines: Array<{
+    id: string;
+    name: string;
+    spec: string;
+    unit: string;
+    batchNo: string;
+    location: string;
+    required: number;
+    checked: boolean;
+  }>;
+  events: Array<{
+    action: string;
+    actorName: string;
+    lineId: string | null;
+    quantity: number | null;
+    createdAt: string;
+  }>;
+}
+export interface PickingLabList {
+  enabled: boolean;
+  syntheticOnly: true;
+  items: PickingLabTask[];
+  nextCursor: string | null;
+}
+export interface PickingLabWrite {
+  task: PickingLabTask;
+  duplicate: boolean;
+}
