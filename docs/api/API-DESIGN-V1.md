@@ -561,3 +561,13 @@ GET /:id?warehouseId=UUID&notesCursor=UUID：返回锁定读取的当前item、�
 POST /:id/notes?warehouseId=UUID仅{key:UUID,note:string,attemptVersion:integer,jobVersion:integer|null}。CR/CRLF规范为LF、去首尾空白，拒绝空/过长和非Tab/LF的C0及DEL控制字符。服务按仓库→尝试→任务锁顺序校验快照和待核查范围，再原子追加备注与PAYMENT_REVIEW_LAB_NOTE审计。原键先匹配既有备注，再校验新快照，已保存原操作可恢复；同键换内容/版本409 IDEMPOTENCY_CONFLICT，旧快照409 REVIEW_SNAPSHOT_STALE，当前无需核查409 REVIEW_NOT_NEEDED。
 
 沿用员工Cookie、payment-readiness.read（默认SUPER_ADMIN）、启用仓库授权，POST另需Origin/CSRF和PAYMENT_NOTIFICATION_LAB_ENABLED；默认503，生产及非本机隔离拒启。非法输入400、未登录401、无权403、不存在记录/游标404。没有更新/删除备注、标记已支付、退款或解决异常的接口。
+
+## 2026-11-01 渠道契约验证（OpenAPI 0.22.0）
+
+- GET `/api/v1/admin/payment-adapter-lab?warehouseId=<uuid>`：返回enabled、syntheticOnly=true、callbackEnabled=false及17个code/title。
+- POST `/api/v1/admin/payment-adapter-lab/run?warehouseId=<uuid>`，严格空JSON `{}`：返回completedAt及results；每行code/title/status(PASSED或FAILED)、classification、evidence(UNKNOWN/SUCCEEDED/CLOSED)、next(RETRY/REVIEW/RECONCILE)、releaseAllowed=false。结果由共享核心实际执行，未保存运行历史。
+- 需要员工Cookie、payment-readiness.read和有效仓库授权；POST还校验Origin与CSRF。401未登录，403权限/仓库/CSRF，400未知字段或非法UUID，503 PAYMENT_ADAPTER_LAB_DISABLED。沿用PAYMENT_NOTIFICATION_LAB_ENABLED本机隔离开关，默认关；既有配置拒绝生产、远端数据库启用。
+
+内部PaymentQueryAdapter.query(binding,signal)返回unknown，executePaymentQuery只调用一次，等待默认3000ms，允许1至10000整数毫秒；超时发出abort并丢弃迟到结果，不在内部重试。异常不返回原文。调用方必须保存原查询绑定并负责后续退避、持久化与核查；这些尚未接入。未来HTTP实现需先验证响应原始字节，再提供authenticated=true，外部API不能传入此标志。本轮无真实HTTP请求或渠道回调入口。
+
+查询协议错误码参照[微信支付小程序查单官方文档](https://pay.wechatpay.cn/doc/v3/merchant/4012791900)：RULE_LIMIT对应业务频率限制，ORDER_NOT_EXIST应核查订单创建，SYSTEM_ERROR应以原参数重试。本项目将不存在/绑定异常保留UNKNOWN并转核查，为保护性策略；真实接入仍需独立验签及渠道验收。

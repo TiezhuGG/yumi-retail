@@ -2431,3 +2431,11 @@ small {
   width: 100%;
   min-width: 0;
 }
+
+.readiness-check.adapter-check > div {
+  display: block;
+}
+.readiness-check.adapter-check p {
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}

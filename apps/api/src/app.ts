@@ -1,3 +1,4 @@
+import { PaymentAdapterLabController, PaymentAdapterLabService } from './payment-adapter-lab.js';
 import 'reflect-metadata';
 import { PaymentReviewLabController, PaymentReviewLabService } from './payment-review-lab.js';
 import { PaymentAttemptLabController, PaymentAttemptLabService } from './payment-attempt-lab.js';
@@ -133,6 +134,7 @@ export async function createApplication(
       OrderController,
       PaymentReadinessController,
       NotificationLabController,
+      PaymentAdapterLabController,
       PaymentCloseLabController,
       PaymentAttemptLabController,
       PaymentReviewLabController,
@@ -191,6 +193,10 @@ export async function createApplication(
       {
         provide: NotificationRecordsService,
         useValue: new NotificationRecordsService(catalog, config.notificationLabEnabled),
+      },
+      {
+        provide: PaymentAdapterLabService,
+        useValue: new PaymentAdapterLabService(catalog, config.notificationLabEnabled),
       },
       {
         provide: PaymentCloseLabService,
@@ -266,7 +272,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.21.0')
+      .setVersion('0.22.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

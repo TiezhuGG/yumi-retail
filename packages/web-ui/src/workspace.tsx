@@ -1,3 +1,4 @@
+import { PaymentAdapterLabWorkbench } from './payment-adapter-lab.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
@@ -28,6 +29,7 @@ export type WorkspaceView =
   | 'payment-readiness'
   | 'notification-lab'
   | 'notification-records'
+  | 'payment-adapter-lab'
   | 'payment-close-lab'
   | 'payment-attempt-lab'
   | 'payment-review-lab';
@@ -100,6 +102,13 @@ const routes: Array<{
     hint: '合成通知持久化与重复接收验证',
     permission: 'payment-readiness.read',
     glyph: '◇',
+  },
+  {
+    id: 'payment-adapter-lab',
+    name: '渠道契约验证',
+    glyph: '◇',
+    hint: '合成查询响应分类，不连接真实渠道',
+    permission: 'payment-readiness.read',
   },
   {
     id: 'payment-close-lab',
@@ -271,6 +280,8 @@ export function Workspace({
             <PaymentReviewLabWorkbench profile={profile} />
           ) : activeView === 'payment-attempt-lab' ? (
             <PaymentAttemptLabWorkbench profile={profile} />
+          ) : activeView === 'payment-adapter-lab' ? (
+            <PaymentAdapterLabWorkbench profile={profile} />
           ) : activeView === 'payment-close-lab' ? (
             <PaymentCloseLabWorkbench profile={profile} />
           ) : activeView === 'notification-lab' ? (
@@ -300,6 +311,7 @@ export function Workspace({
                     | 'payment-readiness'
                     | 'notification-lab'
                     | 'notification-records'
+                    | 'payment-adapter-lab'
                     | 'payment-close-lab'
                     | 'payment-attempt-lab'
                     | 'payment-review-lab'
@@ -310,6 +322,7 @@ export function Workspace({
                     id !== 'payment-readiness' &&
                     id !== 'notification-lab' &&
                     id !== 'notification-records' &&
+                    id !== 'payment-adapter-lab' &&
                     id !== 'payment-close-lab' &&
                     id !== 'payment-attempt-lab' &&
                     id !== 'payment-review-lab',

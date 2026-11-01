@@ -615,3 +615,12 @@ export interface PaymentReviewDetail {
   notes: PaymentReviewNote[];
   nextNotesCursor: string | null;
 }
+
+export type PaymentAdapterLabResult = Omit<NotificationLabResult, 'results'> & {
+  results: (NotificationLabResult['results'][number] & {
+    classification: string;
+    evidence: 'UNKNOWN' | 'SUCCEEDED' | 'CLOSED';
+    next: 'RETRY' | 'REVIEW' | 'RECONCILE';
+    releaseAllowed: false;
+  })[];
+};
