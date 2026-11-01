@@ -526,7 +526,8 @@ export interface NotificationRecord {
   successTime: string;
   createdAt: string;
   syntheticOnly: true;
-  state: 'RECORDED_ONLY';
+  state: 'RECORDED_ONLY' | 'LINKED_SYNTHETIC';
+  application: { attemptId: string; eventId: string } | null;
 }
 export interface NotificationRecords {
   enabled: boolean;
@@ -535,7 +536,12 @@ export interface NotificationRecords {
   items: NotificationRecord[];
   nextCursor: string | null;
 }
+export interface NotificationAttemptOptions {
+  items: { id: string; label: string; amountCents: number }[];
+  nextCursor: string | null;
+}
 export interface NotificationRecorded {
+  applied: boolean;
   record: NotificationRecord;
   duplicate: boolean;
 }
@@ -550,6 +556,13 @@ export interface PaymentAttemptLabSummary {
   releaseAllowed: false;
 }
 export interface PaymentAttemptLabDetail extends PaymentAttemptLabSummary {
+  notificationBinding: {
+    outTradeNo: string;
+    amountCents: number;
+    currency: string;
+    createdAt: string;
+  } | null;
+  notifications: { id: string; notificationId: string; createdAt: string }[];
   queryJob: {
     state: string;
     attempts: number;

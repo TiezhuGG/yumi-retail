@@ -899,6 +899,8 @@ model PaymentPreparationEvent {
 }
 
 model NotificationLabRecord {
+ applicationId String? @map("application_id") @db.Uuid
+ application PaymentNotificationLabApplication? @relation(fields:[applicationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  id String @id @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
  notificationId String @map("notification_id") @db.VarChar(128)
@@ -926,6 +928,7 @@ model PaymentAttemptLab {
  events PaymentAttemptLabEvent[]
  queryJob PaymentQueryLabJob?
  reviewNotes PaymentReviewLabNote[]
+ notificationBinding PaymentNotificationLabBinding?
  @@unique([id,warehouseId])
  @@unique([warehouseId,key])
  @@index([warehouseId,createdAt,id],map:"payment_attempt_labs_warehouse_created_idx")
@@ -942,6 +945,7 @@ model PaymentAttemptLabEvent {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  attempt PaymentAttemptLab @relation(fields:[attemptId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  queryEvents PaymentQueryLabEvent[]
+ notificationApplication PaymentNotificationLabApplication?
  @@unique([attemptId,key])
  @@unique([attemptId,version])
  @@map("payment_attempt_lab_events")
@@ -1003,4 +1007,35 @@ model PaymentReviewLabNote {
  @@unique([attemptId,actorId,key])
  @@index([attemptId,createdAt,id],map:"payment_review_lab_notes_history_idx")
  @@map("payment_review_lab_notes")
+}
+
+model PaymentNotificationLabBinding {
+ attemptId String @id @map("attempt_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ appId String @map("app_id") @db.VarChar(32)
+ merchantId String @map("merchant_id") @db.VarChar(32)
+ outTradeNo String @map("out_trade_no") @db.VarChar(32)
+ amountCents BigInt @map("amount_cents")
+ currency String @db.VarChar(3)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ attempt PaymentAttemptLab @relation(fields:[attemptId,warehouseId],references:[id,warehouseId],onDelete:Restrict,onUpdate:NoAction)
+ application PaymentNotificationLabApplication?
+ @@unique([attemptId,warehouseId])
+ @@unique([warehouseId,outTradeNo])
+ @@map("payment_notification_lab_bindings")
+}
+model PaymentNotificationLabApplication {
+ id String @id @db.Uuid
+ attemptId String @unique @map("attempt_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ transactionId String @map("transaction_id") @db.VarChar(64)
+ successTime String @map("success_time") @db.VarChar(40)
+ attemptEventId String @unique @map("attempt_event_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ binding PaymentNotificationLabBinding @relation(fields:[attemptId,warehouseId],references:[attemptId,warehouseId],onDelete:Restrict,onUpdate:NoAction)
+ event PaymentAttemptLabEvent @relation(fields:[attemptEventId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ records NotificationLabRecord[]
+ @@unique([attemptId,warehouseId])
+ @@unique([warehouseId,transactionId])
+ @@map("payment_notification_lab_applications")
 }

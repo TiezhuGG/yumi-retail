@@ -55,6 +55,27 @@ export class PaymentAttemptLabService {
   private async view(tx: Tx, row: Row) {
     return {
       ...summary(row),
+      notificationBinding: await tx.paymentNotificationLabBinding
+        .findUnique({
+          where: { attemptId: row.id },
+          select: { outTradeNo: true, amountCents: true, currency: true, createdAt: true },
+        })
+        .then((b) =>
+          b
+            ? { ...b, amountCents: Number(b.amountCents), createdAt: b.createdAt.toISOString() }
+            : null,
+        ),
+      notifications: (
+        await tx.notificationLabRecord.findMany({
+          where: { application: { is: { attemptId: row.id } } },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 20,
+        })
+      ).map((n) => ({
+        id: n.id,
+        notificationId: n.notificationId,
+        createdAt: n.createdAt.toISOString(),
+      })),
       queryJob: await this.queryView(tx, row.id),
       events: (
         await tx.paymentAttemptLabEvent.findMany({
@@ -182,6 +203,18 @@ export class PaymentAttemptLabService {
       const row = await tx.paymentAttemptLab.create({
         data: { id: randomUUID(), warehouseId: w, key },
       });
+      await tx.paymentNotificationLabBinding.create({
+        data: {
+          attemptId: row.id,
+          warehouseId: w,
+          appId: 'wx1111111111111111',
+          merchantId: '1900000109',
+          outTradeNo:
+            'SYNTHETIC_' + Buffer.from(row.id.replaceAll('-', ''), 'hex').toString('base64url'),
+          amountCents: 2499n,
+          currency: 'CNY',
+        },
+      });
       await tx.paymentAttemptLabEvent.create({
         data: {
           id: randomUUID(),
@@ -267,6 +300,20 @@ const querySchema = object({
 });
 const detail = object({
   ...props,
+  notificationBinding: {
+    ...object({
+      outTradeNo: text,
+      amountCents: { type: 'integer' },
+      currency: text,
+      createdAt: text,
+    }),
+    nullable: true,
+  },
+  notifications: {
+    type: 'array',
+    maxItems: 20,
+    items: object({ id: text, notificationId: text, createdAt: text }),
+  },
   queryJob: { ...querySchema, nullable: true },
   events: {
     type: 'array',

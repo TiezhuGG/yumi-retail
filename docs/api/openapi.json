@@ -6272,6 +6272,8 @@
                             "syntheticOnly",
                             "plan",
                             "releaseAllowed",
+                            "notificationBinding",
+                            "notifications",
                             "queryJob",
                             "events"
                           ],
@@ -6309,6 +6311,55 @@
                               "enum": [
                                 false
                               ]
+                            },
+                            "notificationBinding": {
+                              "type": "object",
+                              "required": [
+                                "outTradeNo",
+                                "amountCents",
+                                "currency",
+                                "createdAt"
+                              ],
+                              "properties": {
+                                "outTradeNo": {
+                                  "type": "string"
+                                },
+                                "amountCents": {
+                                  "type": "integer"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
+                            },
+                            "notifications": {
+                              "type": "array",
+                              "maxItems": 20,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "notificationId",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "notificationId": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "queryJob": {
                               "type": "object",
@@ -6682,6 +6733,8 @@
                         "syntheticOnly",
                         "plan",
                         "releaseAllowed",
+                        "notificationBinding",
+                        "notifications",
                         "queryJob",
                         "events"
                       ],
@@ -6719,6 +6772,55 @@
                           "enum": [
                             false
                           ]
+                        },
+                        "notificationBinding": {
+                          "type": "object",
+                          "required": [
+                            "outTradeNo",
+                            "amountCents",
+                            "currency",
+                            "createdAt"
+                          ],
+                          "properties": {
+                            "outTradeNo": {
+                              "type": "string"
+                            },
+                            "amountCents": {
+                              "type": "integer"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "notifications": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "notificationId",
+                              "createdAt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "notificationId": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "queryJob": {
                           "type": "object",
@@ -7408,6 +7510,8 @@
                         "syntheticOnly",
                         "plan",
                         "releaseAllowed",
+                        "notificationBinding",
+                        "notifications",
                         "queryJob",
                         "events"
                       ],
@@ -7445,6 +7549,55 @@
                           "enum": [
                             false
                           ]
+                        },
+                        "notificationBinding": {
+                          "type": "object",
+                          "required": [
+                            "outTradeNo",
+                            "amountCents",
+                            "currency",
+                            "createdAt"
+                          ],
+                          "properties": {
+                            "outTradeNo": {
+                              "type": "string"
+                            },
+                            "amountCents": {
+                              "type": "integer"
+                            },
+                            "currency": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "notifications": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "notificationId",
+                              "createdAt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "notificationId": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "queryJob": {
                           "type": "object",
@@ -7934,6 +8087,8 @@
                             "syntheticOnly",
                             "plan",
                             "releaseAllowed",
+                            "notificationBinding",
+                            "notifications",
                             "queryJob",
                             "events"
                           ],
@@ -7971,6 +8126,55 @@
                               "enum": [
                                 false
                               ]
+                            },
+                            "notificationBinding": {
+                              "type": "object",
+                              "required": [
+                                "outTradeNo",
+                                "amountCents",
+                                "currency",
+                                "createdAt"
+                              ],
+                              "properties": {
+                                "outTradeNo": {
+                                  "type": "string"
+                                },
+                                "amountCents": {
+                                  "type": "integer"
+                                },
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
+                            },
+                            "notifications": {
+                              "type": "array",
+                              "maxItems": 20,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "notificationId",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "notificationId": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
                             },
                             "queryJob": {
                               "type": "object",
@@ -9550,7 +9754,8 @@
                               "successTime",
                               "createdAt",
                               "syntheticOnly",
-                              "state"
+                              "state",
+                              "application"
                             ],
                             "properties": {
                               "id": {
@@ -9586,8 +9791,26 @@
                               "state": {
                                 "type": "string",
                                 "enum": [
-                                  "RECORDED_ONLY"
+                                  "RECORDED_ONLY",
+                                  "LINKED_SYNTHETIC"
                                 ]
+                              },
+                              "application": {
+                                "type": "object",
+                                "required": [
+                                  "attemptId",
+                                  "eventId"
+                                ],
+                                "properties": {
+                                  "attemptId": {
+                                    "type": "string"
+                                  },
+                                  "eventId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "nullable": true
                               }
                             },
                             "additionalProperties": false
@@ -9838,6 +10061,10 @@
                   "key": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "attemptId": {
+                    "type": "string",
+                    "format": "uuid"
                   }
                 },
                 "additionalProperties": false
@@ -9861,7 +10088,8 @@
                       "type": "object",
                       "required": [
                         "record",
-                        "duplicate"
+                        "duplicate",
+                        "applied"
                       ],
                       "properties": {
                         "record": {
@@ -9876,7 +10104,8 @@
                             "successTime",
                             "createdAt",
                             "syntheticOnly",
-                            "state"
+                            "state",
+                            "application"
                           ],
                           "properties": {
                             "id": {
@@ -9912,13 +10141,34 @@
                             "state": {
                               "type": "string",
                               "enum": [
-                                "RECORDED_ONLY"
+                                "RECORDED_ONLY",
+                                "LINKED_SYNTHETIC"
                               ]
+                            },
+                            "application": {
+                              "type": "object",
+                              "required": [
+                                "attemptId",
+                                "eventId"
+                              ],
+                              "properties": {
+                                "attemptId": {
+                                  "type": "string"
+                                },
+                                "eventId": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
                             }
                           },
                           "additionalProperties": false
                         },
                         "duplicate": {
+                          "type": "boolean"
+                        },
+                        "applied": {
                           "type": "boolean"
                         }
                       },
@@ -10009,6 +10259,43 @@
             }
           },
           "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
             "description": "错误码和可读信息；requestId关联日志",
             "content": {
               "application/json": {
@@ -10167,6 +10454,282 @@
         ]
       }
     },
+    "/api/v1/admin/payment-notification-records/attempts": {
+      "get": {
+        "operationId": "NotificationRecordsController_options",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "amountCents"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "amountCents": {
+                                "type": "integer"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "nextCursor": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成通知持久化记录"
+        ]
+      }
+    },
     "/api/v1/admin/payment-notification-records/{id}": {
       "get": {
         "operationId": "NotificationRecordsController_detail",
@@ -10212,7 +10775,8 @@
                         "successTime",
                         "createdAt",
                         "syntheticOnly",
-                        "state"
+                        "state",
+                        "application"
                       ],
                       "properties": {
                         "id": {
@@ -10248,8 +10812,26 @@
                         "state": {
                           "type": "string",
                           "enum": [
-                            "RECORDED_ONLY"
+                            "RECORDED_ONLY",
+                            "LINKED_SYNTHETIC"
                           ]
+                        },
+                        "application": {
+                          "type": "object",
+                          "required": [
+                            "attemptId",
+                            "eventId"
+                          ],
+                          "properties": {
+                            "attemptId": {
+                              "type": "string"
+                            },
+                            "eventId": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "nullable": true
                         }
                       },
                       "additionalProperties": false
@@ -10518,7 +11100,8 @@
                       "type": "object",
                       "required": [
                         "record",
-                        "duplicate"
+                        "duplicate",
+                        "applied"
                       ],
                       "properties": {
                         "record": {
@@ -10533,7 +11116,8 @@
                             "successTime",
                             "createdAt",
                             "syntheticOnly",
-                            "state"
+                            "state",
+                            "application"
                           ],
                           "properties": {
                             "id": {
@@ -10569,13 +11153,34 @@
                             "state": {
                               "type": "string",
                               "enum": [
-                                "RECORDED_ONLY"
+                                "RECORDED_ONLY",
+                                "LINKED_SYNTHETIC"
                               ]
+                            },
+                            "application": {
+                              "type": "object",
+                              "required": [
+                                "attemptId",
+                                "eventId"
+                              ],
+                              "properties": {
+                                "attemptId": {
+                                  "type": "string"
+                                },
+                                "eventId": {
+                                  "type": "string"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
                             }
                           },
                           "additionalProperties": false
                         },
                         "duplicate": {
+                          "type": "boolean"
+                        },
+                        "applied": {
                           "type": "boolean"
                         }
                       },
@@ -46937,7 +47542,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.23.0",
+    "version": "0.24.0",
     "contact": {}
   },
   "tags": [],

@@ -2467,3 +2467,7 @@ small {
   color: inherit;
   font: inherit;
 }
+
+.binding-number {
+  overflow-wrap: anywhere;
+}

@@ -580,3 +580,13 @@ POST /:id/notes?warehouseId=UUID仅{key:UUID,note:string,attemptVersion:integer,
 - `/admin/payment-review-lab?warehouseId=…&filter=REVIEW`筛选分类待核查任务。备注的taskState快照兼容REVIEW；其他权限、游标及版本校验不变。
 
 手动“运行一轮”是一次执行触发，不是原键重放命令；响应不明时应刷新详情确认，界面不自动重试。领取仍排除未到期及REVIEW任务，租约令牌只允许一次有效完成。原键重新安排仅适用于UNKNOWN+EXHAUSTED，不能恢复REVIEW。真实支付接口未增加。
+
+## 2026-11-01 通知关联（OpenAPI 0.24.0）
+
+- GET `/api/v1/admin/payment-notification-records/attempts?warehouseId=…&cursor=…`：授权仓库的可关联新尝试，20条，items含id/label/amountCents及nextCursor；固定路由优先于记录`:id`。旧无绑定尝试不列出。
+- POST `/api/v1/admin/payment-notification-records?warehouseId=…`兼容原`{key}`独立记录，增量允许`{key,attemptId}`。仅服务器生成合成签名密文和固定交易事实，不接受rawBody、密钥或任意交易状态。关联不存在404、验签/绑定拒绝400、同通知事实/交易绑定冲突409、默认关闭503。既有员工Cookie/支付检查权限/仓库范围/Origin/CSRF保持。
+- 返回record增量application(nullable，含attemptId/eventId)，state为RECORDED_ONLY或LINKED_SYNTHETIC。写入结果新增applied：仅首次追加尝试证据为true；duplicate仍表示通知记录本身是否已存在。新通知标识+同交易返回duplicate=false、applied=false。
+- 已关联记录重放沿用原尝试绑定及固定交易号，重新签名加密但返回原事实记录。无关联记录保持旧独立行为。
+- 尝试详情新增notificationBinding(nullable，含测试商户单号、金额/币种及创建时间)和最近20条notifications(id/notificationId/createdAt)。关联不代表真实支付，releaseAllowed仍false。
+
+手动创建失败保留按尝试分开的原操作键，切换目标不复用另一目标的键；响应不明先原键重试或刷新。原始报文、付款人字段和密钥既不落库也不回传。尚无公开回调或真实商户HTTP请求。

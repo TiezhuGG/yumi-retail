@@ -487,6 +487,7 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                                     EVENT_LIMIT: '证据记录已达上限，停止查询',
                                     MANUAL_RETRY: '负责人重新安排查询',
                                     LEASE_EXHAUSTED: '租约多次中断，等待核查',
+                                    NOTIFICATION_EVIDENCE: '收到合成通知证据，已停止或转核查',
                                     REVIEW_REQUIRED: '已停止查询，转人工核查',
                                     CLASSIFIED_KNOWN: '已记录合成已知证据，等待事务核对',
                                   } as Record<string, string>
@@ -519,6 +520,42 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                       ))}
                     </div>
                   </>
+                )}
+              </section>
+              <section className="readiness-help notification-binding-panel">
+                <h3>合成通知关联</h3>
+                {selected.notificationBinding ? (
+                  <>
+                    <p>
+                      固定测试金额 ¥{(selected.notificationBinding.amountCents / 100).toFixed(2)}{' '}
+                      {selected.notificationBinding.currency}，仅供通知核验，不是订单应付。
+                    </p>
+                    <p className="binding-number">
+                      测试商户单号：{selected.notificationBinding.outTradeNo}
+                    </p>
+                    <p>
+                      在“通知记录”选择本次合成尝试生成通知。下方显示最近20条关联通知；多条通知可共用同一条成功证据，冲突不会覆盖。
+                    </p>
+                    {selected.notifications.length ? (
+                      <div className="readiness-checks">
+                        {selected.notifications.map((n) => (
+                          <article className="readiness-check" key={n.id}>
+                            <h3>已关联通知 · {n.notificationId.slice(-8)}</h3>
+                            <p>
+                              {new Date(n.createdAt).toLocaleString('zh-CN', {
+                                timeZone: 'Asia/Shanghai',
+                                hour12: false,
+                              })}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>暂无关联通知</p>
+                    )}
+                  </>
+                ) : (
+                  <p>旧合成尝试没有通知绑定，请新建合成尝试后验证；历史不自动补造绑定。</p>
                 )}
               </section>
               <h3>不可变事件历史</h3>

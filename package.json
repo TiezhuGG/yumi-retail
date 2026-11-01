@@ -99,7 +99,9 @@
     "pretest:payment-adapter-lab": "npm run build:server",
     "test:payment-adapter-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-adapter-lab.integration.test.ts",
     "pretest:payment-query-classification": "npm run build:server",
-    "test:payment-query-classification": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-query-classification.integration.test.ts"
+    "test:payment-query-classification": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-query-classification.integration.test.ts",
+    "pretest:payment-notification-links": "npm run build:server",
+    "test:payment-notification-links": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-notification-links.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

@@ -269,3 +269,23 @@ export async function retryPaymentQueryLab(
   );
   return true;
 }
+
+/** Caller already holds the attempt lock; preserve an existing manual-review requirement. */
+export async function settleQueryLabFromNotification(
+  tx: Tx,
+  attempt: { id: string; evidence: string },
+  eventId: string,
+) {
+  await tx.$queryRaw`SELECT id FROM payment_query_lab_jobs WHERE attempt_id=${attempt.id}::uuid FOR UPDATE`;
+  const job = await tx.paymentQueryLabJob.findUnique({ where: { attemptId: attempt.id } });
+  if (!job) return;
+  const state = attempt.evidence === 'CONFLICT' || job.state === 'REVIEW' ? 'REVIEW' : 'DONE';
+  await change(
+    tx,
+    job,
+    { state, leaseToken: null, leaseUntil: null },
+    'NOTIFICATION_EVIDENCE',
+    randomUUID(),
+    eventId,
+  );
+}

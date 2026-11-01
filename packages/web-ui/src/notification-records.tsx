@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type {
   NotificationRecords,
+  NotificationAttemptOptions,
   NotificationRecord,
   NotificationRecorded,
   StaffProfile,
@@ -80,10 +81,12 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     [selected, setSelected] = useState<NotificationRecord | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [attemptId, setAttemptId] = useState(''),
+    [options, setOptions] = useState<NotificationAttemptOptions>({ items: [], nextCursor: null });
   const seq = useRef(0),
     active = useRef(false),
-    pendingKey = useRef<string | null>(null);
+    pendingKeys = useRef<Record<string, string>>({});
   const base = '/admin/payment-notification-records',
     query = '?warehouseId=' + warehouseId;
   async function load(cursor?: string) {
@@ -93,11 +96,32 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     setError('');
     const n = ++seq.current;
     try {
-      const r = await staffRequest<NotificationRecords>(
-        base + query + (cursor ? '&cursor=' + cursor : ''),
-      );
+      const [r, bindings] = await Promise.all([
+        staffRequest<NotificationRecords>(base + query + (cursor ? '&cursor=' + cursor : '')),
+        staffRequest<NotificationAttemptOptions>(base + '/attempts' + query),
+      ]);
+      if (n === seq.current)
+        setOptions((old) => ({
+          ...bindings,
+          items: [
+            ...bindings.items,
+            ...old.items.filter(
+              (x) => x.id === attemptId && !bindings.items.some((b) => b.id === x.id),
+            ),
+          ],
+        }));
       if (n === seq.current) {
-        setData((old) => (cursor && old ? { ...r, items: [...old.items, ...r.items] } : r));
+        setData((old) =>
+          cursor && old
+            ? {
+                ...r,
+                items: [
+                  ...old.items,
+                  ...r.items.filter((x) => !old.items.some((b) => b.id === x.id)),
+                ],
+              }
+            : r,
+        );
       }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '记录读取失败');
@@ -115,6 +139,30 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
       active.current = false;
     };
   }, [warehouseId]);
+  async function moreOptions() {
+    if (active.current || !options.nextCursor) return;
+    active.current = true;
+    setBusy(true);
+    setError('');
+    const n = ++seq.current;
+    try {
+      const r = await staffRequest<NotificationAttemptOptions>(
+        base + '/attempts' + query + '&cursor=' + options.nextCursor,
+      );
+      if (n === seq.current)
+        setOptions((old) => ({
+          ...r,
+          items: [...old.items, ...r.items.filter((x) => !old.items.some((b) => b.id === x.id))],
+        }));
+    } catch (e) {
+      if (n === seq.current) setError(e instanceof Error ? e.message : '绑定读取失败');
+    } finally {
+      if (n === seq.current) {
+        active.current = false;
+        setBusy(false);
+      }
+    }
+  }
   async function write(replay?: NotificationRecord) {
     if (active.current || !data?.enabled) return;
     active.current = true;
@@ -122,23 +170,30 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
     setError('');
     setMessage('');
     const n = ++seq.current;
-    if (!replay) pendingKey.current ??= crypto.randomUUID();
+    const target = attemptId || 'standalone';
+    if (!replay) pendingKeys.current[target] ??= crypto.randomUUID();
     try {
       const result = await staffRequest<NotificationRecorded>(
         base + (replay ? '/' + replay.id + '/replay' : '') + query,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
-          body: JSON.stringify(replay ? {} : { key: pendingKey.current }),
+          body: JSON.stringify(
+            replay ? {} : { key: pendingKeys.current[target], ...(attemptId ? { attemptId } : {}) },
+          ),
         },
       );
       if (n !== seq.current) return;
-      if (!replay) pendingKey.current = null;
+      if (!replay) delete pendingKeys.current[target];
       setSelected(result.record);
       setMessage(
         result.duplicate
           ? '重复通知已识别，返回原记录，未新增记录或业务操作。'
-          : '合成通知已验签并保存，仅记录事实，未处理支付。',
+          : result.record.application
+            ? result.applied
+              ? '合成通知已关联尝试并追加证据；未入账或处理真实支付。'
+              : '通知已保存，交易证据已存在，未重复追加。'
+            : '合成通知已验签并保存，仅记录事实，未处理支付。',
       );
       const fresh = await staffRequest<NotificationRecords>(base + query);
       if (n === seq.current) setData(fresh);
@@ -186,12 +241,40 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
             <span className="badge amber">合成材料 · 非真实支付</span>
             <h2>{data.enabled ? '可接收本机合成通知' : '本机合成接收尚未开启'}</h2>
             <p>原始报文、付款人信息和密钥不落库。合成记录独立保存，真实回调入口保持关闭。</p>
+            <label className="query-scenario">
+              关联合成尝试
+              <select
+                aria-label="关联合成尝试"
+                value={attemptId}
+                disabled={busy || !data.enabled}
+                onChange={(e) => setAttemptId(e.target.value)}
+              >
+                <option value="">独立保存，不关联尝试</option>
+                {options.items.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.label} · ¥{(b.amountCents / 100).toFixed(2)}（固定测试金额）
+                  </option>
+                ))}
+              </select>
+            </label>
+            {options.nextCursor && (
+              <button className="text-button" disabled={busy} onClick={() => void moreOptions()}>
+                更多可关联尝试
+              </button>
+            )}
+            <p>
+              旧记录不自动关联；选择尝试后将按固定测试绑定核验。多条通知可关联同一交易，但只追加一次成功证据。
+            </p>
             <button
               className="primary-button"
               disabled={busy || !data.enabled}
               onClick={() => void write()}
             >
-              {busy ? '正在处理…' : pendingKey.current ? '重试创建合成记录' : '创建合成记录'}
+              {busy
+                ? '正在处理…'
+                : pendingKeys.current[attemptId || 'standalone']
+                  ? '重试创建合成记录'
+                  : '创建合成记录'}
             </button>
           </section>
           <section className="surface">
@@ -207,7 +290,9 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
                   <article className="readiness-check" key={row.id}>
                     <div>
                       <h3>合成通知 · {row.notificationId.slice(-8)}</h3>
-                      <span className="badge amber">仅记录</span>
+                      <span className="badge amber">
+                        {row.application ? '已关联合成证据' : '仅记录'}
+                      </span>
                     </div>
                     <p>
                       {new Date(row.createdAt).toLocaleString('zh-CN', {
@@ -240,7 +325,13 @@ function RecordsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
           {selected && (
             <section className="surface readiness-summary notification-record-detail">
               <h2>合成通知详情</h2>
-              <p>已验签并解密 · 仅记录 · 未入账</p>
+              <p>已验签并解密 · {selected.application ? '已关联合成证据' : '仅记录'} · 未入账</p>
+              {selected.application && (
+                <div className="notice">
+                  关联合成尝试 · {selected.application.attemptId.slice(-8)}
+                  。当前证据请在“支付尝试”详情查看；通知成功不代表真实收款，冲突仍需核查。
+                </div>
+              )}
               <dl>
                 <dt>通知标识</dt>
                 <dd style={{ overflowWrap: 'anywhere' }}>{selected.notificationId}</dd>

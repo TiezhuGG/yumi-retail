@@ -298,10 +298,36 @@ test('migration backfills a pre-existing isolated UNKNOWN attempt with paired du
       'SELECT j.state,j.attempts,e.reason FROM payment_query_lab_jobs j JOIN payment_query_lab_events e ON e.job_id=j.id',
     );
     assert.deepEqual(rows.rows, [{ state: 'RETRY', attempts: 0, reason: 'SCHEDULED' }]);
+    const historicalRecord = randomUUID();
+    await client.query(
+      "INSERT INTO notification_lab_records(id,warehouse_id,notification_id,out_trade_no,transaction_id,amount_cents,currency,success_time,facts_hash) VALUES($1,$2,$3,$4,$5,2499,'CNY',$6,$7)",
+      [
+        historicalRecord,
+        w,
+        'SYNTHETIC_OLD_NOTIFICATION',
+        'SYNTHETIC_OLD_ORDER',
+        'SYNTHETIC_OLD_TX',
+        '2026-01-01T00:00:00.000Z',
+        '0'.repeat(64),
+      ],
+    );
     for (const dir of dirs.filter((n) => n > '202611010005_payment_query_labs'))
       await client.query(
         await readFile('packages/database/prisma/migrations/' + dir + '/migration.sql', 'utf8'),
       );
+    assert.equal(
+      (
+        await client.query('SELECT application_id FROM notification_lab_records WHERE id=$1', [
+          historicalRecord,
+        ])
+      ).rows[0].application_id,
+      null,
+    );
+    assert.equal(
+      (await client.query('SELECT COUNT(*)::int AS count FROM payment_notification_lab_bindings'))
+        .rows[0].count,
+      0,
+    );
     const upgraded = await client.query(
       'SELECT classification,result_evidence,next,scenario FROM payment_query_lab_events',
     );

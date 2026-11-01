@@ -39,3 +39,4 @@ export {
 
 export * from './payment-query-adapter.js';
 export * from './payment-adapter-fixtures.js';
+export { settleQueryLabFromNotification } from './payment-query-lab.js';
