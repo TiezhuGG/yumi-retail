@@ -77,7 +77,8 @@ export class PaymentReadinessService {
               title: '支付通知与补偿',
               group: 'IMPLEMENTATION',
               status: 'BLOCKED',
-              detail: '验签、通知解密、金额核验、重复通知及查单补偿尚未实现；没有可用回调入口。',
+              detail:
+                '已具备原文验签/解密与绑定金额核验的合成验证；真实接收、通知落库去重及查单补偿未实现，没有可用回调入口。',
             },
             {
               code: 'MERCHANT_BINDING',

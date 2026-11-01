@@ -4,7 +4,9 @@ import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { createApplication } from '../../apps/api/dist/app.js';
 import { applicationConfig } from '../../apps/api/dist/config.js';
-export async function addressFixture(options: { orders?: boolean; holdSeconds?: number } = {}) {
+export async function addressFixture(
+  options: { orders?: boolean; holdSeconds?: number; notificationLab?: boolean } = {},
+) {
   const url = new URL(process.env.TEST_DATABASE_URL ?? '');
   if (
     url.hostname !== '127.0.0.1' ||
@@ -38,6 +40,7 @@ export async function addressFixture(options: { orders?: boolean; holdSeconds?: 
     runtime = await createApplication(url.toString(), {
       config: applicationConfig({
         NODE_ENV: 'test',
+        PAYMENT_NOTIFICATION_LAB_ENABLED: options.notificationLab ? '1' : '0',
         ORDER_DEV_SUBMIT_ENABLED: options.orders ? '1' : '0',
         ORDER_DEV_HOLD_SECONDS: String(options.holdSeconds ?? 900),
         STAFF_ALLOWED_ORIGINS: 'http://127.0.0.1:5188,http://127.0.0.1:5173',

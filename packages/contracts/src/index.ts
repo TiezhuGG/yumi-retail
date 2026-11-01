@@ -502,3 +502,16 @@ export interface PaymentReadiness {
   warehouse: { id: string; name: string };
   checks: PaymentReadinessCheck[];
 }
+
+export interface NotificationLabInfo {
+  enabled: boolean;
+  syntheticOnly: true;
+  callbackEnabled: false;
+  cases: Array<{ code: string; title: string }>;
+}
+export interface NotificationLabResult {
+  completedAt: string;
+  syntheticOnly: true;
+  callbackEnabled: false;
+  results: Array<{ code: string; title: string; status: 'PASSED' | 'FAILED' }>;
+}

@@ -491,3 +491,21 @@ GET /api/v1/admin/payment-readiness?warehouseId=UUID。新增payment-readiness.r
 经营项从同仓库真实规则与范围读取，存在/开放仅标CONFIGURED或暂停BLOCKED，不冒充负责人经营验收。渠道下单/查单/关闭及通知验签解密/补偿尚未实现，固定BLOCKED；绑定、凭据、微信身份和HTTPS/真机固定UNVERIFIED。因此无论字段是否格式通过，canStartPayment始终false。准备/订单/库存不受检查动作改变，查询使用RepeatableRead。
 
 applicationConfig集中拒绝除disabled外的PAYMENT_MODE（含mock），API/worker现有启动禁用保护保持。离线命令npm run check:payment-config只输出前三项脱敏格式报告和禁止支付标志；缺字段时退出0，字段INVALID或模式不支持退出1。退出0不是可部署/可支付证明。
+
+
+## 2026-11-01 通知验签/解密隔离基础
+
+本轮不注册公开微信通知接收路由，不接收真实凭据或报文，不更新支付/订单状态。仅新增管理员合成验证接口，复用payment-readiness.read（默认仅SUPER_ADMIN）与显式启用仓库范围。
+
+| 接口（/api/v1下） | 行为 |
+|---|---|
+| GET /admin/payment-notification-lab?warehouseId=UUID | {enabled,syntheticOnly:true,callbackEnabled:false,cases}，9项场景定义 |
+| POST /admin/payment-notification-lab/run?warehouseId=UUID | 员工Cookie、Origin/CSRF、空对象；返回completedAt/结果列表及同样的合成/关闭标志 |
+
+字段和参数严格校验，不能提交rawBody、私钥、APIv3密钥等材料。默认PAYMENT_NOTIFICATION_LAB_ENABLED=0，执行返回503；显式1仅允许非生产loopback API与本地yumi_dev/yumi_test，生产/非本地库拒启。非法输入400、身份401、角色/范围/CSRF403，无权与停用仓库不会因开关而放行。运行是无业务副作用的独立计算，不持久化结果，重复运行不需要业务幂等键。
+
+内部纯函数verifyPaymentNotification只接收调用方提供的可信公钥映射/预期交易信息及原始Buffer：以头部时间戳、随机串、原文字节和末尾换行构造验签串，RSA-SHA256/PKCS1验签后才解析、AES-256-GCM认证解密，再核对商户/AppID/商户单号和整数分金额。返回最小规范化事实，不返回payer或完整明文；无网络、文件、数据库或支付状态迁移。
+
+本地技术保护：原文上限64KiB，签名为规范Base64及RSA2048长度，Wechatpay头拒数组/大小写重复/控制字符，未知标识不自动取证书或回退公钥；可选签名类型只允许WECHATPAY2-SHA256-RSA2048。时间戳要求当前10位秒值并限定正负300秒，资源nonce为12字节、密钥32字节、认证标签16字节，AAD可省略/为空，编码严格UTF-8，资源/交易类型及CNY/安全整数金额严格校验。这些是当前局部保护，不代替可信公钥管理、原始HTTP接收、持久化通知去重、真实支付单核对和补偿。相同报文在时间窗口内可以重复通过纯密码学检查，不能据此重复记账。
+
+GET /admin/payment-readiness仍固定canStartPayment=false，CALLBACK保持BLOCKED，仅说明已有合成验证核心；不将本轮通过转为真实渠道就绪。

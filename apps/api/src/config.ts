@@ -1,6 +1,7 @@
 import { assertDisabledPaymentMode, paymentConfiguration } from './payment-config.js';
 import type { PaymentReadinessCheck } from '@yumi/contracts';
 export interface ApplicationConfig {
+  notificationLabEnabled?: boolean;
   paymentConfiguration?: PaymentReadinessCheck[];
   environment: 'development' | 'test' | 'production';
   staffOrigins: string[];
@@ -68,6 +69,18 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     throw new Error('Invalid STAFF_SESSION_SECONDS.');
   if (env.ORDER_DEV_SUBMIT_ENABLED && !['0', '1'].includes(env.ORDER_DEV_SUBMIT_ENABLED))
     throw new Error('Invalid ORDER_DEV_SUBMIT_ENABLED.');
+  if (
+    env.PAYMENT_NOTIFICATION_LAB_ENABLED &&
+    !['0', '1'].includes(env.PAYMENT_NOTIFICATION_LAB_ENABLED)
+  )
+    throw new Error('Invalid PAYMENT_NOTIFICATION_LAB_ENABLED.');
+  const notificationLabEnabled = env.PAYMENT_NOTIFICATION_LAB_ENABLED === '1';
+  if (
+    notificationLabEnabled &&
+    (environment === 'production' ||
+      (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
+  )
+    throw new Error('Notification lab requires non-production loopback binding.');
   const orderDevSubmit = env.ORDER_DEV_SUBMIT_ENABLED === '1';
   if (
     orderDevSubmit &&
@@ -84,6 +97,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
   )
     throw new Error('Invalid ORDER_DEV_HOLD_SECONDS.');
   return {
+    notificationLabEnabled,
     paymentConfiguration: paymentConfiguration(env),
     orderDevHoldSeconds: Number(env.ORDER_DEV_HOLD_SECONDS ?? 900),
     orderDevSubmit,

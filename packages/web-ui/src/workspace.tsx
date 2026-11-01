@@ -5,6 +5,7 @@ import { CheckoutPolicyWorkbench } from './checkout-policy.js';
 import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
 import { PaymentReadinessWorkbench } from './payment-readiness.js';
+import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
@@ -20,7 +21,8 @@ export type WorkspaceView =
   | 'service-area'
   | 'checkout-policy'
   | 'orders'
-  | 'payment-readiness';
+  | 'payment-readiness'
+  | 'notification-lab';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -75,6 +77,13 @@ const routes: Array<{
     name: '支付接入检查',
     glyph: '◇',
     hint: '核对配置与接入条件，真实渠道保持禁用',
+    permission: 'payment-readiness.read',
+  },
+  {
+    id: 'notification-lab',
+    name: '通知隔离验证',
+    glyph: '⌘',
+    hint: '合成材料验证验签与解密，不处理真实支付',
     permission: 'payment-readiness.read',
   },
   {
@@ -220,6 +229,8 @@ export function Workspace({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
+          ) : activeView === 'notification-lab' ? (
+            <NotificationLabWorkbench profile={profile} />
           ) : activeView === 'payment-readiness' ? (
             <PaymentReadinessWorkbench />
           ) : activeView === 'orders' ? (
@@ -239,12 +250,17 @@ export function Workspace({
                     id,
                   ): id is Exclude<
                     WorkspaceView,
-                    'service-area' | 'checkout-policy' | 'orders' | 'payment-readiness'
+                    | 'service-area'
+                    | 'checkout-policy'
+                    | 'orders'
+                    | 'payment-readiness'
+                    | 'notification-lab'
                   > =>
                     id !== 'service-area' &&
                     id !== 'checkout-policy' &&
                     id !== 'orders' &&
-                    id !== 'payment-readiness',
+                    id !== 'payment-readiness' &&
+                    id !== 'notification-lab',
                 )}
               onNavigate={navigate}
             />

@@ -3,7 +3,9 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import { hashPassword } from '../../packages/database/dist/index.js';
 import { addressFixture } from './address-fixture.ts';
 import { seedCartCatalog } from './cart-catalog.ts';
-export async function checkoutFixture(options: { orders?: boolean; holdSeconds?: number } = {}) {
+export async function checkoutFixture(
+  options: { orders?: boolean; holdSeconds?: number; notificationLab?: boolean } = {},
+) {
   const fixture = await addressFixture(options);
   try {
     const { runtime, base, identity, warehouseId, areaId, buildingId } = fixture;

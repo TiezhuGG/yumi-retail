@@ -18,6 +18,7 @@ import { ConsumerController } from './consumer-controller.js';
 import { PaymentPreparationService, PaymentPreparationController } from './payment-preparation.js';
 import { PaymentReadinessController, PaymentReadinessService } from './payment-readiness.js';
 import { paymentConfiguration } from './payment-config.js';
+import { NotificationLabController, NotificationLabService } from './notification-lab.js';
 import { OrderService } from './orders.js';
 import { AdminOrderController, AdminOrderService } from './admin-orders.js';
 import { OrderController } from './order-controller.js';
@@ -80,7 +81,7 @@ export async function createApplication(
 }> {
   const config = options.config ?? applicationConfig();
   validateConsumerEnvironment(databaseUrl, config);
-  if (config.orderDevSubmit) {
+  if (config.orderDevSubmit || config.notificationLabEnabled) {
     const url = new URL(databaseUrl);
     if (
       config.environment === 'production' ||
@@ -124,6 +125,7 @@ export async function createApplication(
       ConsumerCartController,
       OrderController,
       PaymentReadinessController,
+      NotificationLabController,
       PaymentPreparationController,
       AdminOrderController,
       ConsumerAddressController,
@@ -170,6 +172,10 @@ export async function createApplication(
           catalog,
           config.paymentConfiguration ?? paymentConfiguration({}),
         ),
+      },
+      {
+        provide: NotificationLabService,
+        useValue: new NotificationLabService(catalog, config.notificationLabEnabled),
       },
       { provide: PaymentPreparationService, useValue: new PaymentPreparationService(checkout) },
       { provide: AdminOrderService, useValue: new AdminOrderService(catalog) },
@@ -233,7 +239,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.15.0')
+      .setVersion('0.16.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),
