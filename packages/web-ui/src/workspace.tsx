@@ -5,6 +5,7 @@ import { CheckoutPolicyWorkbench } from './checkout-policy.js';
 import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
 import { PaymentReadinessWorkbench } from './payment-readiness.js';
+import { NotificationRecordsWorkbench } from './notification-records.js';
 import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
@@ -22,7 +23,8 @@ export type WorkspaceView =
   | 'checkout-policy'
   | 'orders'
   | 'payment-readiness'
-  | 'notification-lab';
+  | 'notification-lab'
+  | 'notification-records';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -85,6 +87,13 @@ const routes: Array<{
     glyph: '⌘',
     hint: '合成材料验证验签与解密，不处理真实支付',
     permission: 'payment-readiness.read',
+  },
+  {
+    id: 'notification-records',
+    name: '通知记录',
+    hint: '合成通知持久化与重复接收验证',
+    permission: 'payment-readiness.read',
+    glyph: '◇',
   },
   {
     id: 'stock',
@@ -229,6 +238,8 @@ export function Workspace({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
+          ) : activeView === 'notification-records' ? (
+            <NotificationRecordsWorkbench profile={profile} />
           ) : activeView === 'notification-lab' ? (
             <NotificationLabWorkbench profile={profile} />
           ) : activeView === 'payment-readiness' ? (
@@ -255,12 +266,14 @@ export function Workspace({
                     | 'orders'
                     | 'payment-readiness'
                     | 'notification-lab'
+                    | 'notification-records'
                   > =>
                     id !== 'service-area' &&
                     id !== 'checkout-policy' &&
                     id !== 'orders' &&
                     id !== 'payment-readiness' &&
-                    id !== 'notification-lab',
+                    id !== 'notification-lab' &&
+                    id !== 'notification-records',
                 )}
               onNavigate={navigate}
             />

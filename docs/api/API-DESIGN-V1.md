@@ -509,3 +509,16 @@ applicationConfig集中拒绝除disabled外的PAYMENT_MODE（含mock），API/wo
 本地技术保护：原文上限64KiB，签名为规范Base64及RSA2048长度，Wechatpay头拒数组/大小写重复/控制字符，未知标识不自动取证书或回退公钥；可选签名类型只允许WECHATPAY2-SHA256-RSA2048。时间戳要求当前10位秒值并限定正负300秒，资源nonce为12字节、密钥32字节、认证标签16字节，AAD可省略/为空，编码严格UTF-8，资源/交易类型及CNY/安全整数金额严格校验。这些是当前局部保护，不代替可信公钥管理、原始HTTP接收、持久化通知去重、真实支付单核对和补偿。相同报文在时间窗口内可以重复通过纯密码学检查，不能据此重复记账。
 
 GET /admin/payment-readiness仍固定canStartPayment=false，CALLBACK保持BLOCKED，仅说明已有合成验证核心；不将本轮通过转为真实渠道就绪。
+
+## 2026-11-01 合成通知持久化 API（0.17.0）
+
+以下均为员工Cookie及payment-readiness.read（默认SUPER_ADMIN），warehouseId必填且检查授权启用仓库。GET可在实验关闭时查询；POST另需可信Origin/CSRF及PAYMENT_NOTIFICATION_LAB_ENABLED=1，默认503；不接受真实报文、密钥或任意业务状态。
+
+| 方法与路径（/api/v1） | 输入与返回 |
+|---|---|
+| GET /admin/payment-notification-records | warehouseId、可选cursor；20条最小事实、nextCursor、enabled、syntheticOnly=true、callbackEnabled=false |
+| GET /admin/payment-notification-records/:id | 仓库内详情；不存在或其他仓库记录404 |
+| POST /admin/payment-notification-records | body仅{key:UUID}，由服务端生成、签名并验证合成通知；返回record、duplicate |
+| POST /admin/payment-notification-records/:id/replay | body仅{}，按已有合成标识重新生成签名和密文，重复事实返回同一record |
+
+未知字段/非法UUID400，未登录401，无权限/无仓库范围403，未知游标404，事实冲突409，实验关闭503。每次原文验签及解密后，使用固定字段顺序的已验证事实SHA256判等，不以密文相同为前提；通知标识唯一范围为本隔离表内的warehouseId。事务锁和唯一约束保护竞争，首次记录与业务审计同事务提交；重复接收不重复审计或业务写入。此API没有真实通知入口、订单匹配和付款确认能力；未来真实渠道必须另有商户/渠道命名空间和业务幂等设计。

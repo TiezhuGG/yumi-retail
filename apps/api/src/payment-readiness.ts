@@ -78,7 +78,7 @@ export class PaymentReadinessService {
               group: 'IMPLEMENTATION',
               status: 'BLOCKED',
               detail:
-                '已具备原文验签/解密与绑定金额核验的合成验证；真实接收、通知落库去重及查单补偿未实现，没有可用回调入口。',
+                '原文验签/解密及合成通知落库去重已隔离验证；真实接收、订单入账和查单补偿未实现，没有可用回调入口。',
             },
             {
               code: 'MERCHANT_BINDING',

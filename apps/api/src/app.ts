@@ -18,6 +18,10 @@ import { ConsumerController } from './consumer-controller.js';
 import { PaymentPreparationService, PaymentPreparationController } from './payment-preparation.js';
 import { PaymentReadinessController, PaymentReadinessService } from './payment-readiness.js';
 import { paymentConfiguration } from './payment-config.js';
+import {
+  NotificationRecordsController,
+  NotificationRecordsService,
+} from './notification-records.js';
 import { NotificationLabController, NotificationLabService } from './notification-lab.js';
 import { OrderService } from './orders.js';
 import { AdminOrderController, AdminOrderService } from './admin-orders.js';
@@ -126,6 +130,7 @@ export async function createApplication(
       OrderController,
       PaymentReadinessController,
       NotificationLabController,
+      NotificationRecordsController,
       PaymentPreparationController,
       AdminOrderController,
       ConsumerAddressController,
@@ -176,6 +181,10 @@ export async function createApplication(
       {
         provide: NotificationLabService,
         useValue: new NotificationLabService(catalog, config.notificationLabEnabled),
+      },
+      {
+        provide: NotificationRecordsService,
+        useValue: new NotificationRecordsService(catalog, config.notificationLabEnabled),
       },
       { provide: PaymentPreparationService, useValue: new PaymentPreparationService(checkout) },
       { provide: AdminOrderService, useValue: new AdminOrderService(catalog) },
@@ -239,7 +248,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.16.0')
+      .setVersion('0.17.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

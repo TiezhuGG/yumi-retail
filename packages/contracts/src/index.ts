@@ -515,3 +515,27 @@ export interface NotificationLabResult {
   callbackEnabled: false;
   results: Array<{ code: string; title: string; status: 'PASSED' | 'FAILED' }>;
 }
+
+export interface NotificationRecord {
+  id: string;
+  notificationId: string;
+  outTradeNo: string;
+  transactionId: string;
+  amountCents: number;
+  currency: string;
+  successTime: string;
+  createdAt: string;
+  syntheticOnly: true;
+  state: 'RECORDED_ONLY';
+}
+export interface NotificationRecords {
+  enabled: boolean;
+  syntheticOnly: true;
+  callbackEnabled: false;
+  items: NotificationRecord[];
+  nextCursor: string | null;
+}
+export interface NotificationRecorded {
+  record: NotificationRecord;
+  duplicate: boolean;
+}

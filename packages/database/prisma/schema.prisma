@@ -60,6 +60,7 @@ model Warehouse {
   @@map("warehouses")
   orders ConsumerOrder[]
   checkoutPolicy CheckoutPolicy?
+  notificationLabRecords NotificationLabRecord[]
 }
 
 model Staff {
@@ -893,4 +894,21 @@ model PaymentPreparationEvent {
  preparation PaymentPreparation @relation(fields:[preparationId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([preparationId,type])
  @@map("payment_preparation_events")
+}
+
+model NotificationLabRecord {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ notificationId String @map("notification_id") @db.VarChar(128)
+ outTradeNo String @map("out_trade_no") @db.VarChar(32)
+ transactionId String @map("transaction_id") @db.VarChar(64)
+ amountCents BigInt @map("amount_cents")
+ currency String @db.VarChar(3)
+ successTime String @map("success_time") @db.VarChar(40)
+ factsHash String @map("facts_hash") @db.VarChar(64)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([warehouseId,notificationId])
+ @@index([warehouseId,createdAt,id], map:"notification_lab_records_warehouse_created_idx")
+ @@map("notification_lab_records")
 }

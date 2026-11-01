@@ -391,3 +391,11 @@ stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；
 ## 2026-11-01 通知合成验证边界
 
 本轮没有数据库迁移、通知收件箱或支付成功写入。管理员运行仅在授权仓库核验后，用服务端内存生成的RSA/AES材料调用纯函数，返回固定用例结果；不保存密钥、原文、明文、结果或payer信息，不修改订单、支付准备、库存、流水、事件。重复通知的持久化唯一性与业务状态迁移尚未实现，密码学检查通过不能触发付款确认或履约。
+
+## 2026-11-01 合成通知独立记录表
+
+新增迁移202611010003_notification_lab_records，无既有行变更。notification_lab_records保存id、warehouse_id、notification_id、out_trade_no、transaction_id、整数分amount_cents、CNY、合成success_time、facts_hash和首次created_at。通知/订单/交易标识仅允许合成前缀；无真实订单/支付准备外键、付款人、报文或密钥字段。warehouse_id引用仓库，(warehouse_id,notification_id)唯一，仓库/创建时间/id索引用于稳定游标；数据库触发器拒绝UPDATE/DELETE。表用于隔离基础，不是正式通知收件箱或已支付账本。
+
+服务先验证签名与解密，再在事务内检查仓库、按仓库+通知标识取事务锁、查已有事实摘要。相同事实返回原记录；冲突拒绝覆盖。首次写入及NOTIFICATION_LAB_RECORDED业务审计原子提交，审计失败整体回滚。签名/密文及接收时间不参与事实判等；当前合成生产器按操作键生成稳定事实，重启后依赖PostgreSQL而非内存去重。重复尝试次数、冲突尝试和处理状态不在本轮持久化。
+
+部署需停旧API/Worker写入，应用迁移，生成客户端并构建后启动新版；只增表，可保留表退回旧版应用，不能删除记录或清库回退。本机开发/测试库已应用，其他环境需自行按部署门禁执行。

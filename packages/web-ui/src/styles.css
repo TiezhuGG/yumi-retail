@@ -2374,3 +2374,29 @@ small {
     min-width: 0;
   }
 }
+
+.notification-record-detail dl {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 14px 20px;
+  margin: 24px 0;
+  font-family: var(--font-body, sans-serif);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.notification-record-detail dt {
+  color: var(--muted);
+}
+.notification-record-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .notification-record-detail dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .notification-record-detail dd {
+    margin-bottom: 12px;
+  }
+}
