@@ -4,6 +4,7 @@ import type { StaffProfile } from '@yumi/contracts';
 import { CheckoutPolicyWorkbench } from './checkout-policy.js';
 import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
+import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
   | 'overview'
@@ -16,7 +17,8 @@ export type WorkspaceView =
   | 'dispositions'
   | 'reversals'
   | 'service-area'
-  | 'checkout-policy';
+  | 'checkout-policy'
+  | 'orders';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -58,6 +60,13 @@ const routes: Array<{
     glyph: '¥',
     hint: '配置运费、起送与手动报价状态',
     permission: 'checkout-policy.read',
+  },
+  {
+    id: 'orders',
+    name: '订单查询',
+    glyph: '▤',
+    hint: '查看订单与批次库位预占记录',
+    permission: 'order.read',
   },
   {
     id: 'stock',
@@ -202,6 +211,8 @@ export function Workspace({
               <h2>你好，{profile.displayName}</h2>
               <p>当前账号暂未开放仓库管理。配送任务开放后会在此显示。</p>
             </div>
+          ) : activeView === 'orders' ? (
+            <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
           ) : activeView === 'service-area' ? (
@@ -213,8 +224,10 @@ export function Workspace({
               allowedViews={allowed
                 .map((r) => r.id)
                 .filter(
-                  (id): id is Exclude<WorkspaceView, 'service-area' | 'checkout-policy'> =>
-                    id !== 'service-area' && id !== 'checkout-policy',
+                  (
+                    id,
+                  ): id is Exclude<WorkspaceView, 'service-area' | 'checkout-policy' | 'orders'> =>
+                    id !== 'service-area' && id !== 'checkout-policy' && id !== 'orders',
                 )}
               onNavigate={navigate}
             />

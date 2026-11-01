@@ -448,3 +448,17 @@ preview逐行status为AVAILABLE/UNAVAILABLE/EXCESS，无有效售价为null；�
 状态仅AWAITING_PAYMENT→CANCELED，paymentState=NOT_STARTED，fulfillmentState=NOT_READY。取消/后台超时复用事务释放内核，订单行锁与原分配保证只释放一次；只更改reserved，追加释放流水/事件，不改原事实、不退款。开发预占默认900秒，可设ORDER_DEV_HOLD_SECONDS=1..900用于隔离测试，非已确认付款承诺。worker启动即检查，此后30秒一轮，每轮最多20笔、每笔独立事务并SKIP LOCKED；任何未来已开始/未知支付状态必须先对账/关单，不进入直接释放路径。事件当前持久化为PENDING，未实现消费者、履约派发或外部消息投递。
 
 严格输入400、身份失效401、非本人报价/订单404、过期/变化/已用报价/库存不足/幂等冲突409、开发关闭或并发可重试503。真实支付、退款、微信身份、合法域名与真机网络需另外交付验收。
+
+
+## 2026-11-01 后台订单只读查询
+
+新增`order.read`，仅SUPER_ADMIN/OPERATIONS默认获得，且必须显式拥有对应warehouse_id。仓管、拣货、骑手、客服不因此取得订单查询权。员工Cookie鉴权和每请求角色/仓库范围复验沿用现有机制；消费者Bearer不可访问。此次无写路由，无代客取消、支付、退款或通用状态编辑。
+
+| 接口（/api/v1下） | 输入与输出 |
+|---|---|
+| GET /admin/orders | 必填warehouseId；可选status=AWAITING_PAYMENT/CANCELED、q=1–40位英文字母数字订单号前缀（转大写）、UUID cursor；返回items/hasMore/nextCursor，每页20 |
+| GET /admin/orders/:id | 必填warehouseId；返回订单商品/金额快照、原预占分配及释放时间、订单动作记录 |
+
+按createdAt/id倒序，以同仓库且匹配当前筛选的订单作游标锚点；跨筛选/不存在游标404，未授权或停用仓库403，仓库内不存在订单404，额外字段/重复参数/无效格式400，未登录401。没有limit、客户姓名/电话检索或批量导出参数。查询事务使用RepeatableRead，避免取消期间混合旧订单状态与新释放记录。
+
+列表和详情显式选择字段，不查询/解密address_payload，不返回用户ID、联系人、电话、门牌、地址/订单备注、原报价ID、幂等键/摘要、请求编号、事件payload或库存操作人的内部ID。金额为整数分；预占展示商品、规格、数量、批次、效期、库位code/name和reserve/release时间，表示该单分配记录，不是当前库位库存。库位名称是当前主数据。订单事件仅返回动作类型/来源类别/时间。查询不追加业务事件或修改订单/库存；拒绝访问仍沿用员工权限审计。

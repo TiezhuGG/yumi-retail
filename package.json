@@ -71,7 +71,9 @@
     "test:checkout": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/checkout.integration.test.ts",
     "pretest:orders": "npm run build:server",
     "test:orders": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/orders.integration.test.ts",
-    "test:order-intent": "node --import tsx tests/order-intent.test.ts"
+    "test:order-intent": "node --import tsx tests/order-intent.test.ts",
+    "pretest:admin-orders": "npm run build:server",
+    "test:admin-orders": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/admin-orders.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

@@ -365,3 +365,10 @@ ADDRESS_ENCRYPTION_KEY为32随机字节的64位hex环境配置，无默认值；
 stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；actor_id变可空，新增consumer_actor_id。CHECK强制三种合法结构：STAFF仅员工、CONSUMER仅消费者、SYSTEM无用户ID。消费者预占/主动取消记录真实consumerActorId，后台超时记SYSTEM，不借用员工身份。现有员工写入不传actor_kind仍取STAFF，保持兼容。实物on_hand不因创建/取消/超时改变，reserved在汇总、批次、位置同事务增减，stock_balance和position版本递增；配套不可变两级流水。
 
 创建按SKU有序锁汇总，再锁批次/位置及商品元数据，分配FEFO并排除过期、停售、冻结、隔离、核对暂停和无效位置。取消与超时先锁订单，再按SKU有序锁汇总，共用释放内核；最后库存争抢、晚期事件失败、取消/超时竞争均通过真实PostgreSQL验证。工作进程每次事务只处理一笔，最长批次20笔，不将Redis当库存真相。
+
+
+## 2026-11-01 后台订单读取模型
+
+本轮无表结构或数据迁移，复用consumer_orders、order_items、order_allocations及order_events。按warehouse_id与不可变created_at/id进行20笔游标分页，订单号前缀/状态由服务端筛选；游标锚点限定同仓库且匹配筛选。详情通过原分配关联StockPosition→批次/库位及预占/释放流水时间，不使用当前汇总reserved冒充本单数量。
+
+读取事务采用RepeatableRead，订单、分配与事件处在同一快照。取消并发时，返回取消前的一致预占记录或取消后的一致释放记录，不混合两者。显式字段白名单不读取联系密文和消费者身份，查询不更改订单/两级库存账/事件；原有取消、超时、不可变约束和加密密钥不变。员工权限使用代码中的order.read及现有StaffWarehouse范围，每请求重新验证，无权限数据回填。

@@ -440,3 +440,34 @@ export interface ConsumerOrder {
     lineCents: number;
   }>;
 }
+
+// Operational read model: no customer identifiers, address/contact data or order notes.
+export type AdminOrderSummary = Pick<
+  ConsumerOrder,
+  | 'id'
+  | 'orderNo'
+  | 'status'
+  | 'paymentState'
+  | 'fulfillmentState'
+  | 'goodsCents'
+  | 'deliveryFeeCents'
+  | 'payableCents'
+  | 'createdAt'
+  | 'paymentDeadline'
+  | 'cancelReason'
+  | 'items'
+>;
+export interface AdminOrderDetail extends AdminOrderSummary {
+  allocations: Array<{
+    id: string;
+    skuId: string;
+    quantity: number;
+    batchNo: string;
+    expiresAt: string | null;
+    locationCode: string;
+    locationName: string;
+    reservedAt: string;
+    releasedAt: string | null;
+  }>;
+  events: Array<{ type: string; actorKind: string; createdAt: string }>;
+}
