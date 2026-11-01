@@ -551,3 +551,13 @@ GET /api/v1/admin/payment-attempt-lab/:id详情新增queryJob（可空），含s
 POST /api/v1/admin/payment-attempt-lab/run-query-cycle?warehouseId=UUID仅body{}，处理本仓至多一个到期合成任务，返回processed及syntheticOnly=true；不是所选详情的强制执行接口。没有到期任务时processed=false；第三次租约过期可将任务标耗尽而不再执行查询。该调度动作可重复检查，并不承诺原请求响应重放，任务副作用由租约和操作键保证有效完成一次。
 
 POST /api/v1/admin/payment-attempt-lab/:id/retry-query?warehouseId=UUID仅body{key:UUID}，只允许仍UNKNOWN的耗尽任务重新安排，原键重试返回当前详情且不重复审计/任务事件。不满足条件或键已用于其他任务动作409。沿用员工Cookie、payment-readiness.read、启用仓库范围、Origin/CSRF与默认关闭的PAYMENT_NOTIFICATION_LAB_ENABLED；未登录401、无权403、非法输入400、未知记录404、实验关闭503。所有观察仍来自明确的合成适配器，没有微信查单入口。
+
+## 2026-11-01 合成补偿核查 API（0.21.0）
+
+GET /api/v1/admin/payment-review-lab?warehouseId=UUID&filter=ALL|UNKNOWN|CONFLICT|EXHAUSTED&cursor=UUID：filter默认ALL，返回enabled、syntheticOnly=true、20条待核查摘要和nextCursor。ALL为未知/冲突/耗尽并集；摘要含证据、尝试/任务版本、任务状态、真实备注数量和needsReview，不含凭据或租约令牌。
+
+GET /:id?warehouseId=UUID&notesCursor=UUID：返回锁定读取的当前item、最近20条不可变备注和nextNotesCursor。详情可查看已离开待核查范围的历史，游标限定同仓同尝试。按createdAt/id稳定降序，列表游标不要求锚点仍满足动态筛选，避免状态变化使下一页不可用。
+
+POST /:id/notes?warehouseId=UUID仅{key:UUID,note:string,attemptVersion:integer,jobVersion:integer|null}。CR/CRLF规范为LF、去首尾空白，拒绝空/过长和非Tab/LF的C0及DEL控制字符。服务按仓库→尝试→任务锁顺序校验快照和待核查范围，再原子追加备注与PAYMENT_REVIEW_LAB_NOTE审计。原键先匹配既有备注，再校验新快照，已保存原操作可恢复；同键换内容/版本409 IDEMPOTENCY_CONFLICT，旧快照409 REVIEW_SNAPSHOT_STALE，当前无需核查409 REVIEW_NOT_NEEDED。
+
+沿用员工Cookie、payment-readiness.read（默认SUPER_ADMIN）、启用仓库授权，POST另需Origin/CSRF和PAYMENT_NOTIFICATION_LAB_ENABLED；默认503，生产及非本机隔离拒启。非法输入400、未登录401、无权403、不存在记录/游标404。没有更新/删除备注、标记已支付、退款或解决异常的接口。

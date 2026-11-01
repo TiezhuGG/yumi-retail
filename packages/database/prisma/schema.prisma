@@ -79,6 +79,7 @@ model Staff {
   createdReceipts      InboundReceipt[]   @relation("receiptCreator")
   reviewedReceipts     InboundReceipt[]   @relation("receiptReviewer")
   businessAudits       BusinessAudit[]
+  paymentReviewNotes PaymentReviewLabNote[]
   stockLedger          StockLedger[]
   inventoryChecks      InventoryCheck[]
   createdCounts        StockCount[]       @relation("countCreator")
@@ -924,6 +925,7 @@ model PaymentAttemptLab {
  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  events PaymentAttemptLabEvent[]
  queryJob PaymentQueryLabJob?
+ reviewNotes PaymentReviewLabNote[]
  @@unique([id,warehouseId])
  @@unique([warehouseId,key])
  @@index([warehouseId,createdAt,id],map:"payment_attempt_labs_warehouse_created_idx")
@@ -977,4 +979,24 @@ model PaymentQueryLabEvent {
  @@unique([jobId,key])
  @@unique([jobId,version])
  @@map("payment_query_lab_events")
+}
+
+model PaymentReviewLabNote {
+ id String @id @db.Uuid
+ attemptId String @map("attempt_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(120)
+ key String @db.Uuid
+ note String @db.VarChar(500)
+ evidence String @db.VarChar(16)
+ attemptVersion Int @map("attempt_version")
+ taskState String? @map("task_state") @db.VarChar(16)
+ jobVersion Int? @map("job_version")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ attempt PaymentAttemptLab @relation(fields:[attemptId,warehouseId],references:[id,warehouseId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([attemptId,actorId,key])
+ @@index([attemptId,createdAt,id],map:"payment_review_lab_notes_history_idx")
+ @@map("payment_review_lab_notes")
 }

@@ -92,7 +92,9 @@
     "pretest:payment-attempt-lab": "npm run build:server",
     "test:payment-attempt-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-attempt-lab.integration.test.ts",
     "pretest:payment-query-lab": "npm run build:server",
-    "test:payment-query-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-query-lab.integration.test.ts"
+    "test:payment-query-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-query-lab.integration.test.ts",
+    "pretest:payment-review-lab": "npm run build:server",
+    "test:payment-review-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-review-lab.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

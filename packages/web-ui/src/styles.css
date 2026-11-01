@@ -2400,3 +2400,34 @@ small {
     margin-bottom: 12px;
   }
 }
+
+.review-note-field {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.review-note-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  padding: 14px;
+  border: 1px solid var(--line, #dce6df);
+  border-radius: 10px;
+  font: inherit;
+  line-height: 1.6;
+  color: inherit;
+  background: white;
+}
+.payment-review-detail form {
+  margin-bottom: 32px;
+}
+
+.review-filter-field {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 260px);
+}
+.review-filter-field select {
+  width: 100%;
+  min-width: 0;
+}

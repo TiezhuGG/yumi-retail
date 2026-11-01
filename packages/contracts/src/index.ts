@@ -583,3 +583,35 @@ export interface PaymentAttemptLabWrite {
   attempt: PaymentAttemptLabDetail;
   duplicate: boolean;
 }
+export interface PaymentReviewCase {
+  id: string;
+  evidence: string;
+  attemptVersion: number;
+  taskState: string | null;
+  jobVersion: number | null;
+  createdAt: string;
+  noteCount: number;
+  needsReview: boolean;
+  syntheticOnly: true;
+}
+export interface PaymentReviewNote {
+  id: string;
+  actorName: string;
+  note: string;
+  evidence: string;
+  attemptVersion: number;
+  taskState: string | null;
+  jobVersion: number | null;
+  createdAt: string;
+}
+export interface PaymentReviewList {
+  enabled: boolean;
+  syntheticOnly: true;
+  items: PaymentReviewCase[];
+  nextCursor: string | null;
+}
+export interface PaymentReviewDetail {
+  item: PaymentReviewCase;
+  notes: PaymentReviewNote[];
+  nextNotesCursor: string | null;
+}

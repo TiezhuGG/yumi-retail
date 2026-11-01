@@ -266,7 +266,7 @@ test('migration backfills a pre-existing isolated UNKNOWN attempt with paired du
     const dirs = (await readdir('packages/database/prisma/migrations'))
       .filter((n) => /^\d/.test(n))
       .sort();
-    for (const dir of dirs.filter((n) => n !== '202611010005_payment_query_labs'))
+    for (const dir of dirs.filter((n) => n < '202611010005_payment_query_labs'))
       await client.query(
         await readFile('packages/database/prisma/migrations/' + dir + '/migration.sql', 'utf8'),
       );
