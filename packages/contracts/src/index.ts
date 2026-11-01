@@ -705,6 +705,16 @@ export interface PickingReadinessDetail extends PickingReadinessSummary {
 }
 
 export interface PickingLabTask {
+  packingReadiness: { ready: boolean; blockers: string[] };
+  pack: {
+    id: string;
+    actorName: string;
+    packageCount: number;
+    singleQuantity: number;
+    tripleQuantity: number;
+    createdAt: string;
+    dispatch: { id: string; actorName: string; createdAt: string } | null;
+  } | null;
   id: string;
   label: string;
   state: 'READY' | 'PICKING' | 'CHECKED';

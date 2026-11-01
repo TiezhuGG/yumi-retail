@@ -651,3 +651,13 @@ POST `/:id/shortages/:shortageId/restore?warehouseId=UUID`：体{key,version,exc
 CLAIM/CHECK新增可选exceptionVersion，省略按0解释，旧无缺货任务/原键保持兼容；出现缺货变化后旧版本0请求409，需要刷新并提交新版本。原领取/核对事件保存缺货快照，原请求键绑定该字段；已成功原键仍先恢复再判断新状态。上报/处理幂等键按任务+操作者隔离，绑定动作、任务版本、缺货版本、明细或记录、数量/原因及记录版本，变更409。
 
 所有新动作与CHECK锁定同一任务，序列化缺货/核对竞争。OPEN时任何CHECK均被服务端和数据库阻止；上报与处理的任务/缺货/事件/业务审计原子提交。未知网络/5xx保留原操作，明确4xx拒绝后可刷新修正；无通用改状态、部分放行或真实出库接口。
+
+## 2026-11-01 合成打包/出库接口
+
+OpenAPI0.30.0由实际应用导出，新增`POST /api/v1/warehouse/picking-lab/:id/pack`及`/:id/dispatch`，均要求warehouseId查询参数、员工会话、可信Origin和X-CSRF-Token；返回`{task,duplicate}`。
+
+pack严格字段：key(UUID)、version(0–3)、exceptionVersion(0–100)、packageCount(1–20)、singleQuantity/tripleQuantity(整数0–200)。实际数量必须2/1，任务必须CHECKED/两行已核对/无OPEN；仅领取人且有picking-lab.work。dispatch严格字段：key、version、exceptionVersion、packId(UUID)，需负责人/仓管的picking-lab.ship；所引用打包必须属于当前任务且快照一致。
+
+GET列表/详情和写回投影增加packingReadiness（ready/blockers：PICKING_INCOMPLETE、SHORTAGE_OPEN、PACK_ALREADY_RECORDED）及可空pack。pack含id、actorName、packageCount、singleQuantity、tripleQuantity、createdAt和可空dispatch（id、actorName、createdAt）；不暴露原请求键。原任务状态/版本和既有接口不变。
+
+同任务行锁串行化，先识别已成功同人员/键，再核验当前快照。原键内容改变409 IDEMPOTENCY_CONFLICT；另一键/人员重复该阶段409 PICKING_STAGE_RECORDED；旧快照409 PICKING_VERSION_STALE；不完整409 PICKING_INCOMPLETE；未决缺货409 PICKING_SHORTAGE_OPEN；数量不匹配409 PICKING_PACK_QUANTITY；无打包/错打包/过时打包分别409 PICKING_PACK_REQUIRED/MISMATCH/STALE。角色/归属403、未知任务404、严格参数400、默认关闭503；5xx/网络失败只能判定结果未知，客户端保留原请求。旧GET客户端可忽略新增字段，新增UI须配合0.30.0 API与迁移部署。

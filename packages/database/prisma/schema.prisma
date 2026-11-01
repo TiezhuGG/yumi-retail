@@ -66,6 +66,8 @@ model Warehouse {
 }
 
 model Staff {
+ pickingLabPacks PickingLabPack[] @relation("pickingPacker")
+ pickingLabDispatches PickingLabDispatch[] @relation("pickingDispatcher")
  pickingShortageReports PickingLabShortage[] @relation("shortageReporter")
  pickingShortageResolutions PickingLabShortage[] @relation("shortageResolver")
  pickingShortageActions PickingLabShortageEvent[] @relation("shortageActor")
@@ -1049,6 +1051,7 @@ model PaymentNotificationLabApplication {
 }
 
 model PickingLabTask {
+ pack PickingLabPack?
  exceptionVersion Int @default(0) @map("exception_version")
  shortages PickingLabShortage[]
  id String @id @db.Uuid
@@ -1136,4 +1139,38 @@ model PickingLabShortageEvent {
  @@unique([taskId,revision])
  @@unique([shortageId,action])
  @@map("picking_lab_shortage_events")
+}
+
+model PickingLabPack {
+ id String @id @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ taskVersion Int @map("task_version")
+ exceptionVersion Int @map("exception_version")
+ packageCount Int @map("package_count")
+ singleQuantity Int @map("single_quantity")
+ tripleQuantity Int @map("triple_quantity")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ task PickingLabTask @relation(fields:[taskId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation("pickingPacker",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ dispatch PickingLabDispatch?
+ @@unique([id,taskId])
+ @@map("picking_lab_packs")
+}
+model PickingLabDispatch {
+ id String @id @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ packId String @unique @map("pack_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ taskVersion Int @map("task_version")
+ exceptionVersion Int @map("exception_version")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ pack PickingLabPack @relation(fields:[packId,taskId],references:[id,taskId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation("pickingDispatcher",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([packId,taskId])
+ @@map("picking_lab_dispatches")
 }

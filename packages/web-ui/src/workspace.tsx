@@ -140,7 +140,7 @@ const routes: Array<{
     id: 'picking-lab',
     name: '拣货演练',
     glyph: '◇',
-    hint: '合成任务领取与逐行核对，独立于真实库存',
+    hint: '合成核对、打包与出库，独立于真实库存',
     permission: 'picking-lab.read',
   },
   {

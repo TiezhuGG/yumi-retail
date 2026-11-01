@@ -29,6 +29,7 @@ export const fixture = [
   },
 ];
 export const include = {
+  pack: { include: { dispatch: true } },
   owner: { select: { displayName: true } },
   events: { orderBy: { version: 'asc' as const } },
   shortages: {
@@ -47,6 +48,37 @@ export const dto = (t: Row): PickingLabTask => ({
   state: t.state as PickingLabTask['state'],
   version: t.version,
   exceptionVersion: t.exceptionVersion,
+  packingReadiness: {
+    ready:
+      t.state === 'CHECKED' &&
+      fixture.every((l) => t.checkedLines.includes(l.id)) &&
+      !t.shortages.some((s) => s.state === 'OPEN') &&
+      !t.pack,
+    blockers: [
+      ...(t.state !== 'CHECKED' || !fixture.every((l) => t.checkedLines.includes(l.id))
+        ? ['PICKING_INCOMPLETE']
+        : []),
+      ...(t.shortages.some((s) => s.state === 'OPEN') ? ['SHORTAGE_OPEN'] : []),
+      ...(t.pack ? ['PACK_ALREADY_RECORDED'] : []),
+    ],
+  },
+  pack: t.pack
+    ? {
+        id: t.pack.id,
+        actorName: t.pack.actorName,
+        packageCount: t.pack.packageCount,
+        singleQuantity: t.pack.singleQuantity,
+        tripleQuantity: t.pack.tripleQuantity,
+        createdAt: t.pack.createdAt.toISOString(),
+        dispatch: t.pack.dispatch
+          ? {
+              id: t.pack.dispatch.id,
+              actorName: t.pack.dispatch.actorName,
+              createdAt: t.pack.dispatch.createdAt.toISOString(),
+            }
+          : null,
+      }
+    : null,
   shortages: t.shortages.map((s) => ({
     id: s.id,
     lineId: s.lineId,
@@ -266,6 +298,22 @@ export const taskSchema = object({
   state: { type: 'string', enum: ['READY', 'PICKING', 'CHECKED'] },
   version: { type: 'integer', minimum: 0, maximum: 3 },
   exceptionVersion: { type: 'integer', minimum: 0, maximum: 100 },
+  packingReadiness: object({
+    ready: { type: 'boolean' },
+    blockers: { type: 'array', items: text },
+  }),
+  pack: {
+    ...object({
+      id: text,
+      actorName: text,
+      packageCount: { type: 'integer' },
+      singleQuantity: { type: 'integer' },
+      tripleQuantity: { type: 'integer' },
+      createdAt: text,
+      dispatch: { ...object({ id: text, actorName: text, createdAt: text }), nullable: true },
+    }),
+    nullable: true,
+  },
   shortages: {
     type: 'array',
     maxItems: 50,

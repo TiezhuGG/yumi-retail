@@ -1,3 +1,4 @@
+import { PickingPackingPanel } from './picking-packing.js';
 import { PickingShortagesPanel } from './picking-shortages.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
@@ -20,6 +21,10 @@ export type Operation = {
     reason?: string;
     shortageVersion?: number;
     confirmedQuantity?: number;
+    packageCount?: number;
+    singleQuantity?: number;
+    tripleQuantity?: number;
+    packId?: string;
   };
   label: string;
 };
@@ -58,7 +63,7 @@ export function PickingLabWorkbench({ profile }: { profile: StaffProfile }) {
     <div className="picking-workbench">
       <div className="notice">
         拣货隔离演练 ·
-        固定合成商品、批次和库位。未关联真实订单或库存，领取和核对均不会扣库存、记付款、打包或出库。
+        固定合成商品、批次和库位。未关联真实订单或库存，所有演练操作均不会扣真实库存、记真实付款或生成真实配送。
       </div>
       {loading ? (
         <div className="surface empty-state" role="status">
@@ -227,7 +232,7 @@ function LabPanel({
         pending.delete(scope);
         setDetail(r.task);
         setMessage(
-          r.duplicate ? '原操作已恢复，未重复追加核对。' : '演练操作已保存；真实订单与库存未改变。',
+          r.duplicate ? '原操作已恢复，未重复追加记录。' : '演练操作已保存；真实订单与库存未改变。',
         );
         if (op.body.lineId) setQuantities((old) => ({ ...old, [op.body.lineId!]: '' }));
       }
@@ -264,7 +269,7 @@ function LabPanel({
           {message}
         </div>
       )}
-      {op && (
+      {op && !busy && (
         <div className="notice" role="status">
           {op.label}结果未确认；刷新不能代替原操作确认。
           <button
@@ -312,7 +317,11 @@ function LabPanel({
                       ? '有未决缺货，暂停核对'
                       : t.state === 'PICKING'
                         ? '已领取，核对中'
-                        : states[t.state]}
+                        : t.pack?.dispatch
+                          ? '合成出库已记录'
+                          : t.pack
+                            ? '合成打包已记录'
+                            : states[t.state]}
                   </span>
                   <p>
                     领取人：{t.ownerName ?? '尚未领取'} · 已核对{' '}
@@ -372,7 +381,11 @@ function LabPanel({
                     ? '有未决缺货，暂停核对'
                     : detail.state === 'PICKING' && detail.ownerId !== profile.id
                       ? '由其他人员领取，核对中'
-                      : states[detail.state]}
+                      : detail.pack?.dispatch
+                        ? '合成出库已记录'
+                        : detail.pack
+                          ? '合成打包已记录'
+                          : states[detail.state]}
                 </span>
                 <p>领取人：{detail.ownerName ?? '尚未领取'}</p>
                 {detail.state === 'READY' && profile.permissions.includes('picking-lab.work') && (
@@ -399,7 +412,7 @@ function LabPanel({
                     领取演练任务
                   </button>
                 )}
-                {detail.state === 'CHECKED' && (
+                {detail.state === 'CHECKED' && !detail.pack && (
                   <div className="notice">全部演练明细已核对；未打包、未出库、未交接骑手。</div>
                 )}
                 <PickingShortagesPanel
@@ -480,6 +493,13 @@ function LabPanel({
                     )}
                   </article>
                 ))}
+                <PickingPackingPanel
+                  key={detail.id}
+                  task={detail}
+                  profile={profile}
+                  disabled={busy || !enabled || !!op}
+                  onExecute={execute}
+                />
                 <h3>演练操作历史</h3>
                 <ol>
                   {detail.events.map((e, i) => (
