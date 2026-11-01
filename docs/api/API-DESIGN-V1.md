@@ -590,3 +590,13 @@ POST /:id/notes?warehouseId=UUID仅{key:UUID,note:string,attemptVersion:integer,
 - 尝试详情新增notificationBinding(nullable，含测试商户单号、金额/币种及创建时间)和最近20条notifications(id/notificationId/createdAt)。关联不代表真实支付，releaseAllowed仍false。
 
 手动创建失败保留按尝试分开的原操作键，切换目标不复用另一目标的键；响应不明先原键重试或刷新。原始报文、付款人字段和密钥既不落库也不回传。尚无公开回调或真实商户HTTP请求。
+
+## 2026-11-01 只读核查时间线（OpenAPI 0.25.0）
+
+新增GET `/api/v1/admin/payment-review-lab/:id/timeline?warehouseId=…`，员工Cookie、payment-readiness.read及仓库授权；实验关闭仍可只读查看已有事实。未知尝试404，匿名401，越权/仓库撤销403。严格query仅warehouseId/filter/cursor/focus，未知字段400。
+
+filter为ALL(默认)、ATTEMPT、QUERY、NOTIFICATION、NOTE。cursor和focus为服务器生成的`SOURCE:uuid`引用，不能同时使用；服务器重新在当前尝试/仓库内查锚点，不信任客户端时间或任何外部URL。来源不支持、UUID无效、与非ALL筛选冲突400；引用不属于当前范围404。cursor排除锚点加载更早页；focus包含目标且排首位，再向更早记录分页。
+
+响应item是同次锁定读取的当前核查摘要，items最多20，nextCursor可空，filter/focusedRef/syntheticOnly如实返回。行包含id/ref/source/createdAt/title、只读entries(label/value)和最多2个related(ref/label)。字段为核查展示投影，不作为状态写入参数。无leaseToken、事件幂等键、原始报文、付款人或密钥；接口通用requestId元数据保持原样。
+
+旧核查详情及notesCursor接口保持兼容，新UI用统一时间线及NOTE筛选呈现历史，不改变POST备注的CSRF/Origin、幂等和版本校验。分页是实时keyset读取，新增事实需刷新；不提供跨请求冻结快照。

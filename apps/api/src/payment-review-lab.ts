@@ -1,3 +1,9 @@
+import {
+  evidenceSources,
+  evidenceReference,
+  paymentEvidenceTimeline,
+  type EvidenceFilter,
+} from './payment-evidence-timeline.js';
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
@@ -139,6 +145,22 @@ export class PaymentReviewLabService {
       };
     });
   }
+  async timeline(
+    r: ApiRequest,
+    w: string,
+    id: string,
+    filter: EvidenceFilter,
+    cursor?: string,
+    focus?: string,
+  ) {
+    return this.catalog.db.$transaction(async (tx) => {
+      const row = await this.locked(tx, r, w, id);
+      return {
+        ...(await paymentEvidenceTimeline(tx, w, id, filter, cursor, focus)),
+        item: item(row),
+      };
+    });
+  }
   async append(
     r: ApiRequest,
     w: string,
@@ -270,6 +292,58 @@ export class PaymentReviewLabController {
   async detail(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string) {
     const b = query(q, true);
     return success(r, await this.service.detail(r, b.w, uuid(id), b.cursor));
+  }
+  @Get(':id/timeline')
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiQuery({ name: 'filter', required: false, enum: [...evidenceSources] })
+  @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'focus', required: false, type: String })
+  @ApiParam({ name: 'id', type: String })
+  @ApiResult(
+    object({
+      item: object(caseProps),
+      syntheticOnly: { type: 'boolean', enum: [true] },
+      filter: { type: 'string', enum: [...evidenceSources] },
+      focusedRef: { ...text, nullable: true },
+      nextCursor: { ...text, nullable: true },
+      items: {
+        type: 'array',
+        maxItems: 20,
+        items: object({
+          id: text,
+          ref: text,
+          source: { type: 'string', enum: [...evidenceSources].slice(1) },
+          createdAt: text,
+          title: text,
+          entries: { type: 'array', maxItems: 8, items: object({ label: text, value: text }) },
+          related: { type: 'array', maxItems: 2, items: object({ ref: text, label: text }) },
+        }),
+      },
+    }),
+    [400, 401, 403, 404, 500],
+  )
+  async timeline(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string) {
+    const b = fields(q, ['warehouseId', 'filter', 'cursor', 'focus']);
+    if (
+      b.filter !== undefined &&
+      (typeof b.filter !== 'string' || !evidenceSources.includes(b.filter as EvidenceFilter))
+    )
+      throw failure(400, 'VALIDATION_ERROR', '证据筛选无效');
+    if (b.cursor !== undefined && b.focus !== undefined)
+      throw failure(400, 'VALIDATION_ERROR', '分页与定位不能同时使用');
+    if (b.cursor !== undefined) evidenceReference(b.cursor);
+    if (b.focus !== undefined) evidenceReference(b.focus);
+    return success(
+      r,
+      await this.service.timeline(
+        r,
+        uuid(b.warehouseId),
+        uuid(id),
+        (b.filter ?? 'ALL') as EvidenceFilter,
+        b.cursor as string | undefined,
+        b.focus as string | undefined,
+      ),
+    );
   }
   @Post(':id/notes')
   @HttpCode(200)

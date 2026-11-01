@@ -642,3 +642,22 @@ export type PaymentAdapterLabResult = Omit<NotificationLabResult, 'results'> & {
     releaseAllowed: false;
   })[];
 };
+
+export type PaymentEvidenceSource = 'ATTEMPT' | 'QUERY' | 'NOTIFICATION' | 'NOTE';
+export interface PaymentEvidenceTimelineItem {
+  id: string;
+  ref: string;
+  source: PaymentEvidenceSource;
+  createdAt: string;
+  title: string;
+  entries: { label: string; value: string }[];
+  related: { ref: string; label: string }[];
+}
+export interface PaymentEvidenceTimeline {
+  item: PaymentReviewCase;
+  items: PaymentEvidenceTimelineItem[];
+  nextCursor: string | null;
+  filter: 'ALL' | PaymentEvidenceSource;
+  focusedRef: string | null;
+  syntheticOnly: true;
+}

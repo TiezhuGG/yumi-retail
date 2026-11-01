@@ -1,3 +1,4 @@
+import { PaymentEvidenceTimelinePanel } from './payment-evidence-timeline.js';
 import { useEffect, useRef, useState } from 'react';
 import type {
   PaymentReviewList,
@@ -393,42 +394,21 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
                   {busy ? '正在处理…' : '保存核查备注'}
                 </button>
               </form>
-              <h3>核查历史</h3>
-              {detail.notes.length ? (
-                <div className="readiness-checks">
-                  {detail.notes.map((note) => (
-                    <article className="readiness-check" key={note.id}>
-                      <div>
-                        <h3>{note.actorName}</h3>
-                        <span className="badge">
-                          当时：{evidenceLabel[note.evidence]} ·{' '}
-                          {note.taskState ? taskLabel[note.taskState] : '暂无查询任务'}
-                        </span>
-                      </div>
-                      <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                        {note.note}
-                      </p>
-                      <small>
-                        {new Date(note.createdAt).toLocaleString('zh-CN', {
-                          timeZone: 'Asia/Shanghai',
-                          hour12: false,
-                        })}
-                      </small>
-                    </article>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state">暂无核查备注</div>
-              )}
-              {detail.nextNotesCursor && (
-                <button
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={() => void open(detail.item.id, detail.nextNotesCursor!)}
-                >
-                  加载更多核查备注
-                </button>
-              )}
+              <PaymentEvidenceTimelinePanel
+                key={
+                  detail.item.id +
+                  ':' +
+                  detail.item.attemptVersion +
+                  ':' +
+                  detail.item.jobVersion +
+                  ':' +
+                  detail.item.noteCount
+                }
+                warehouseId={warehouseId}
+                snapshot={detail.item}
+                refresh={() => void open(detail.item.id)}
+                disabled={busy}
+              />
             </section>
           )}
         </>
