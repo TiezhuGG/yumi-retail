@@ -528,3 +528,18 @@ GET /admin/payment-readiness仍固定canStartPayment=false，CALLBACK保持BLOCK
 GET /api/v1/admin/payment-close-lab?warehouseId=UUID返回enabled、syntheticOnly=true、callbackEnabled=false及12项code/title。POST同路径/run仅接收空对象{}，返回completedAt及实际纯判定运算结果PASSED/FAILED，不接收订单号、状态或支付报文，不产生业务写入。
 
 员工Cookie、payment-readiness.read（默认SUPER_ADMIN）和授权启用仓库必需；POST还需可信Origin/CSRF及PAYMENT_NOTIFICATION_LAB_ENABLED=1，默认503。非法/额外输入400，未登录401，无权限/无仓库范围403。仍限制非生产loopback及本地yumi_dev/yumi_test。运行结果只是确定性处理预案与结果顺序检查，不能当成渠道并发或支付成功验收。现有消费者取消API/worker接口不变，底层释放改为锁定重读真实订单再决策。
+
+## 2026-11-01 合成支付尝试 API（0.19.0）
+
+以下/api/v1/admin/payment-attempt-lab均需要员工Cookie、payment-readiness.read（默认SUPER_ADMIN）及warehouseId授权启用仓库。GET在实验关闭时仍可读；POST另需可信Origin/CSRF及默认关闭的PAYMENT_NOTIFICATION_LAB_ENABLED=1，仅非生产loopback和本地yumi_dev/yumi_test允许。
+
+| 方法与路径 | 输入/输出 |
+|---|---|
+| GET / | warehouseId、可选cursor；20条摘要、nextCursor、enabled、syntheticOnly=true、callbackEnabled=false |
+| GET /:id | 当前证据、处理预案及最多101条版本顺序事件 |
+| POST / | 仅body{key:UUID}；先保存尝试/STARTED事件及审计，返回attempt、duplicate |
+| POST /:id/actions/unknown-result | 仅{key:UUID}；保存UNKNOWN_RESULT合成观察 |
+| POST /:id/actions/closed-result | 仅{key:UUID}；保存CLOSED_RESULT合成观察 |
+| POST /:id/actions/success-result | 仅{key:UUID}；保存SUCCESS_RESULT合成观察 |
+
+不接受订单号、任意状态、凭据或报文。证据NONE/UNKNOWN/CLOSED/SUCCEEDED/CONFLICT与paymentCloseDecision处理预案同查；releaseAllowed始终false。详情锁定同一尝试，避免读取旧汇总配新事件；按createdAt/id稳定降序分页。未登录401，无权限/范围403，非法UUID/动作/额外字段400，不存在记录或游标404，同键动作冲突/100次结果上限409，默认关闭503。同键重试返回当前详情，不承诺重放旧响应快照；幂等保证副作用只发生一次。

@@ -405,3 +405,11 @@ stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；
 本轮无迁移。releaseUnpaidOrder在事务内按订单ID FOR UPDATE重读id/user_id/warehouse_id/status/payment_state，校验调用者身份/仓库/支付快照，再基于真实行判断。已取消返回，只有AWAITING_PAYMENT+NOT_STARTED才允许本地释放；现有余额/分配/支付准备关闭/流水与事件仍在同一事务，数据库约束未放宽。旧快照并发调用在锁后看到已取消，不再重复释放或因旧快照二次过账。
 
 新增纯paymentCloseDecision及mergePaymentEvidence。NONE/UNKNOWN/CLOSED/SUCCEEDED/CONFLICT为隔离证据输入；合并满足幂等、交换、结合，成功与关闭冲突粘滞，未知不降级已知结果。只有未发起且无证据返回releaseAllowed=true。其余返回查单、请求关闭、事务核对或人工核查预案；没有实现这些动作。本轮证据不持久化，未来适配器必须按同一支付尝试在数据库锁内合并证据，持久化支付已发起状态后才可调用渠道，不能将纯函数返回值直接当作入账或释放许可。现有真实支付禁用，订单仍无PAID/PENDING状态。
+
+## 2026-11-01 合成尝试与证据事件链
+
+新增202611010004_payment_attempt_labs迁移。payment_attempt_labs保存id、warehouse_id、创建key、evidence、version、created_at，(warehouse_id,key)唯一且有仓库/时间/id游标索引。payment_attempt_lab_events保存attempt_id、操作key、业务action、observation、合并后evidence、version、created_at，(attempt_id,key)/(attempt_id,version)唯一。独立合成表与真实订单/支付准备没有关联，无金额、顾客、凭据或报文字段。
+
+创建以仓库/键事务锁保证一次STARTED；后续按尝试行FOR UPDATE串行合并。首次写入和每个新操作的业务审计同事务，重复操作不追加事件或审计。STARTED为版本0且key等于创建键；每个新结果版本加1，上限100。数据库触发器拒绝变更身份/创建时间、删除尝试、修改或删除事件；延迟约束验证完整连续事件链、观察与动作映射、合并规则及最终汇总一致。SQL合并函数与共享纯函数全25对证据组合对比通过，成功/关闭冲突不可被未知结果洗掉。
+
+本轮仅持久化隔离证据及预案，未接收真实渠道结果，未实现自动查单任务/租约/重试调度或支付入账。部署需停旧API/Worker写入、迁移、生成客户端并构建后启动新版；只增表，无已有数据回填。本机开发/测试库已应用；其他环境仍需按门禁部署，可保留新表退回旧应用，禁止删除事实或清库回退。

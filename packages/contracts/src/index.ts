@@ -539,3 +539,34 @@ export interface NotificationRecorded {
   record: NotificationRecord;
   duplicate: boolean;
 }
+
+export interface PaymentAttemptLabSummary {
+  id: string;
+  evidence: 'NONE' | 'UNKNOWN' | 'CLOSED' | 'SUCCEEDED' | 'CONFLICT';
+  version: number;
+  createdAt: string;
+  syntheticOnly: true;
+  plan: string;
+  releaseAllowed: false;
+}
+export interface PaymentAttemptLabDetail extends PaymentAttemptLabSummary {
+  events: Array<{
+    id: string;
+    action: string;
+    observation: string;
+    evidence: string;
+    version: number;
+    createdAt: string;
+  }>;
+}
+export interface PaymentAttemptLabList {
+  enabled: boolean;
+  syntheticOnly: true;
+  callbackEnabled: false;
+  items: PaymentAttemptLabSummary[];
+  nextCursor: string | null;
+}
+export interface PaymentAttemptLabWrite {
+  attempt: PaymentAttemptLabDetail;
+  duplicate: boolean;
+}

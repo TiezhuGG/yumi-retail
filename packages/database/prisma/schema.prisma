@@ -61,6 +61,7 @@ model Warehouse {
   orders ConsumerOrder[]
   checkoutPolicy CheckoutPolicy?
   notificationLabRecords NotificationLabRecord[]
+  paymentAttemptLabs PaymentAttemptLab[]
 }
 
 model Staff {
@@ -911,4 +912,32 @@ model NotificationLabRecord {
  @@unique([warehouseId,notificationId])
  @@index([warehouseId,createdAt,id], map:"notification_lab_records_warehouse_created_idx")
  @@map("notification_lab_records")
+}
+
+model PaymentAttemptLab {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ key String @db.Uuid
+ evidence String @default("NONE") @db.VarChar(16)
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events PaymentAttemptLabEvent[]
+ @@unique([warehouseId,key])
+ @@index([warehouseId,createdAt,id],map:"payment_attempt_labs_warehouse_created_idx")
+ @@map("payment_attempt_labs")
+}
+model PaymentAttemptLabEvent {
+ id String @id @db.Uuid
+ attemptId String @map("attempt_id") @db.Uuid
+ key String @db.Uuid
+ action String @db.VarChar(24)
+ observation String @db.VarChar(16)
+ evidence String @db.VarChar(16)
+ version Int
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ attempt PaymentAttemptLab @relation(fields:[attemptId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([attemptId,key])
+ @@unique([attemptId,version])
+ @@map("payment_attempt_lab_events")
 }

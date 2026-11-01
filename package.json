@@ -88,7 +88,9 @@
     "test:notification-records": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/notification-records.integration.test.ts",
     "test:payment-close-policy": "node --import tsx --test tests/payment-close-policy.test.ts",
     "pretest:payment-close": "npm run build:server",
-    "test:payment-close": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-close.integration.test.ts"
+    "test:payment-close": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-close.integration.test.ts",
+    "pretest:payment-attempt-lab": "npm run build:server",
+    "test:payment-attempt-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/payment-attempt-lab.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

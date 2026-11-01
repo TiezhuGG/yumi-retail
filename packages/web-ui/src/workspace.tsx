@@ -6,6 +6,7 @@ import { ServiceAreaWorkbench } from './service-area.js';
 import { CatalogWorkbench } from './catalog.js';
 import { PaymentReadinessWorkbench } from './payment-readiness.js';
 import { NotificationRecordsWorkbench } from './notification-records.js';
+import { PaymentAttemptLabWorkbench } from './payment-attempt-lab.js';
 import { PaymentCloseLabWorkbench } from './payment-close-lab.js';
 import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
@@ -26,7 +27,8 @@ export type WorkspaceView =
   | 'payment-readiness'
   | 'notification-lab'
   | 'notification-records'
-  | 'payment-close-lab';
+  | 'payment-close-lab'
+  | 'payment-attempt-lab';
 const routes: Array<{
   id: WorkspaceView;
   name: string;
@@ -102,6 +104,13 @@ const routes: Array<{
     name: '支付关闭验证',
     glyph: '⌘',
     hint: '支付结果与关闭竞争的隔离判定',
+    permission: 'payment-readiness.read',
+  },
+  {
+    id: 'payment-attempt-lab',
+    name: '支付尝试',
+    glyph: '◇',
+    hint: '合成支付尝试与未知结果记录',
     permission: 'payment-readiness.read',
   },
   {
@@ -249,6 +258,8 @@ export function Workspace({
             </div>
           ) : activeView === 'notification-records' ? (
             <NotificationRecordsWorkbench profile={profile} />
+          ) : activeView === 'payment-attempt-lab' ? (
+            <PaymentAttemptLabWorkbench profile={profile} />
           ) : activeView === 'payment-close-lab' ? (
             <PaymentCloseLabWorkbench profile={profile} />
           ) : activeView === 'notification-lab' ? (
@@ -279,6 +290,7 @@ export function Workspace({
                     | 'notification-lab'
                     | 'notification-records'
                     | 'payment-close-lab'
+                    | 'payment-attempt-lab'
                   > =>
                     id !== 'service-area' &&
                     id !== 'checkout-policy' &&
@@ -286,7 +298,8 @@ export function Workspace({
                     id !== 'payment-readiness' &&
                     id !== 'notification-lab' &&
                     id !== 'notification-records' &&
-                    id !== 'payment-close-lab',
+                    id !== 'payment-close-lab' &&
+                    id !== 'payment-attempt-lab',
                 )}
               onNavigate={navigate}
             />
