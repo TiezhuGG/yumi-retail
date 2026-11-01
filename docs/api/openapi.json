@@ -5900,6 +5900,7 @@
                         "enabled",
                         "syntheticOnly",
                         "callbackEnabled",
+                        "queryScenarios",
                         "items",
                         "nextCursor"
                       ],
@@ -5918,6 +5919,25 @@
                           "enum": [
                             false
                           ]
+                        },
+                        "queryScenarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "title"
+                            ],
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "items": {
                           "type": "array",
@@ -6320,6 +6340,10 @@
                                     "required": [
                                       "id",
                                       "reason",
+                                      "classification",
+                                      "resultEvidence",
+                                      "next",
+                                      "scenario",
                                       "state",
                                       "attempts",
                                       "createdAt"
@@ -6330,6 +6354,22 @@
                                       },
                                       "reason": {
                                         "type": "string"
+                                      },
+                                      "classification": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "resultEvidence": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "next": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "scenario": {
+                                        "type": "string",
+                                        "nullable": true
                                       },
                                       "state": {
                                         "type": "string"
@@ -6710,6 +6750,10 @@
                                 "required": [
                                   "id",
                                   "reason",
+                                  "classification",
+                                  "resultEvidence",
+                                  "next",
+                                  "scenario",
                                   "state",
                                   "attempts",
                                   "createdAt"
@@ -6720,6 +6764,22 @@
                                   },
                                   "reason": {
                                     "type": "string"
+                                  },
+                                  "classification": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "resultEvidence": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "next": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "scenario": {
+                                    "type": "string",
+                                    "nullable": true
                                   },
                                   "state": {
                                     "type": "string"
@@ -7011,7 +7071,30 @@
               "schema": {
                 "type": "object",
                 "required": [],
-                "properties": {},
+                "properties": {
+                  "scenario": {
+                    "type": "string",
+                    "enum": [
+                      "SUCCESS",
+                      "CLOSED",
+                      "NOTPAY",
+                      "USERPAYING",
+                      "TIMEOUT",
+                      "NETWORK",
+                      "RATE",
+                      "RULE",
+                      "SERVER",
+                      "MISSING",
+                      "REJECTED",
+                      "UNVERIFIED",
+                      "BINDING",
+                      "AMOUNT",
+                      "MALFORMED",
+                      "NO_TRANSACTION",
+                      "UNSUPPORTED"
+                    ]
+                  }
+                },
                 "additionalProperties": false
               }
             }
@@ -7393,6 +7476,10 @@
                                 "required": [
                                   "id",
                                   "reason",
+                                  "classification",
+                                  "resultEvidence",
+                                  "next",
+                                  "scenario",
                                   "state",
                                   "attempts",
                                   "createdAt"
@@ -7403,6 +7490,22 @@
                                   },
                                   "reason": {
                                     "type": "string"
+                                  },
+                                  "classification": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "resultEvidence": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "next": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "scenario": {
+                                    "type": "string",
+                                    "nullable": true
                                   },
                                   "state": {
                                     "type": "string"
@@ -7899,6 +8002,10 @@
                                     "required": [
                                       "id",
                                       "reason",
+                                      "classification",
+                                      "resultEvidence",
+                                      "next",
+                                      "scenario",
                                       "state",
                                       "attempts",
                                       "createdAt"
@@ -7909,6 +8016,22 @@
                                       },
                                       "reason": {
                                         "type": "string"
+                                      },
+                                      "classification": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "resultEvidence": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "next": {
+                                        "type": "string",
+                                        "nullable": true
+                                      },
+                                      "scenario": {
+                                        "type": "string",
+                                        "nullable": true
                                       },
                                       "state": {
                                         "type": "string"
@@ -8273,7 +8396,8 @@
                 "ALL",
                 "UNKNOWN",
                 "CONFLICT",
-                "EXHAUSTED"
+                "EXHAUSTED",
+                "REVIEW"
               ],
               "type": "string"
             }
@@ -46813,7 +46937,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "contact": {}
   },
   "tags": [],

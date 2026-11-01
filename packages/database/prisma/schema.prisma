@@ -965,6 +965,10 @@ model PaymentQueryLabJob {
  @@map("payment_query_lab_jobs")
 }
 model PaymentQueryLabEvent {
+ classification String? @db.VarChar(32)
+ resultEvidence String? @map("result_evidence") @db.VarChar(16)
+ next String? @db.VarChar(16)
+ scenario String? @db.VarChar(32)
  id String @id @db.Uuid
  jobId String @map("job_id") @db.Uuid
  key String @db.Uuid

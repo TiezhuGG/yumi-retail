@@ -10,13 +10,13 @@ import { failure, success } from './http.js';
 import type { ApiRequest } from './http.js';
 import { object, ApiResult, text } from './api-result.js';
 type Tx = Prisma.TransactionClient;
-const filters = ['ALL', 'UNKNOWN', 'CONFLICT', 'EXHAUSTED'] as const;
+const filters = ['ALL', 'UNKNOWN', 'CONFLICT', 'EXHAUSTED', 'REVIEW'] as const;
 export type ReviewFilter = (typeof filters)[number];
 const attention: Prisma.PaymentAttemptLabWhereInput = {
   OR: [
     { evidence: 'UNKNOWN' },
     { evidence: 'CONFLICT' },
-    { queryJob: { is: { state: 'EXHAUSTED' } } },
+    { queryJob: { is: { state: { in: ['EXHAUSTED', 'REVIEW'] } } } },
   ],
 };
 const selected = { queryJob: true, _count: { select: { reviewNotes: true } } } as const;
@@ -30,7 +30,9 @@ const item = (r: Row): PaymentReviewCase => ({
   createdAt: r.createdAt.toISOString(),
   noteCount: r._count.reviewNotes,
   needsReview:
-    r.evidence === 'UNKNOWN' || r.evidence === 'CONFLICT' || r.queryJob?.state === 'EXHAUSTED',
+    r.evidence === 'UNKNOWN' ||
+    r.evidence === 'CONFLICT' ||
+    ['EXHAUSTED', 'REVIEW'].includes(r.queryJob?.state ?? ''),
   syntheticOnly: true,
 });
 const noteView = (
@@ -74,8 +76,8 @@ export class PaymentReviewLabService {
       const scope: Prisma.PaymentAttemptLabWhereInput =
         filter === 'ALL'
           ? attention
-          : filter === 'EXHAUSTED'
-            ? { queryJob: { is: { state: 'EXHAUSTED' } } }
+          : filter === 'EXHAUSTED' || filter === 'REVIEW'
+            ? { queryJob: { is: { state: filter } } }
             : { evidence: filter };
       const rows = await tx.paymentAttemptLab.findMany({
         where: {

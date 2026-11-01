@@ -2439,3 +2439,31 @@ small {
   margin: 12px 0;
   overflow-wrap: anywhere;
 }
+
+.query-scenario {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  max-width: 100%;
+}
+.query-scenario select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.query-lab-panel .readiness-check p {
+  overflow-wrap: anywhere;
+}
+
+.query-scenario {
+  max-width: 38rem;
+}
+.query-scenario select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}

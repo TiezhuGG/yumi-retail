@@ -36,3 +36,6 @@ export {
   runPaymentQueryLabOnce,
   retryPaymentQueryLab,
 } from './payment-query-lab.js';
+
+export * from './payment-query-adapter.js';
+export * from './payment-adapter-fixtures.js';

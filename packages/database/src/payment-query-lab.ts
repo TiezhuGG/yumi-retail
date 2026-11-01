@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from './generated/prisma/client.js';
 import type { createDatabase } from './index.js';
+import { adapterFixtureBinding, paymentAdapterCases } from './payment-adapter-fixtures.js';
+import { executePaymentQuery, type PaymentQueryObservation } from './payment-query-adapter.js';
 import { mergePaymentEvidence } from './payment-close-policy.js';
 type Tx = Prisma.TransactionClient;
 type Job = Prisma.PaymentQueryLabJobGetPayload<Record<string, never>>;
@@ -55,6 +57,8 @@ async function change(
   reason: string,
   key: string = randomUUID(),
   attemptEventId?: string,
+  result?: PaymentQueryObservation,
+  scenario?: string,
 ) {
   const row = await tx.paymentQueryLabJob.update({
     where: { id: job.id },
@@ -70,6 +74,10 @@ async function change(
       attempts: row.attempts,
       version: row.version,
       attemptEventId,
+      classification: result?.classification,
+      resultEvidence: result?.evidence,
+      next: result?.next,
+      scenario,
     },
   });
   return row;
@@ -121,7 +129,12 @@ export async function claimPaymentQueryLab(
 export async function finishPaymentQueryLab(
   db: ReturnType<typeof createDatabase>,
   lease: QueryLabLease,
+  scenario = 'NOTPAY',
 ): Promise<boolean> {
+  const fixture = paymentAdapterCases.find((c) => c.code === scenario);
+  if (!fixture) throw Error('INVALID_QUERY_SCENARIO');
+  // Fixed in-memory fixtures only. Query outside the transaction, then validate the lease again.
+  const result = await executePaymentQuery(fixture.adapter, adapterFixtureBinding, fixture.timeout);
   return db.$transaction(async (tx) => {
     const warehouses = await tx.$queryRaw<
       { enabled: boolean }[]
@@ -144,18 +157,25 @@ export async function finishPaymentQueryLab(
       job.leaseUntil <= now
     )
       return false;
-    if (attempt.evidence !== 'UNKNOWN' || attempt.version >= 100) {
+    if (
+      (attempt.evidence !== 'UNKNOWN' && result.evidence === 'UNKNOWN') ||
+      attempt.version >= 100
+    ) {
       await change(
         tx,
         job,
-        { state: 'DONE', leaseToken: null, leaseUntil: null },
+        {
+          state: attempt.evidence === 'CONFLICT' ? 'REVIEW' : 'DONE',
+          leaseToken: null,
+          leaseUntil: null,
+        },
         attempt.evidence !== 'UNKNOWN' ? 'STOPPED_KNOWN' : 'EVENT_LIMIT',
         lease.token,
       );
       return true;
     }
-    // Deliberately synthetic: no HTTP adapter or credentials. Never reports paid/closed.
-    const evidence = mergePaymentEvidence(attempt.evidence, 'UNKNOWN'),
+    // Synthetic evidence only; never linked to an order or real funds.
+    const evidence = mergePaymentEvidence(attempt.evidence, result.evidence),
       version = attempt.version + 1,
       eventId = randomUUID();
     await tx.paymentAttemptLab.update({ where: { id: attempt.id }, data: { evidence, version } });
@@ -164,8 +184,13 @@ export async function finishPaymentQueryLab(
         id: eventId,
         attemptId: attempt.id,
         key: lease.token,
-        action: 'UNKNOWN_RESULT',
-        observation: 'UNKNOWN',
+        action:
+          result.evidence === 'SUCCEEDED'
+            ? 'SUCCESS_RESULT'
+            : result.evidence === 'CLOSED'
+              ? 'CLOSED_RESULT'
+              : 'UNKNOWN_RESULT',
+        observation: result.evidence,
         evidence,
         version,
       },
@@ -174,14 +199,29 @@ export async function finishPaymentQueryLab(
       tx,
       job,
       {
-        state: job.attempts >= 3 ? 'EXHAUSTED' : 'RETRY',
+        state:
+          evidence === 'CONFLICT' || result.next === 'REVIEW'
+            ? 'REVIEW'
+            : result.next === 'RECONCILE'
+              ? 'DONE'
+              : job.attempts >= 3
+                ? 'EXHAUSTED'
+                : 'RETRY',
         leaseToken: null,
         leaseUntil: null,
         nextRunAt: new Date(now.getTime() + (job.attempts === 1 ? 1000 : 5000)),
       },
-      job.attempts >= 3 ? 'EXHAUSTED_UNKNOWN' : 'RETRY_UNKNOWN',
+      evidence === 'CONFLICT' || result.next === 'REVIEW'
+        ? 'REVIEW_REQUIRED'
+        : result.next === 'RECONCILE'
+          ? 'CLASSIFIED_KNOWN'
+          : job.attempts >= 3
+            ? 'EXHAUSTED_UNKNOWN'
+            : 'RETRY_UNKNOWN',
       lease.token,
       eventId,
+      result,
+      scenario,
     );
     return true;
   });
@@ -189,10 +229,12 @@ export async function finishPaymentQueryLab(
 export async function runPaymentQueryLabOnce(
   db: ReturnType<typeof createDatabase>,
   warehouseId?: string,
+  scenario = 'NOTPAY',
 ) {
+  if (!paymentAdapterCases.some((c) => c.code === scenario)) throw Error('INVALID_QUERY_SCENARIO');
   const lease = await claimPaymentQueryLab(db, warehouseId);
   if (!lease) return { processed: false };
-  return { processed: await finishPaymentQueryLab(db, lease) };
+  return { processed: await finishPaymentQueryLab(db, lease, scenario) };
 }
 export async function retryPaymentQueryLab(
   tx: Tx,

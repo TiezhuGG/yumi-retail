@@ -84,9 +84,9 @@ const evidenceLabel: Record<string, string> = {
 };
 const actionLabel: Record<string, string> = {
   STARTED: '开始合成尝试',
-  UNKNOWN_RESULT: '模拟响应丢失',
-  CLOSED_RESULT: '模拟查单关闭',
-  SUCCESS_RESULT: '模拟查单成功',
+  UNKNOWN_RESULT: '已记录未知结果',
+  CLOSED_RESULT: '已记录合成关闭证据',
+  SUCCESS_RESULT: '已记录合成成功证据',
 };
 const planLabel: Record<string, string> = {
   REQUEST_CHANNEL_CLOSE: '后续应请求渠道关闭；本页未调用渠道。',
@@ -100,7 +100,8 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
     [selected, setSelected] = useState<PaymentAttemptLabDetail | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [scenario, setScenario] = useState('NOTPAY');
   const seq = useRef(0),
     active = useRef(false),
     keys = useRef<Record<string, string>>({});
@@ -234,12 +235,12 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
     const n = ++seq.current,
       op = selected?.id + ':retry-query';
     try {
-      await staffRequest(
+      const response = await staffRequest<{ processed?: boolean }>(
         base + (retry ? '/' + selected!.id + '/retry-query' : '/run-query-cycle') + query,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
-          body: JSON.stringify(retry ? { key: keyFor(op) } : {}),
+          body: JSON.stringify(retry ? { key: keyFor(op) } : { scenario }),
         },
       );
       if (retry) clearKey(op);
@@ -247,7 +248,9 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
       setMessage(
         retry
           ? '合成查询已重新安排，仍未调用真实渠道。'
-          : '本仓一轮合成查询已检查，请查看任务状态及历史。',
+          : response.processed
+            ? '本仓一轮合成查询已处理，请查看任务状态及分类历史。'
+            : '本仓暂无可领取的到期查询；请刷新查看，待核查任务不会自动领取。',
       );
       if (selected) {
         const detail = await staffRequest<PaymentAttemptLabDetail>(
@@ -383,14 +386,17 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
               <section className="readiness-help query-lab-panel">
                 <h3>合成查询补偿任务</h3>
                 <p>
-                  适配器只返回合成未知结果，不访问微信。自动 Worker
-                  默认关闭；手动运行只处理本仓一个到期任务，未到期时不会执行。
+                  适配器只使用固定内存场景，不访问微信。自动 Worker
+                  默认关闭且启用时使用“未支付”合成场景；手动运行处理本仓下一个到期任务，可能是其他尝试，未到期时不执行。待人工核查后停止自动领取，备注不恢复查询。
                 </p>
                 {selected.queryJob ? (
                   <>
                     <span
                       className={
-                        'badge ' + (selected.queryJob.state === 'EXHAUSTED' ? 'red' : 'amber')
+                        'badge ' +
+                        (['EXHAUSTED', 'REVIEW'].includes(selected.queryJob.state)
+                          ? 'red'
+                          : 'amber')
                       }
                     >
                       {
@@ -400,6 +406,7 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                             LEASED: '已领取，租约执行中',
                             DONE: '任务已停止，仍需核对结果',
                             EXHAUSTED: '已耗尽，等待核查',
+                            REVIEW: '待人工核查，自动查询已停止',
                           } as Record<string, string>
                         )[selected.queryJob.state]
                       }
@@ -424,6 +431,21 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                 ) : (
                   <p>尚无查询任务；记录未知结果后会自动安排。</p>
                 )}
+                <label className="query-scenario">
+                  下一轮合成查询场景
+                  <select
+                    aria-label="下一轮合成查询场景"
+                    value={scenario}
+                    disabled={busy || !data.enabled}
+                    onChange={(e) => setScenario(e.target.value)}
+                  >
+                    {data.queryScenarios.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <div className="toolbar">
                   <button
                     className="secondary-button"
@@ -465,11 +487,28 @@ function AttemptsPanel({ warehouseId, profile }: { warehouseId: string; profile:
                                     EVENT_LIMIT: '证据记录已达上限，停止查询',
                                     MANUAL_RETRY: '负责人重新安排查询',
                                     LEASE_EXHAUSTED: '租约多次中断，等待核查',
+                                    REVIEW_REQUIRED: '已停止查询，转人工核查',
+                                    CLASSIFIED_KNOWN: '已记录合成已知证据，等待事务核对',
                                   } as Record<string, string>
                                 )[e.reason]
                               }
                             </h3>
                           </div>
+                          {e.classification ? (
+                            <p>
+                              分类：{e.classification} · 场景：{e.scenario}
+                              <br />
+                              查询证据：{evidenceLabel[e.resultEvidence ?? 'UNKNOWN']} · 建议：
+                              {e.next === 'RETRY'
+                                ? '继续查单'
+                                : e.next === 'REVIEW'
+                                  ? '人工核查'
+                                  : '事务核对'}
+                              ；冲突证据优先人工核查。
+                            </p>
+                          ) : (
+                            <p>本事件不含查询响应。</p>
+                          )}
                           <p>
                             {new Date(e.createdAt).toLocaleString('zh-CN', {
                               timeZone: 'Asia/Shanghai',

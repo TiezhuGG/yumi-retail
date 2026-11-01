@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import {
+  paymentAdapterCases,
   mergePaymentEvidence,
   paymentCloseDecision,
   schedulePaymentQueryLab,
@@ -85,6 +86,10 @@ export class PaymentAttemptLabService {
       events: job.events.map((e) => ({
         id: e.id,
         reason: e.reason,
+        classification: e.classification,
+        resultEvidence: e.resultEvidence,
+        next: e.next,
+        scenario: e.scenario,
         state: e.state,
         attempts: e.attempts,
         createdAt: e.createdAt.toISOString(),
@@ -106,16 +111,23 @@ export class PaymentAttemptLabService {
           e instanceof Error &&
           ['QUERY_RETRY_NOT_ALLOWED', 'QUERY_KEY_CONFLICT'].includes(e.message)
         )
-          throw failure(409, e.message, '只有未知且已耗尽的任务可重新安排查询');
+          throw failure(
+            409,
+            e.message,
+            '只有未知且已耗尽的任务可重新安排查询，待人工核查任务不能自动恢复',
+          );
         throw e;
       }
       return this.view(tx, attempt);
     });
   }
-  async runQuery(r: ApiRequest, w: string) {
+  async runQuery(r: ApiRequest, w: string, scenario = 'NOTPAY') {
     this.writable();
     await this.catalog.warehouse(this.catalog.db, r, w);
-    return { ...(await runPaymentQueryLabOnce(this.catalog.db, w)), syntheticOnly: true as const };
+    return {
+      ...(await runPaymentQueryLabOnce(this.catalog.db, w, scenario)),
+      syntheticOnly: true as const,
+    };
   }
   async list(r: ApiRequest, w: string, cursor?: string) {
     return this.catalog.db.$transaction(async (tx) => {
@@ -143,6 +155,7 @@ export class PaymentAttemptLabService {
         enabled: this.enabled,
         syntheticOnly: true as const,
         callbackEnabled: false as const,
+        queryScenarios: paymentAdapterCases.map(({ code, title }) => ({ code, title })),
         items: rows.slice(0, 20).map(summary),
         nextCursor: rows.length > 20 ? rows[19]!.id : null,
       };
@@ -242,6 +255,10 @@ const querySchema = object({
     items: object({
       id: text,
       reason: text,
+      classification: { ...text, nullable: true },
+      resultEvidence: { ...text, nullable: true },
+      next: { ...text, nullable: true },
+      scenario: { ...text, nullable: true },
       state: text,
       attempts: { type: 'integer' },
       createdAt: text,
@@ -280,6 +297,7 @@ export class PaymentAttemptLabController {
       enabled: { type: 'boolean' },
       syntheticOnly: { type: 'boolean', enum: [true] },
       callbackEnabled: { type: 'boolean', enum: [false] },
+      queryScenarios: { type: 'array', items: object({ code: text, title: text }) },
       items: { type: 'array', items: object(props) },
       nextCursor: { type: 'string', nullable: true },
     }),
@@ -308,15 +326,25 @@ export class PaymentAttemptLabController {
   @HttpCode(200)
   @ApiQuery({ name: 'warehouseId', required: true, type: String })
   @ApiHeader({ name: 'X-CSRF-Token', required: true })
-  @ApiBody({ schema: object({}) })
+  @ApiBody({
+    schema: {
+      ...object({ scenario: { type: 'string', enum: paymentAdapterCases.map((c) => c.code) } }),
+      required: [],
+    },
+  })
   @ApiResult(
     object({ processed: { type: 'boolean' }, syntheticOnly: { type: 'boolean', enum: [true] } }),
     [400, 401, 403, 503, 500],
   )
   async runQuery(@Req() r: ApiRequest, @Query() q: unknown, @Body() body: unknown) {
     const b = fields(q, ['warehouseId']);
-    fields(body, []);
-    return success(r, await this.service.runQuery(r, uuid(b.warehouseId)));
+    const v = fields(body, ['scenario']);
+    if (v.scenario !== undefined && !paymentAdapterCases.some((c) => c.code === v.scenario))
+      throw failure(400, 'INVALID_INPUT', '请选择固定合成查询场景');
+    return success(
+      r,
+      await this.service.runQuery(r, uuid(b.warehouseId), v.scenario as string | undefined),
+    );
   }
   @Post(':id/retry-query')
   @HttpCode(200)

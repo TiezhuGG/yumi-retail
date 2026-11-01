@@ -298,6 +298,16 @@ test('migration backfills a pre-existing isolated UNKNOWN attempt with paired du
       'SELECT j.state,j.attempts,e.reason FROM payment_query_lab_jobs j JOIN payment_query_lab_events e ON e.job_id=j.id',
     );
     assert.deepEqual(rows.rows, [{ state: 'RETRY', attempts: 0, reason: 'SCHEDULED' }]);
+    for (const dir of dirs.filter((n) => n > '202611010005_payment_query_labs'))
+      await client.query(
+        await readFile('packages/database/prisma/migrations/' + dir + '/migration.sql', 'utf8'),
+      );
+    const upgraded = await client.query(
+      'SELECT classification,result_evidence,next,scenario FROM payment_query_lab_events',
+    );
+    assert.deepEqual(upgraded.rows, [
+      { classification: null, result_evidence: null, next: null, scenario: null },
+    ]);
   } finally {
     await client.query('ROLLBACK');
     await client.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE');

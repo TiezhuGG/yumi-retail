@@ -558,6 +558,10 @@ export interface PaymentAttemptLabDetail extends PaymentAttemptLabSummary {
     events: Array<{
       id: string;
       reason: string;
+      classification: string | null;
+      resultEvidence: string | null;
+      next: string | null;
+      scenario: string | null;
       state: string;
       attempts: number;
       createdAt: string;
@@ -573,6 +577,7 @@ export interface PaymentAttemptLabDetail extends PaymentAttemptLabSummary {
   }>;
 }
 export interface PaymentAttemptLabList {
+  queryScenarios: { code: string; title: string }[];
   enabled: boolean;
   syntheticOnly: true;
   callbackEnabled: false;

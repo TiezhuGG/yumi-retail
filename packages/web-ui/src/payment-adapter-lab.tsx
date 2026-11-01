@@ -247,8 +247,8 @@ function LabPanel({ warehouseId, profile }: { warehouseId: string; profile: Staf
           <section className="surface readiness-help">
             <h2>仍需后续交付</h2>
             <p>
-              此契约不包含真实HTTP适配器、响应密码学验签、凭据管理或数据库写入，合成 authenticated
-              标志不等同验签。现有查询Worker仍只生成合成未知结果；下一步接入分类持久化与任务处理，不自动退款或推进履约。
+              契约核心不包含真实HTTP适配器、响应密码学验签或凭据管理，合成 authenticated
+              标志不等同验签。查询任务现已保存合成分类并区分重试与核查，可在“支付尝试”详情查看；本页验证仍不写入记录，不自动退款或推进履约。
             </p>
           </section>
         </>

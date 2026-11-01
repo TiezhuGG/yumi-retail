@@ -571,3 +571,12 @@ POST /:id/notes?warehouseId=UUID仅{key:UUID,note:string,attemptVersion:integer,
 内部PaymentQueryAdapter.query(binding,signal)返回unknown，executePaymentQuery只调用一次，等待默认3000ms，允许1至10000整数毫秒；超时发出abort并丢弃迟到结果，不在内部重试。异常不返回原文。调用方必须保存原查询绑定并负责后续退避、持久化与核查；这些尚未接入。未来HTTP实现需先验证响应原始字节，再提供authenticated=true，外部API不能传入此标志。本轮无真实HTTP请求或渠道回调入口。
 
 查询协议错误码参照[微信支付小程序查单官方文档](https://pay.wechatpay.cn/doc/v3/merchant/4012791900)：RULE_LIMIT对应业务频率限制，ORDER_NOT_EXIST应核查订单创建，SYSTEM_ERROR应以原参数重试。本项目将不存在/绑定异常保留UNKNOWN并转核查，为保护性策略；真实接入仍需独立验签及渠道验收。
+
+## 2026-11-01 查询分类隔离接入（OpenAPI 0.23.0）
+
+- GET `/admin/payment-attempt-lab?warehouseId=…`增量返回queryScenarios(code/title)，供17个固定合成场景选择。
+- POST `/admin/payment-attempt-lab/run-query-cycle?warehouseId=…`兼容空JSON，新增可选scenario，默认NOTPAY，值仅queryScenarios中的code。仍需员工Cookie、支付检查权限、授权仓库、Origin及CSRF，实验关闭503；未知场景/原始响应/多余字段400且不领取任务。返回processed表示是否成功提交一条本仓到期任务，不保证是当前详情记录。
+- 尝试详情queryJob.events新增可空classification、resultEvidence、next、scenario。历史/领取/停止事件没有查询结果时全部null；不返回租约令牌或原始渠道材料。任务状态新增REVIEW。
+- `/admin/payment-review-lab?warehouseId=…&filter=REVIEW`筛选分类待核查任务。备注的taskState快照兼容REVIEW；其他权限、游标及版本校验不变。
+
+手动“运行一轮”是一次执行触发，不是原键重放命令；响应不明时应刷新详情确认，界面不自动重试。领取仍排除未到期及REVIEW任务，租约令牌只允许一次有效完成。原键重新安排仅适用于UNKNOWN+EXHAUSTED，不能恢复REVIEW。真实支付接口未增加。

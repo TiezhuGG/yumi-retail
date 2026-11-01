@@ -76,6 +76,9 @@ export async function addressFixture(
     };
     return { runtime, base, identity, areaId, buildingId, warehouseId, cleanup };
   } catch (e) {
+    // A transactional migration may fail before COMMIT. Clear the aborted transaction
+    // so schema cleanup can still run and the diagnostic is not masked.
+    await admin.query('ROLLBACK');
     await cleanup();
     throw e;
   }

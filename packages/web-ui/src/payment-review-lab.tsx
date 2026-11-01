@@ -87,6 +87,7 @@ const taskLabel: Record<string, string> = {
   LEASED: '租约已领取',
   DONE: '自动查询已停止',
   EXHAUSTED: '查询已耗尽',
+  REVIEW: '分类要求人工核查',
 };
 function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: StaffProfile }) {
   const [data, setData] = useState<PaymentReviewList | null>(null),
@@ -263,6 +264,7 @@ function ReviewsPanel({ warehouseId, profile }: { warehouseId: string; profile: 
               ['UNKNOWN', '结果未知'],
               ['CONFLICT', '结果冲突'],
               ['EXHAUSTED', '查询耗尽'],
+              ['REVIEW', '分类待核查'],
             ].map(([value, title]) => (
               <option key={value} value={value}>
                 {title}
