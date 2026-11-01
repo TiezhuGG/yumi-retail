@@ -26,3 +26,5 @@ export {
   releaseUnpaidOrder,
   expireUnpaidOrders,
 } from './order-reservations.js';
+
+export { mergePaymentEvidence, paymentCloseDecision } from './payment-close-policy.js';

@@ -522,3 +522,9 @@ GET /admin/payment-readiness仍固定canStartPayment=false，CALLBACK保持BLOCK
 | POST /admin/payment-notification-records/:id/replay | body仅{}，按已有合成标识重新生成签名和密文，重复事实返回同一record |
 
 未知字段/非法UUID400，未登录401，无权限/无仓库范围403，未知游标404，事实冲突409，实验关闭503。每次原文验签及解密后，使用固定字段顺序的已验证事实SHA256判等，不以密文相同为前提；通知标识唯一范围为本隔离表内的warehouseId。事务锁和唯一约束保护竞争，首次记录与业务审计同事务提交；重复接收不重复审计或业务写入。此API没有真实通知入口、订单匹配和付款确认能力；未来真实渠道必须另有商户/渠道命名空间和业务幂等设计。
+
+## 2026-11-01 支付关闭判定实验（0.18.0）
+
+GET /api/v1/admin/payment-close-lab?warehouseId=UUID返回enabled、syntheticOnly=true、callbackEnabled=false及12项code/title。POST同路径/run仅接收空对象{}，返回completedAt及实际纯判定运算结果PASSED/FAILED，不接收订单号、状态或支付报文，不产生业务写入。
+
+员工Cookie、payment-readiness.read（默认SUPER_ADMIN）和授权启用仓库必需；POST还需可信Origin/CSRF及PAYMENT_NOTIFICATION_LAB_ENABLED=1，默认503。非法/额外输入400，未登录401，无权限/无仓库范围403。仍限制非生产loopback及本地yumi_dev/yumi_test。运行结果只是确定性处理预案与结果顺序检查，不能当成渠道并发或支付成功验收。现有消费者取消API/worker接口不变，底层释放改为锁定重读真实订单再决策。

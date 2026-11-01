@@ -399,3 +399,9 @@ stock_ledger增量actor_kind默认STAFF，既有actor_id与原字段值不改；
 服务先验证签名与解密，再在事务内检查仓库、按仓库+通知标识取事务锁、查已有事实摘要。相同事实返回原记录；冲突拒绝覆盖。首次写入及NOTIFICATION_LAB_RECORDED业务审计原子提交，审计失败整体回滚。签名/密文及接收时间不参与事实判等；当前合成生产器按操作键生成稳定事实，重启后依赖PostgreSQL而非内存去重。重复尝试次数、冲突尝试和处理状态不在本轮持久化。
 
 部署需停旧API/Worker写入，应用迁移，生成客户端并构建后启动新版；只增表，可保留表退回旧版应用，不能删除记录或清库回退。本机开发/测试库已应用，其他环境需自行按部署门禁执行。
+
+## 2026-11-01 关闭前重读与支付证据判定
+
+本轮无迁移。releaseUnpaidOrder在事务内按订单ID FOR UPDATE重读id/user_id/warehouse_id/status/payment_state，校验调用者身份/仓库/支付快照，再基于真实行判断。已取消返回，只有AWAITING_PAYMENT+NOT_STARTED才允许本地释放；现有余额/分配/支付准备关闭/流水与事件仍在同一事务，数据库约束未放宽。旧快照并发调用在锁后看到已取消，不再重复释放或因旧快照二次过账。
+
+新增纯paymentCloseDecision及mergePaymentEvidence。NONE/UNKNOWN/CLOSED/SUCCEEDED/CONFLICT为隔离证据输入；合并满足幂等、交换、结合，成功与关闭冲突粘滞，未知不降级已知结果。只有未发起且无证据返回releaseAllowed=true。其余返回查单、请求关闭、事务核对或人工核查预案；没有实现这些动作。本轮证据不持久化，未来适配器必须按同一支付尝试在数据库锁内合并证据，持久化支付已发起状态后才可调用渠道，不能将纯函数返回值直接当作入账或释放许可。现有真实支付禁用，订单仍无PAID/PENDING状态。

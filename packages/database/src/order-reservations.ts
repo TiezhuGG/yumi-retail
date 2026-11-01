@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { paymentCloseDecision } from './payment-close-policy.js';
 import { closePaymentPreparation } from './payment-preparation.js';
 import type { Prisma } from './generated/prisma/client.js';
 import type { createDatabase } from './index.js';
@@ -62,16 +63,28 @@ export async function orderReservationDelta(
   });
   return stockLedgerId;
 }
-// Caller holds the order row. Only orders which never started a payment may release without a channel close.
+// Lock and reread the authoritative order, even when the caller has a stale snapshot.
 export async function releaseUnpaidOrder(
   tx: Tx,
   order: { id: string; warehouseId: string; userId: string; status: string; paymentState: string },
   reason: 'CONSUMER_CANCEL' | 'PAYMENT_TIMEOUT',
   requestId: string,
 ) {
-  if (order.status === 'CANCELED') return;
-  if (order.status !== 'AWAITING_PAYMENT' || order.paymentState !== 'NOT_STARTED')
-    throw Error('Order cannot release without payment reconciliation');
+  const rows = await tx.$queryRaw<
+    Array<{ id: string; warehouseId: string; userId: string; status: string; paymentState: string }>
+  >`SELECT id,warehouse_id AS "warehouseId",user_id AS "userId",status,payment_state AS "paymentState" FROM consumer_orders WHERE id=${order.id}::uuid FOR UPDATE`;
+  const current = rows[0];
+  if (
+    !current ||
+    current.warehouseId !== order.warehouseId ||
+    current.userId !== order.userId ||
+    current.paymentState !== order.paymentState
+  )
+    throw Error('Order identity or payment snapshot requires reconciliation');
+  const decision = paymentCloseDecision(current, 'NONE');
+  if (decision.action === 'NOOP_CANCELED') return;
+  if (!decision.releaseAllowed) throw Error('Order cannot release without payment reconciliation');
+  order = current;
   const allocations = await tx.orderAllocation.findMany({
     where: { orderId: order.id },
     orderBy: [{ skuId: 'asc' }, { lotId: 'asc' }, { positionId: 'asc' }],
