@@ -20576,6 +20576,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "timeline",
                               "id",
                               "label",
                               "packageCount",
@@ -20588,6 +20589,54 @@
                               "handoffReadiness"
                             ],
                             "properties": {
+                              "timeline": {
+                                "type": "array",
+                                "maxItems": 7,
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "kind",
+                                    "createdAt",
+                                    "actorName",
+                                    "reason",
+                                    "relatedId"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "DISPATCH",
+                                        "ASSIGN",
+                                        "HANDOFF",
+                                        "START",
+                                        "EXCEPTION",
+                                        "RESOLVE",
+                                        "COMPLETE"
+                                      ]
+                                    },
+                                    "createdAt": {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    "actorName": {
+                                      "type": "string"
+                                    },
+                                    "reason": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "relatedId": {
+                                      "type": "string",
+                                      "nullable": true
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
                               "id": {
                                 "type": "string"
                               },
@@ -21057,6 +21106,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -21069,6 +21119,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -21534,6 +21632,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -21546,6 +21645,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -22092,6 +22239,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -22104,6 +22252,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -22641,6 +22837,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -22653,6 +22850,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -23190,6 +23435,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -23202,6 +23448,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -23745,6 +24039,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -23757,6 +24052,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -24299,6 +24642,7 @@
                         "task": {
                           "type": "object",
                           "required": [
+                            "timeline",
                             "id",
                             "label",
                             "packageCount",
@@ -24311,6 +24655,54 @@
                             "handoffReadiness"
                           ],
                           "properties": {
+                            "timeline": {
+                              "type": "array",
+                              "maxItems": 7,
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "kind",
+                                  "createdAt",
+                                  "actorName",
+                                  "reason",
+                                  "relatedId"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "DISPATCH",
+                                      "ASSIGN",
+                                      "HANDOFF",
+                                      "START",
+                                      "EXCEPTION",
+                                      "RESOLVE",
+                                      "COMPLETE"
+                                    ]
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "relatedId": {
+                                    "type": "string",
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
                             "id": {
                               "type": "string"
                             },
@@ -59388,7 +59780,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.36.0",
+    "version": "0.37.0",
     "contact": {}
   },
   "tags": [],

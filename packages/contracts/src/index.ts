@@ -766,7 +766,16 @@ export interface PickingLabWrite {
   duplicate: boolean;
 }
 
+export type DeliveryTimelineEvent = {
+  id: string;
+  kind: 'DISPATCH' | 'ASSIGN' | 'HANDOFF' | 'START' | 'EXCEPTION' | 'RESOLVE' | 'COMPLETE';
+  createdAt: string;
+  actorName: string;
+  reason: string | null;
+  relatedId: string | null;
+};
 export type DeliveryLabTask = {
+  timeline: DeliveryTimelineEvent[];
   id: string;
   label: string;
   packageCount: number;

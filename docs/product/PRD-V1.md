@@ -527,3 +527,7 @@ PICKING_LAB_ENABLED默认0，仅本机开发/隔离测试可显式启用，生�
 ## 2026-11-02 合成异常清单与概览
 
 配送GET列表新增exceptionState=ALL/OPEN/RESOLVED/NONE（默认ALL），当前授权仓库/骑手本人范围内过滤；游标也校验筛选。summary返回all/open/resolved/none/readAt，三类互斥覆盖全部，统计不受分页/筛选影响并与当前页同一RepeatableRead快照。异常已处置不等于送达。UI计数筛选、原因标识、空/错态和详情返回刷新完成。OpenAPI0.36.0，无迁移和新写入动作；22项PG及实际桌面/手机UI验证通过，截图仅本地忽略。完整边界见S7-DELIVERY-EXCEPTION-LIST-2026-11-02记录。
+
+## 2026-11-02 合成配送凭据时间线
+
+任务DTO新增最多7节点timeline{id,kind,createdAt,actorName,reason,relatedId}，只聚合已保存出库/分配/接货/开始/异常/处置/送达事实，按记录时间及同毫秒固定次序展示；姓名来自不可变凭据/原分配快照，处置关联原异常，不暴露请求键或员工内部ID。复用本仓/本人服务端权限，无迁移或新增状态写入。UI支持异常过滤、无异常空态及滚动/键盘焦点定位。OpenAPI0.37.0，23项相关PG及实际桌面/手机UI验证通过，真实履约/真机/生产仍未验收；详见S7-DELIVERY-TIMELINE-2026-11-02记录。

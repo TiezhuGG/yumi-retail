@@ -813,3 +813,44 @@ test('filtered pagination has global counts and rejects cross-filter cursor', as
   assert.equal(empty.data.summary.none, 21);
   assert.equal((await read('?exceptionState=OPEN&cursor=' + first.data.nextCursor)).status, 404);
 });
+
+test('timeline uses saved facts, source links and immutable names; never invents pending events or leaks request keys', async () => {
+  const id = await ready();
+  let t = (await read('/' + id)).data.task;
+  assert.deepEqual(
+    t.timeline.map((e: { kind: string }) => e.kind),
+    ['DISPATCH'],
+  );
+  const assignKey = randomUUID(),
+    rid = await rider();
+  await assign(id, { key: assignKey, riderId: rid });
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  await stage(id, 'start', { key: randomUUID() });
+  await reportException(id, { key: randomUUID(), reason: 'DAMAGED' });
+  const db = f.runtime.db,
+    e = await db.deliveryLabException.findFirstOrThrow();
+  const resolveKey = randomUUID();
+  await resolveException(id, { key: resolveKey, exceptionId: e.id });
+  await stage(id, 'complete', { key: randomUUID() });
+  t = (await read('/' + id)).data.task;
+  assert.deepEqual(
+    t.timeline.map((v: { kind: string }) => v.kind),
+    ['DISPATCH', 'ASSIGN', 'HANDOFF', 'START', 'EXCEPTION', 'RESOLVE', 'COMPLETE'],
+  );
+  assert.equal(new Set(t.timeline.map((v: { id: string }) => v.id)).size, 7);
+  const event = t.timeline.find((v: { kind: string }) => v.kind === 'RESOLVE');
+  assert.equal(event.relatedId, e.id);
+  assert.equal(event.reason, 'DAMAGED');
+  const original = JSON.stringify(t.timeline);
+  assert.equal(original.includes(assignKey), false);
+  assert.equal(original.includes(resolveKey), false);
+  assert.equal(original.includes(rid), false);
+  await db.staff.update({
+    where: { id: rid },
+    data: { displayName: '新的合成员工名', enabled: false },
+  });
+  assert.equal(JSON.stringify((await read('/' + id)).data.task.timeline), original);
+  assert.equal((await read('/' + id, f.extraCookies[1]!)).status, 401);
+  const other = await otherRider();
+  assert.equal((await read('/' + id, other.cookie)).status, 404);
+});

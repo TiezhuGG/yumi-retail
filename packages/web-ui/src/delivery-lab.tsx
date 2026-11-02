@@ -361,7 +361,10 @@ function DeliveryPanel({
           ) : (
             task && (
               <>
-                <h3>{task.label}</h3>
+                <h3 id={task.id + '--dispatch'} tabIndex={-1}>
+                  {task.label}
+                </h3>
+                <DeliveryTimeline key={task.id} task={task} />
                 <p>
                   {task.packageCount} 个合成包裹 · 合成出库时间 {date(task.dispatchedAt)}
                 </p>
@@ -384,7 +387,12 @@ function DeliveryPanel({
                   </p>
                 </div>
                 {task.handoff ? (
-                  <div className="picking-line" role="status">
+                  <div
+                    className="picking-line"
+                    role="status"
+                    id={task.id + '--handoff'}
+                    tabIndex={-1}
+                  >
                     <h3>不可变合成接货凭据</h3>
                     <p>
                       已核对 {task.handoff.packageCount} 个合成包裹 · {date(task.handoff.createdAt)}
@@ -424,7 +432,9 @@ function DeliveryPanel({
                 />
                 {task.assignment ? (
                   <div className="picking-line">
-                    <h3>不可变分配凭据</h3>
+                    <h3 id={task.id + '--assignment'} tabIndex={-1}>
+                      不可变分配凭据
+                    </h3>
                     <p>骑手：{task.assignment.riderName}</p>
                     <p>
                       分配人：{task.assignment.actorName} · {date(task.assignment.createdAt)}
@@ -634,7 +644,9 @@ function JourneyPanel({
   }
   return (
     <div className="picking-line">
-      <h3>合成配送进度</h3>
+      <h3 id={task.id + '--journey'} tabIndex={-1}>
+        合成配送进度
+      </h3>
       <p>
         {task.journey.completion
           ? '合成送达已记录'
@@ -753,7 +765,9 @@ function ExceptionPanel({
   if (!task.exception && (!task.handoff || task.journey.completion)) return null;
   return (
     <div className="picking-line">
-      <h3>合成配送异常</h3>
+      <h3 id={task.id + '--exception'} tabIndex={-1}>
+        合成配送异常
+      </h3>
       {task.exception && (
         <p role="status">
           {task.exception.resolution ? '已处置异常：' : '未决异常：'}
@@ -894,4 +908,81 @@ function ResolvePanel({
       )}
     </div>
   );
+}
+
+function DeliveryTimeline({ task }: { task: DeliveryLabTask }) {
+  const [filter, setFilter] = useState('ALL');
+  const names: Record<string, string> = {
+    DISPATCH: '合成出库',
+    ASSIGN: '骑手分配',
+    HANDOFF: '本人接货',
+    START: '配送开始',
+    EXCEPTION: '异常上报',
+    RESOLVE: '异常处置',
+    COMPLETE: '合成送达',
+  };
+  const target: Record<string, string> = {
+    DISPATCH: 'dispatch',
+    ASSIGN: 'assignment',
+    HANDOFF: 'handoff',
+    START: 'journey',
+    EXCEPTION: 'exception',
+    RESOLVE: 'exception',
+    COMPLETE: 'journey',
+  };
+  const rows = task.timeline.filter(
+    (e) => filter === 'ALL' || e.kind === 'EXCEPTION' || e.kind === 'RESOLVE',
+  );
+  return (
+    <section className="picking-line" aria-label="合成配送凭据时间线">
+      <h3>合成配送凭据时间线</h3>
+      <p>仅显示已保存凭据，按记录时间升序；同毫秒按阶段固定排序。当前资格与历史事实分别查看。</p>
+      <div className="toolbar">
+        <button
+          className="secondary-button"
+          aria-pressed={filter === 'ALL'}
+          onClick={() => setFilter('ALL')}
+        >
+          全部凭据
+        </button>
+        <button
+          className="secondary-button"
+          aria-pressed={filter === 'EXCEPTION'}
+          onClick={() => setFilter('EXCEPTION')}
+        >
+          异常相关凭据
+        </button>
+      </div>
+      {!rows.length ? (
+        <p role="status">暂无异常相关凭据</p>
+      ) : (
+        <ol>
+          {rows.map((e) => (
+            <li key={e.id}>
+              <strong>{names[e.kind]}</strong>
+              <p>
+                {date(e.createdAt)} · {e.actorName}
+              </p>
+              {e.reason && <p>{exceptionNames[e.reason] ?? e.reason}</p>}
+              <button
+                className="text-button"
+                onClick={() => {
+                  const el = document.getElementById(task.id + '--' + target[e.kind]);
+                  el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                  el?.focus({ preventScroll: true });
+                }}
+              >
+                定位{nameSuffix(e.kind)}
+              </button>
+              {e.kind === 'RESOLVE' && <p>关联原异常上报，原记录保留。</p>}
+            </li>
+          ))}
+        </ol>
+      )}
+      <p>全部为隔离合成记录，不代表实物交接、顾客签收或真实支付。</p>
+    </section>
+  );
+  function nameSuffix(kind: string) {
+    return names[kind] + '凭据';
+  }
 }

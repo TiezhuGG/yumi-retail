@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiHeader, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@yumi/database';
-import type { DeliveryLabTask } from '@yumi/contracts';
+import type { DeliveryLabTask, DeliveryTimelineEvent } from '@yumi/contracts';
 import { CatalogService } from './catalog-service.js';
 import { fields, uuid, integer } from './catalog-input.js';
 import { Permissions } from './staff-guard.js';
@@ -21,6 +21,54 @@ const include = {
 };
 type Row = Prisma.PickingLabDispatchGetPayload<{ include: typeof include }>;
 const manager = (r: ApiRequest) => r.staffContext!.permissions.includes('delivery-lab.assign');
+function timeline(d: Row): DeliveryTimelineEvent[] {
+  const a = d.assignment,
+    e = a?.exception;
+  const events: DeliveryTimelineEvent[] = [];
+  const add = (
+    kind: DeliveryTimelineEvent['kind'],
+    id: string,
+    createdAt: Date,
+    actorName: string,
+    reason: string | null = null,
+    relatedId: string | null = null,
+  ) =>
+    events.push({
+      id: kind + ':' + id,
+      kind,
+      createdAt: createdAt.toISOString(),
+      actorName,
+      reason,
+      relatedId,
+    });
+  add('DISPATCH', d.id, d.createdAt, d.actorName);
+  if (a) {
+    add('ASSIGN', a.id, a.createdAt, a.actorName, null, d.id);
+    if (a.handoff) add('HANDOFF', a.handoff.id, a.handoff.createdAt, a.riderName, null, a.id);
+    for (const f of a.journeyFacts)
+      if (f.kind === 'START' || f.kind === 'COMPLETE')
+        add(f.kind, f.id, f.createdAt, a.riderName, null, a.id);
+    if (e) {
+      add('EXCEPTION', e.id, e.createdAt, a.riderName, e.reason, a.id);
+      if (e.resolution)
+        add(
+          'RESOLVE',
+          e.resolution.id,
+          e.resolution.createdAt,
+          e.resolution.actorName,
+          e.reason,
+          e.id,
+        );
+    }
+  }
+  const order = ['DISPATCH', 'ASSIGN', 'HANDOFF', 'START', 'EXCEPTION', 'RESOLVE', 'COMPLETE'];
+  return events.sort(
+    (x, y) =>
+      x.createdAt.localeCompare(y.createdAt) ||
+      order.indexOf(x.kind) - order.indexOf(y.kind) ||
+      x.id.localeCompare(y.id),
+  );
+}
 const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
   const a = d.assignment,
     t = d.pack.task;
@@ -41,6 +89,7 @@ const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
   ];
   return {
     id: d.id,
+    timeline: timeline(d),
     label: '合成配送 · ' + t.id.slice(-8),
     packageCount: d.pack.packageCount,
     dispatchedAt: d.createdAt.toISOString(),
@@ -92,6 +141,21 @@ const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
   };
 };
 const taskSchema = object({
+  timeline: {
+    type: 'array',
+    maxItems: 7,
+    items: object({
+      id: text,
+      kind: {
+        type: 'string',
+        enum: ['DISPATCH', 'ASSIGN', 'HANDOFF', 'START', 'EXCEPTION', 'RESOLVE', 'COMPLETE'],
+      },
+      createdAt: { type: 'string', format: 'date-time' },
+      actorName: text,
+      reason: { type: 'string', nullable: true },
+      relatedId: { type: 'string', nullable: true },
+    }),
+  },
   id: text,
   label: text,
   packageCount: { type: 'integer' },
