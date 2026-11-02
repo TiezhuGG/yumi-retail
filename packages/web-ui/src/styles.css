@@ -2759,3 +2759,12 @@ small {
 .picking-packing {
   margin: 24px 0;
 }
+
+.delivery-workbench .picking-check-form label {
+  width: 100%;
+  max-width: 300px;
+  min-width: 0;
+}
+.delivery-workbench .picking-check-form select {
+  width: 100%;
+}

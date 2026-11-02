@@ -1,0 +1,383 @@
+import { useEffect, useRef, useState } from 'react';
+import type {
+  DeliveryLabList,
+  DeliveryLabTask,
+  StaffProfile,
+  WarehouseSummary,
+} from '@yumi/contracts';
+import { staffRequest, StaffRequestError } from './index.js';
+type Pending = { key: string; riderId: string; riderName: string };
+const reasons: Record<string, string> = {
+  LAB_DISABLED: '本机演练写入未开启',
+  UNASSIGNED: '尚未分配骑手',
+  RIDER_DISABLED: '骑手账号已停用',
+  RIDER_ROLE_REMOVED: '骑手角色已移除',
+  RIDER_WAREHOUSE_REMOVED: '骑手已无本仓权限',
+  PICKING_NOT_READY: '拣货或出库快照不再满足条件',
+};
+const date = (v: string) =>
+  new Date(v).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+export function DeliveryLabWorkbench({ profile }: { profile: StaffProfile }) {
+  const [warehouses, setWarehouses] = useState<WarehouseSummary[] | null>(null),
+    [w, setW] = useState(''),
+    [error, setError] = useState('');
+  const seq = useRef(0),
+    pending = useRef(new Map<string, Pending>());
+  async function load() {
+    const n = ++seq.current;
+    setError('');
+    setWarehouses(null);
+    try {
+      const r = await staffRequest<{ items: WarehouseSummary[] }>('/delivery-lab/warehouses');
+      if (n === seq.current) {
+        setWarehouses(r.items);
+        setW((old) => (r.items.some((i) => i.id === old) ? old : (r.items[0]?.id ?? '')));
+      }
+    } catch (e) {
+      if (n === seq.current) setError(e instanceof Error ? e.message : '演练仓库读取失败');
+    }
+  }
+  useEffect(() => {
+    void load();
+    return () => {
+      seq.current++;
+    };
+  }, []);
+  return (
+    <div className="picking-workbench delivery-workbench">
+      <div className="notice">
+        配送隔离演练 ·
+        只分配合成出库任务并核验交接资格，不关联真实订单、顾客地址或库存，不代表已经接货或送达。
+      </div>
+      {error ? (
+        <div className="notice task-error" role="alert">
+          {error}
+          <button onClick={() => void load()}>重试配送仓库</button>
+        </div>
+      ) : !warehouses ? (
+        <div className="surface empty-state" role="status">
+          正在读取配送仓库…
+        </div>
+      ) : !warehouses.length ? (
+        <div className="surface empty-state">暂无授权配送仓库</div>
+      ) : (
+        <>
+          <div className="toolbar">
+            <label className="readiness-warehouse">
+              配送演练仓库
+              <select aria-label="配送演练仓库" value={w} onChange={(e) => setW(e.target.value)}>
+                {warehouses.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <DeliveryPanel key={w} w={w} profile={profile} pending={pending.current} />
+        </>
+      )}
+    </div>
+  );
+}
+function DeliveryPanel({
+  w,
+  profile,
+  pending,
+}: {
+  w: string;
+  profile: StaffProfile;
+  pending: Map<string, Pending>;
+}) {
+  const [list, setList] = useState<DeliveryLabList | null>(null),
+    [task, setTask] = useState<DeliveryLabTask | null>(null),
+    [selected, setSelected] = useState<string | null>(null),
+    [riders, setRiders] = useState<{ id: string; displayName: string }[]>([]),
+    [rider, setRider] = useState(''),
+    [enabled, setEnabled] = useState(false),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [message, setMessage] = useState('');
+  const seq = useRef(0),
+    running = useRef(false);
+  const manage = profile.permissions.includes('delivery-lab.assign'),
+    base = '/delivery-lab',
+    query = '?warehouseId=' + w;
+  function start() {
+    if (running.current) return null;
+    running.current = true;
+    setBusy(true);
+    setError('');
+    setMessage('');
+    return ++seq.current;
+  }
+  function finish(n: number) {
+    if (n === seq.current) {
+      running.current = false;
+      setBusy(false);
+    }
+  }
+  async function load(cursor?: string) {
+    const n = start();
+    if (n === null) return;
+    try {
+      const r = await staffRequest<DeliveryLabList>(
+        base + query + (cursor ? '&cursor=' + cursor : ''),
+      );
+      if (n === seq.current) {
+        setList((old) => (cursor && old ? { ...r, items: [...old.items, ...r.items] } : r));
+        setEnabled(r.enabled);
+      }
+    } catch (e) {
+      if (n === seq.current) setError(e instanceof Error ? e.message : '配送列表读取失败');
+    } finally {
+      finish(n);
+    }
+  }
+  async function open(id: string) {
+    const n = start();
+    if (n === null) return;
+    setSelected(id);
+    setTask(null);
+    setRiders([]);
+    setRider('');
+    try {
+      const [r, people] = await Promise.all([
+        staffRequest<{ enabled: boolean; task: DeliveryLabTask }>(base + '/' + id + query),
+        manage
+          ? staffRequest<{ items: { id: string; displayName: string }[] }>(base + '/riders' + query)
+          : Promise.resolve({ items: [] }),
+      ]);
+      if (n === seq.current) {
+        setTask(r.task);
+        setEnabled(r.enabled);
+        setRiders(people.items);
+      }
+    } catch (e) {
+      if (n === seq.current) setError(e instanceof Error ? e.message : '配送详情读取失败');
+    } finally {
+      finish(n);
+    }
+  }
+  useEffect(() => {
+    void load();
+    return () => {
+      seq.current++;
+      running.current = false;
+    };
+  }, [w]);
+  async function assign(op: Pending) {
+    if (!selected) return;
+    const n = start();
+    if (n === null) return;
+    const scope = w + ':' + selected;
+    pending.set(scope, op);
+    try {
+      const r = await staffRequest<{ task: DeliveryLabTask; duplicate: boolean }>(
+        base + '/' + selected + '/assign' + query,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify({ key: op.key, riderId: op.riderId }),
+        },
+      );
+      if (n === seq.current) {
+        pending.delete(scope);
+        setTask(r.task);
+        setMessage(r.duplicate ? '原分配已恢复，未重复生成凭据。' : '合成分配已记录，尚未交接。');
+      }
+    } catch (e) {
+      if (n === seq.current) {
+        if (e instanceof StaffRequestError && [400, 401, 403, 404, 409].includes(e.status))
+          pending.delete(scope);
+        setError(e instanceof Error ? e.message : '分配结果未确认');
+      }
+    } finally {
+      finish(n);
+    }
+  }
+  const op = selected ? pending.get(w + ':' + selected) : undefined;
+  return (
+    <>
+      {(list || task) && !enabled && (
+        <div className="notice">本机配送演练写入尚未开启，已有任务可只读查看。</div>
+      )}
+      {error && (
+        <div className="notice task-error" role="alert">
+          {error}
+          <button disabled={busy} onClick={() => void (selected ? open(selected) : load())}>
+            重试配送读取
+          </button>
+        </div>
+      )}
+      {message && (
+        <div className="notice" role="status">
+          {message}
+        </div>
+      )}
+      {op && !busy && (
+        <div className="notice" role="status">
+          分配给{op.riderName}的结果未确认；刷新不能代替原请求确认。
+          <button className="secondary-button" disabled={!enabled} onClick={() => void assign(op)}>
+            按原分配重试
+          </button>
+        </div>
+      )}
+      {!selected ? (
+        <section className="surface" aria-label="合成配送任务列表">
+          <div className="service-area-list-heading">
+            <div>
+              <h2>{manage ? '合成配送分配' : '我的合成配送任务'}</h2>
+              <p>
+                {manage
+                  ? '仅列出已完成合成出库的任务。'
+                  : '仅显示分配给本人的任务，不含真实顾客资料。'}
+              </p>
+            </div>
+            <button className="secondary-button" disabled={busy} onClick={() => void load()}>
+              刷新配送列表
+            </button>
+          </div>
+          {!list && busy ? (
+            <div className="empty-state" role="status">
+              正在读取配送任务…
+            </div>
+          ) : !list ? (
+            <div className="empty-state">尚未读取配送任务，请重试。</div>
+          ) : !list.items.length ? (
+            <div className="empty-state">
+              {manage ? '暂无已出库的合成任务' : '暂无分配给你的合成任务'}
+            </div>
+          ) : (
+            <div className="picking-order-grid">
+              {list.items.map((t) => (
+                <article className="readiness-check picking-order-card" key={t.id}>
+                  <h3>{t.label}</h3>
+                  <span className={'badge ' + (t.assignment ? 'green' : 'amber')}>
+                    {t.assignment ? '已分配 · 尚未交接' : '待分配骑手'}
+                  </span>
+                  <p>
+                    {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
+                  </p>
+                  <button className="text-button" disabled={busy} onClick={() => void open(t.id)}>
+                    查看合成配送
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+          {list?.nextCursor && (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void load(list.nextCursor!)}
+            >
+              加载更多配送任务
+            </button>
+          )}
+        </section>
+      ) : (
+        <section className="surface" aria-label="合成配送详情">
+          <div className="service-area-list-heading">
+            <h2>合成配送详情</h2>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => {
+                setSelected(null);
+                setTask(null);
+                void load();
+              }}
+            >
+              返回配送列表
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void open(selected)}
+            >
+              刷新配送详情
+            </button>
+          </div>
+          {!task && busy ? (
+            <div className="empty-state" role="status">
+              正在读取配送详情…
+            </div>
+          ) : (
+            task && (
+              <>
+                <h3>{task.label}</h3>
+                <p>
+                  {task.packageCount} 个合成包裹 · 合成出库时间 {date(task.dispatchedAt)}
+                </p>
+                <div className="readiness-check">
+                  <h3>交接资格核验</h3>
+                  <span className={'badge ' + (task.handoffReadiness.ready ? 'green' : 'amber')}>
+                    {task.handoffReadiness.ready ? '资格满足 · 尚未接货' : '交接资格未满足'}
+                  </span>
+                  <ul>
+                    {task.handoffReadiness.blockers.map((b) => (
+                      <li key={b}>{reasons[b] ?? '需要刷新核验'}</li>
+                    ))}
+                  </ul>
+                  <p>
+                    本轮只核验资格，不执行接货、配送或送达。资格随账号、角色和仓库权限变化，交接前须重新校验。
+                  </p>
+                </div>
+                {task.assignment ? (
+                  <div className="picking-line">
+                    <h3>不可变分配凭据</h3>
+                    <p>骑手：{task.assignment.riderName}</p>
+                    <p>
+                      分配人：{task.assignment.actorName} · {date(task.assignment.createdAt)}
+                    </p>
+                    <p>已分配，尚未交接；本轮不支持改派或撤销。</p>
+                  </div>
+                ) : manage ? (
+                  <form
+                    className="picking-line picking-check-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const person = riders.find((p) => p.id === rider);
+                      if (person)
+                        void assign({
+                          key: crypto.randomUUID(),
+                          riderId: rider,
+                          riderName: person.displayName,
+                        });
+                    }}
+                  >
+                    <label>
+                      接收骑手
+                      <select
+                        aria-label="接收骑手"
+                        required
+                        value={rider}
+                        disabled={busy || !enabled || !!op}
+                        onChange={(e) => setRider(e.target.value)}
+                      >
+                        <option value="">请选择本仓启用的骑手</option>
+                        {riders.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.displayName}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {!riders.length && <p>本仓暂无可分配骑手，请先维护员工角色与仓库权限。</p>}
+                    <button
+                      className="primary-button"
+                      disabled={busy || !enabled || !!op || !rider}
+                    >
+                      确认合成分配
+                    </button>
+                  </form>
+                ) : null}
+              </>
+            )
+          )}
+        </section>
+      )}
+    </>
+  );
+}

@@ -66,6 +66,8 @@ model Warehouse {
 }
 
 model Staff {
+ deliveryLabAssigned DeliveryLabAssignment[] @relation("deliveryAssigner")
+ deliveryLabTasks DeliveryLabAssignment[] @relation("deliveryRider")
  pickingLabPacks PickingLabPack[] @relation("pickingPacker")
  pickingLabDispatches PickingLabDispatch[] @relation("pickingDispatcher")
  pickingShortageReports PickingLabShortage[] @relation("shortageReporter")
@@ -1160,6 +1162,7 @@ model PickingLabPack {
  @@map("picking_lab_packs")
 }
 model PickingLabDispatch {
+ assignment DeliveryLabAssignment?
  id String @id @db.Uuid
  taskId String @unique @map("task_id") @db.Uuid
  packId String @unique @map("pack_id") @db.Uuid
@@ -1173,4 +1176,20 @@ model PickingLabDispatch {
  actor Staff @relation("pickingDispatcher",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([packId,taskId])
  @@map("picking_lab_dispatches")
+}
+
+model DeliveryLabAssignment {
+ id String @id @db.Uuid
+ dispatchId String @unique @map("dispatch_id") @db.Uuid
+ riderId String @map("rider_id") @db.Uuid
+ riderName String @map("rider_name") @db.VarChar(80)
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ dispatch PickingLabDispatch @relation(fields:[dispatchId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ rider Staff @relation("deliveryRider",fields:[riderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation("deliveryAssigner",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([riderId],map:"delivery_assignments_rider")
+ @@map("delivery_lab_assignments")
 }

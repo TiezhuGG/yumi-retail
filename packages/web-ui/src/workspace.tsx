@@ -1,3 +1,4 @@
+import { DeliveryLabWorkbench } from './delivery-lab.js';
 import { PickingLabWorkbench } from './picking-lab.js';
 import { PickingReadinessWorkbench } from './picking-readiness.js';
 import type { PaymentReviewDestination, OpenPaymentReview } from './payment-navigation.js';
@@ -17,6 +18,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'delivery-lab'
   | 'picking-lab'
   | 'picking-readiness'
   | 'overview'
@@ -137,6 +139,13 @@ const routes: Array<{
     permission: 'payment-readiness.read',
   },
   {
+    id: 'delivery-lab',
+    name: '配送演练',
+    glyph: '◇',
+    hint: '合成任务分配与交接资格，尚未接货',
+    permission: 'delivery-lab.read',
+  },
+  {
     id: 'picking-lab',
     name: '拣货演练',
     glyph: '◇',
@@ -218,10 +227,11 @@ function WorkspaceSession({
     mobile && profile.roles.includes('PICKER') && !profile.permissions.includes('stock.transfer');
   const mobileViews = new Set<WorkspaceView>(
     pickerOnly
-      ? ['picking-readiness', 'picking-lab', 'stock', 'locations']
+      ? ['picking-readiness', 'picking-lab', 'delivery-lab', 'stock', 'locations']
       : [
           'picking-readiness',
           'picking-lab',
+          'delivery-lab',
           'overview',
           'stock',
           'receipts',
@@ -267,6 +277,7 @@ function WorkspaceSession({
     }
   };
   const retainedViews: WorkspaceView[] = [
+    'delivery-lab',
     'picking-lab',
     'notification-records',
     'payment-review-lab',
@@ -375,7 +386,9 @@ function WorkspaceSession({
               className="retained-payment-view"
               data-payment-view={v}
             >
-              {v === 'picking-lab' ? (
+              {v === 'delivery-lab' ? (
+                <DeliveryLabWorkbench profile={profile} />
+              ) : v === 'picking-lab' ? (
                 <PickingLabWorkbench profile={profile} />
               ) : v === 'notification-records' ? (
                 <NotificationRecordsWorkbench profile={profile} onOpenReview={openReview(v)} />

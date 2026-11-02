@@ -765,3 +765,19 @@ export interface PickingLabWrite {
   task: PickingLabTask;
   duplicate: boolean;
 }
+
+export type DeliveryLabTask = {
+  id: string;
+  label: string;
+  packageCount: number;
+  dispatchedAt: string;
+  syntheticOnly: true;
+  assignment: null | { id: string; riderName: string; actorName: string; createdAt: string };
+  handoffReadiness: { ready: boolean; blockers: string[] };
+};
+export type DeliveryLabList = {
+  enabled: boolean;
+  selfOnly: boolean;
+  items: DeliveryLabTask[];
+  nextCursor: string | null;
+};

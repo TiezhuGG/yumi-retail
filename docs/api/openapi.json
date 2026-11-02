@@ -20106,6 +20106,1520 @@
         ]
       }
     },
+    "/api/v1/delivery-lab/warehouses": {
+      "get": {
+        "operationId": "DeliveryLabController_warehouses",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成配送分配与交接资格"
+        ]
+      }
+    },
+    "/api/v1/delivery-lab/riders": {
+      "get": {
+        "operationId": "DeliveryLabController_riders",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "displayName"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成配送分配与交接资格"
+        ]
+      }
+    },
+    "/api/v1/delivery-lab": {
+      "get": {
+        "operationId": "DeliveryLabController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "enabled",
+                        "selfOnly",
+                        "items",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "selfOnly": {
+                          "type": "boolean"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "packageCount",
+                              "dispatchedAt",
+                              "syntheticOnly",
+                              "assignment",
+                              "handoffReadiness"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "packageCount": {
+                                "type": "integer"
+                              },
+                              "dispatchedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "syntheticOnly": {
+                                "type": "boolean",
+                                "enum": [
+                                  true
+                                ]
+                              },
+                              "assignment": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "riderName",
+                                  "actorName",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "riderName": {
+                                    "type": "string"
+                                  },
+                                  "actorName": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "additionalProperties": false,
+                                "nullable": true
+                              },
+                              "handoffReadiness": {
+                                "type": "object",
+                                "required": [
+                                  "ready",
+                                  "blockers"
+                                ],
+                                "properties": {
+                                  "ready": {
+                                    "type": "boolean"
+                                  },
+                                  "blockers": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "additionalProperties": false
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "nextCursor": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成配送分配与交接资格"
+        ]
+      }
+    },
+    "/api/v1/delivery-lab/{id}": {
+      "get": {
+        "operationId": "DeliveryLabController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "enabled",
+                        "task"
+                      ],
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "task": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "label",
+                            "packageCount",
+                            "dispatchedAt",
+                            "syntheticOnly",
+                            "assignment",
+                            "handoffReadiness"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "packageCount": {
+                              "type": "integer"
+                            },
+                            "dispatchedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "syntheticOnly": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "assignment": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "riderName",
+                                "actorName",
+                                "createdAt"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "riderName": {
+                                  "type": "string"
+                                },
+                                "actorName": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
+                            },
+                            "handoffReadiness": {
+                              "type": "object",
+                              "required": [
+                                "ready",
+                                "blockers"
+                              ],
+                              "properties": {
+                                "ready": {
+                                  "type": "boolean"
+                                },
+                                "blockers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成配送分配与交接资格"
+        ]
+      }
+    },
+    "/api/v1/delivery-lab/{id}/assign": {
+      "post": {
+        "operationId": "DeliveryLabController_assign",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "key",
+                  "riderId"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "riderId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "task",
+                        "duplicate"
+                      ],
+                      "properties": {
+                        "task": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "label",
+                            "packageCount",
+                            "dispatchedAt",
+                            "syntheticOnly",
+                            "assignment",
+                            "handoffReadiness"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "packageCount": {
+                              "type": "integer"
+                            },
+                            "dispatchedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "syntheticOnly": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "assignment": {
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "riderName",
+                                "actorName",
+                                "createdAt"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "riderName": {
+                                  "type": "string"
+                                },
+                                "actorName": {
+                                  "type": "string"
+                                },
+                                "createdAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "nullable": true
+                            },
+                            "handoffReadiness": {
+                              "type": "object",
+                              "required": [
+                                "ready",
+                                "blockers"
+                              ],
+                              "properties": {
+                                "ready": {
+                                  "type": "boolean"
+                                },
+                                "blockers": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "duplicate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "合成配送分配与交接资格"
+        ]
+      }
+    },
     "/api/v1/consumer/addresses": {
       "get": {
         "operationId": "ConsumerAddressController_read",
@@ -54717,7 +56231,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.30.0",
+    "version": "0.31.0",
     "contact": {}
   },
   "tags": [],

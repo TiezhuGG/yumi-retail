@@ -661,3 +661,21 @@ pack严格字段：key(UUID)、version(0–3)、exceptionVersion(0–100)、pack
 GET列表/详情和写回投影增加packingReadiness（ready/blockers：PICKING_INCOMPLETE、SHORTAGE_OPEN、PACK_ALREADY_RECORDED）及可空pack。pack含id、actorName、packageCount、singleQuantity、tripleQuantity、createdAt和可空dispatch（id、actorName、createdAt）；不暴露原请求键。原任务状态/版本和既有接口不变。
 
 同任务行锁串行化，先识别已成功同人员/键，再核验当前快照。原键内容改变409 IDEMPOTENCY_CONFLICT；另一键/人员重复该阶段409 PICKING_STAGE_RECORDED；旧快照409 PICKING_VERSION_STALE；不完整409 PICKING_INCOMPLETE；未决缺货409 PICKING_SHORTAGE_OPEN；数量不匹配409 PICKING_PACK_QUANTITY；无打包/错打包/过时打包分别409 PICKING_PACK_REQUIRED/MISMATCH/STALE。角色/归属403、未知任务404、严格参数400、默认关闭503；5xx/网络失败只能判定结果未知，客户端保留原请求。旧GET客户端可忽略新增字段，新增UI须配合0.30.0 API与迁移部署。
+
+## 2026-11-02 合成配送分配与本人任务
+
+OpenAPI0.31.0已由实际应用导出。新增`/api/v1/delivery-lab`：
+
+| 方法/路径 | 权限与行为 |
+| --- | --- |
+| GET /warehouses | delivery-lab.read，仅返回本人启用授权仓库的id/code/name，不新增骑手warehouse.read权限 |
+| GET /riders?warehouseId | read+assign，仅返回本仓启用RIDER的id/displayName，不包含联系方式/账号凭据 |
+| GET /?warehouseId&cursor? | read；有assign权限可查本仓已合成出库任务，其余人员限定assignment.riderId=本人；20条稳定分页，nextCursor可空 |
+| GET /:id?warehouseId | read，id为合成出库id；同仓且本人归属，不可见或不存在统一404 |
+| POST /:id/assign?warehouseId | read+assign，严格body={key(UUID),riderId(UUID)}，可信Origin/CSRF必需；只首次分配，返回{task,duplicate} |
+
+SUPER_ADMIN/WAREHOUSE_MANAGER新增delivery-lab.read及assign；RIDER仅read。列表返回enabled、selfOnly、items、nextCursor；详情返回enabled/task。task为id、label、packageCount、dispatchedAt、syntheticOnly=true、可空assignment(id/riderName/actorName/createdAt)、handoffReadiness(ready/blockers)。只返回姓名快照，不暴露原请求键、原骑手/分配者内部id、真实订单或顾客数据。交接资格报告不等于当前查看者的动作授权。
+
+资格阻断码：LAB_DISABLED、UNASSIGNED、RIDER_DISABLED、RIDER_ROLE_REMOVED、RIDER_WAREHOUSE_REMOVED、PICKING_NOT_READY。账号/角色/范围来自当前数据库快照；列表/详情在RepeatableRead事务中读取，不把历史分配等同持续有效资格。
+
+写入先锁原任务，已成功原人员/键先恢复，改骑手409 IDEMPOTENCY_CONFLICT；换键/人员重复阶段409 DELIVERY_ALREADY_ASSIGNED；无合成出库404 DELIVERY_LAB_NOT_FOUND；原快照不满足409 DELIVERY_NOT_READY；目标骑手不合格409 RIDER_INELIGIBLE。当前仓库/权限403，格式或额外字段400，默认关闭503。未知网络/5xx不得视为未提交，原请求应保留恢复；资格撤销后原成功请求仍返回原凭据和当前阻断信息。没有接货、送达、改派或通用状态修改接口。

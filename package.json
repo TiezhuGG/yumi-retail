@@ -113,7 +113,9 @@
     "pretest:picking-shortage": "npm run build:server",
     "test:picking-shortage": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-shortage.integration.test.ts",
     "pretest:picking-packing": "npm run build:server",
-    "test:picking-packing": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-packing.integration.test.ts"
+    "test:picking-packing": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-packing.integration.test.ts",
+    "pretest:delivery-lab": "npm run build:server",
+    "test:delivery-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/delivery-lab.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

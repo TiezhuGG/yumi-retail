@@ -1,3 +1,4 @@
+import { DeliveryLabController, DeliveryLabService } from './delivery-lab.js';
 import { PickingPackingController, PickingPackingService } from './picking-packing.js';
 import { PickingShortageController, PickingShortageService } from './picking-shortage.js';
 import { PickingLabController, PickingLabService } from './picking-lab.js';
@@ -149,6 +150,7 @@ export async function createApplication(
       PickingLabController,
       PickingShortageController,
       PickingPackingController,
+      DeliveryLabController,
       ConsumerAddressController,
       CheckoutController,
       CheckoutPolicyController,
@@ -228,6 +230,10 @@ export async function createApplication(
         useValue: new PickingShortageService(catalog, config.pickingLabEnabled),
       },
       {
+        provide: DeliveryLabService,
+        useValue: new DeliveryLabService(catalog, config.pickingLabEnabled),
+      },
+      {
         provide: PickingLabService,
         useValue: new PickingLabService(catalog, config.pickingLabEnabled),
       },
@@ -293,7 +299,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.30.0')
+      .setVersion('0.31.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

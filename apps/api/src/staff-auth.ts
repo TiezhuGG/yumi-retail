@@ -13,6 +13,8 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'picking-lab.create',
     'picking-lab.resolve',
     'picking-lab.ship',
+    'delivery-lab.read',
+    'delivery-lab.assign',
     'picking-lab.work',
     'payment-readiness.read',
     'order.read',
@@ -60,6 +62,8 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'picking-lab.create',
     'picking-lab.resolve',
     'picking-lab.ship',
+    'delivery-lab.read',
+    'delivery-lab.assign',
     'picking-lab.work',
     'warehouse.read',
     'catalog.read',
@@ -92,7 +96,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'stock.read',
   ],
   DISPATCHER: ['warehouse.read'],
-  RIDER: ['rider.tasks.self'],
+  RIDER: ['rider.tasks.self', 'delivery-lab.read'],
   CUSTOMER_SERVICE: [],
 };
 export interface StaffContext {
