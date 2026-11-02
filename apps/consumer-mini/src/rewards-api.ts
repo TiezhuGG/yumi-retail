@@ -1,0 +1,20 @@
+export type Reward = {
+  id: string;
+  skuId: string;
+  title: string;
+  name: string;
+  spec: string;
+  unit: string;
+  description: string;
+  categoryId: string;
+  imageUrl: string | null;
+  pointsPrice: string;
+  perUserLimit: number;
+  totalQuota: number;
+  available: number;
+  version: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  redemptionEnabled: false;
+};
+export type RewardPage = { items: Reward[]; nextCursor: string | null };

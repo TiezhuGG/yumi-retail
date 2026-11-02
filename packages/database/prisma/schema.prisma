@@ -47,6 +47,7 @@ model ValidationLedger {
 }
 
 model Warehouse {
+ rewards RewardProduct[]
  pointsGrantPolicy PointsGrantPolicy?
  pointsGrants PointsGrant[]
   pickingLabTasks PickingLabTask[]
@@ -219,6 +220,7 @@ model ProductImage {
 }
 
 model Sku {
+ rewards RewardProduct[]
   id            String         @id @db.Uuid
   productId     String         @map("product_id") @db.Uuid
   code          String         @unique @db.VarChar(64)
@@ -1330,4 +1332,26 @@ model PointsCorrection {
  @@index([grantId,status],map:"points_corrections_source_idx")
  @@index([warehouseId,id])
  @@map("points_corrections")
+}
+
+model RewardProduct {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ skuId String @map("sku_id") @db.Uuid
+ title String @db.VarChar(120)
+ pointsPrice BigInt @map("points_price")
+ status String @default("DRAFT") @db.VarChar(16)
+ sortOrder Int @default(0) @map("sort_order")
+ perUserLimit Int @map("per_user_limit")
+ totalQuota Int @map("total_quota")
+ startsAt DateTime? @map("starts_at") @db.Timestamptz(3)
+ endsAt DateTime? @map("ends_at") @db.Timestamptz(3)
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ sku Sku @relation(fields:[skuId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([warehouseId,skuId],map:"reward_products_sku_unique")
+ @@unique([id,warehouseId,skuId],map:"reward_products_source_unique")
+ @@index([warehouseId,status,sortOrder,id],map:"reward_products_scope_idx")
+ @@map("reward_products")
 }

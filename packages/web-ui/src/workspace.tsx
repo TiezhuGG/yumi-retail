@@ -1,3 +1,4 @@
+import { RewardsWorkbench } from './rewards.js';
 import { PointsGrants } from './points-grants.js';
 import { PointsWorkbench } from './points.js';
 import { DeliveryLabWorkbench } from './delivery-lab.js';
@@ -20,6 +21,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'rewards'
   | 'points-corrections'
   | 'points-grants'
   | 'points'
@@ -52,6 +54,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'rewards',
+    name: '兑换商品',
+    glyph: '◇',
+    hint: '管理积分商城商品与展示规则',
+    permission: 'points.write',
+  },
   {
     id: 'points-corrections',
     name: '积分误发冲正',
@@ -454,6 +463,8 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'rewards' ? (
+            <RewardsWorkbench profile={profile} />
           ) : activeView === 'points-corrections' ? (
             <PointsGrants key="corrections" profile={profile} correction />
           ) : activeView === 'points-grants' ? (

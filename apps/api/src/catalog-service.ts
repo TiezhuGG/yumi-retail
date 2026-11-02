@@ -606,7 +606,7 @@ export class CatalogService {
       ),
     );
   }
-  private visibleSkus(
+  visibleSkus(
     warehouseId: string,
     query: { keyword: string; categoryId: string | null; skuId?: string; relatedToSkuId?: string },
   ) {

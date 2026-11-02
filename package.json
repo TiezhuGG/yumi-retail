@@ -130,7 +130,11 @@
     "preverify:points:grants": "npm run build:server",
     "verify:points:grants": "node --env-file=.env --import tsx scripts/ui/verify-points-grants.mjs",
     "preverify:points:corrections": "npm run build:server",
-    "verify:points:corrections": "node --env-file=.env --import tsx scripts/ui/verify-points-corrections.mjs"
+    "verify:points:corrections": "node --env-file=.env --import tsx scripts/ui/verify-points-corrections.mjs",
+    "pretest:rewards": "npm run build:server",
+    "test:rewards": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/rewards.integration.test.ts",
+    "preverify:rewards:ui": "npm run build:server",
+    "verify:rewards:ui": "node --env-file=.env --import tsx scripts/ui/verify-rewards.mjs"
   },
   "pnpm": {
     "overrides": {

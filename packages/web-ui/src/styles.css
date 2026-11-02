@@ -2909,3 +2909,72 @@ small {
   min-height: 18px;
   height: 18px;
 }
+
+.rewards-workbench {
+  min-width: 0;
+}
+.reward-price {
+  color: #008a42;
+  font-size: 26px;
+  font-weight: 700;
+}
+.reward-detail {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+}
+.reward-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.reward-form label {
+  display: block;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.reward-form input,
+.reward-form textarea,
+.rewards-workbench select {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d7dfd9;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 6px;
+  font: inherit;
+}
+.reward-form textarea {
+  min-height: 80px;
+}
+.reward-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+.reward-sku {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d7dfd9;
+  border-radius: 8px;
+  background: #f5faf6;
+  padding: 12px;
+  margin: 8px 0;
+}
+@media (max-width: 600px) {
+  .reward-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .reward-detail {
+    padding: 16px;
+  }
+}
+.reward-sku[aria-pressed='true'] {
+  border-color: #008a42;
+  background: #e4f4e9;
+  color: #006b36;
+}

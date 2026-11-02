@@ -70,6 +70,12 @@ export default function Index() {
           </Text>
           <Text className="community-note">用心选好物</Text>
         </View>
+        <Button
+          className="reward-home-entry"
+          onClick={() => void Taro.navigateTo({ url: '/pages/rewards/index' })}
+        >
+          ◇ 积分商城 · 发现日用好物 →
+        </Button>
         <View className="store-search">
           <Text className="search-symbol">⌕</Text>
           <Input

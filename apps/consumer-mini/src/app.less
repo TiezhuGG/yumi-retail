@@ -1881,7 +1881,9 @@ button[disabled] {
   }
 }
 
-.points-page .points-action {
+.points-page .points-action,
+.rewards-page .points-action,
+.reward-detail-page .points-action {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -1896,7 +1898,161 @@ button[disabled] {
   line-height: 1.5;
   margin-top: 16px;
 }
-.points-page .points-action[disabled] {
+.points-page .points-action[disabled],
+.rewards-page .points-action[disabled],
+.reward-detail-page .points-action[disabled] {
   background: #e6ede2;
   color: #7b8b77;
+}
+
+.reward-home-entry {
+  margin: 24rpx 0;
+  background: #edf7ef;
+  color: #087744;
+  font-size: 26rpx;
+  text-align: left;
+  border: 0;
+}
+.reward-balance {
+  margin: 24rpx 0 0;
+  background: #fff;
+  color: #087744;
+  border-radius: 18rpx;
+  font-size: 28rpx;
+}
+.reward-notice {
+  padding: 24rpx;
+  background: #fff8e8;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  line-height: 1.8;
+  color: #795d2e;
+}
+.reward-notice text {
+  display: block;
+}
+.reward-search {
+  display: flex;
+  gap: 16rpx;
+  margin: 28rpx 0 16rpx;
+}
+.reward-search input {
+  flex: 1;
+  min-width: 0;
+  background: white;
+  border: 1rpx solid #dce6de;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  height: 48rpx;
+}
+.reward-search button {
+  margin: 0;
+  background: #087744;
+  color: white;
+  font-size: 26rpx;
+  min-height: 88rpx;
+}
+.reward-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+}
+.reward-categories button {
+  margin: 0;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  background: white;
+  min-height: 88rpx;
+}
+.reward-categories .active {
+  color: #087744;
+  background: #e4f2e8;
+}
+.reward-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+}
+.reward-card {
+  overflow: hidden;
+  border-radius: 24rpx;
+  background: white;
+  min-width: 0;
+}
+.reward-card-copy {
+  padding: 20rpx;
+}
+.reward-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.reward-price {
+  display: block;
+  font-size: 34rpx;
+  color: #087744;
+  font-weight: 700;
+  margin: 16rpx 0;
+}
+.reward-price text {
+  font-size: 24rpx;
+}
+.reward-stock {
+  display: block;
+  font-size: 23rpx;
+  color: #69756d;
+  margin-bottom: 16rpx;
+}
+.reward-card .product-visual {
+  height: 270rpx;
+}
+.reward-card .points-action {
+  font-size: 24rpx;
+  padding: 0;
+  min-height: 88rpx;
+}
+.reward-quantity {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 24rpx 0;
+}
+.reward-quantity button {
+  width: 88rpx;
+  min-height: 88rpx;
+  margin: 0;
+  background: #edf7ef;
+}
+.reward-quantity input {
+  flex: 1;
+  width: 0;
+  text-align: center;
+  border: 1rpx solid #dce6de;
+  padding: 20rpx;
+}
+
+.reward-balance {
+  min-height: 88rpx;
+  padding: 20rpx 24rpx;
+  border: 0;
+  line-height: 1.5;
+}
+.reward-search button,
+.reward-categories button,
+.reward-quantity button {
+  border: 0;
+  border-radius: 14rpx;
+  line-height: 88rpx;
+}
+.reward-quantity button[disabled] {
+  opacity: 0.45;
+}
+.reward-card .points-action {
+  line-height: 88rpx;
+}
+
+.reward-search button {
+  min-width: 88rpx;
 }
