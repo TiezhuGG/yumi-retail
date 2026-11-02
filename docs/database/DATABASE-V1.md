@@ -613,3 +613,18 @@ BEFORE INSERT触发器锁对应合成任务，检查已核对且无未决缺货�
 任务CLAIMED允许在原owner/claimed_at不变下逐次递增版本，完整完成变CHECKED，CHECKED终态本轮不允许重新打开。BEFORE触发器校验当前版本/状态、原分配件数、员工角色/仓库和归属、前序事实连续、未决原异常、全项最新CHECK；延迟约束保证每次任务版本匹配不可变事实。旧CREATED/CLAIMED/CANCELED凭据与Outbox配平保护保留并兼容CHECKED。
 
 沿用本仓授权/仓库共享锁→商品及库存锁→订单→Outbox→任务，所有动作、版本、事实、业务审计、幂等结果同事务；报告异常不锁外部系统、不移动积分/任何层实物账。核对/处置/完成在审计后以真实时钟再次核验效期和预占。迁移仅在随机临时schema重放，未应用业务主库。先迁移后部署匹配API、Worker及双端；有CHECKED或work事实后不得盲退P4a（不识别CHECKED且旧状态约束不兼容）。停止写开关并保留兼容读取及取消保护，不删除事实、不通过回退自动退分释放。
+
+
+## 2026-11-02 P4c原预占打包与真实幂等出库
+
+领取人逐项原批次/库位完整装包、本仓负责人/仓管核验实物出库已实现，本地验证见[P4c记录](../verification/P4C-REDEMPTION-PACKING-2026-11-02.md)。打包只写不可变凭据；出库同事务写唯一出库凭据、每项原预占消费指针、库位/批次/仓库on_hand与reserved等量扣减及主/位置流水、审计和幂等结果。冻结、盘点、失效来源、停用库位、过期、数量/完整性不符均阻断，晚失败全部回滚。出库不再扣积分、不退积分、不释放累计限兑/总配额；兑换单仍ACTIVE，履约由真实事实展示PACKED_WAIT_SHIP或SHIPPED_WAIT_HANDOFF。消费者不能直接取消已开始履约的单。仍为本机默认关闭的开发能力，未操作业务主库或生产，未接骑手配送、售后或协调取消；P4/P5未整体验收。下一项P4d真实兑换骑手分配与接货，后续继续配送、异常、售后及经营上线门禁。领取人停用接续/重派、已领取消及打包后异常恢复仍是上线前必需能力。
+
+新增迁移202611020015_redemption_packing，仅随机临时schema重放。redemption_allocations新增consume_ledger_id，唯一且通过(id,warehouse,sku,lot)外键关联stock_ledger；release和consume互斥、原分配快照不可变，仅允许未结算→一次释放或消费，终态不可覆盖/清空。现金order_allocations沿用原触发器，不受本次替换影响。
+
+redemption_packs（task/order唯一、完成拣货版本、包裹数、员工/请求/时间），redemption_pack_lines（同单分配复合来源、每分配唯一及原数量），redemption_shipments（task/order/pack唯一、完成拣货版本、员工/请求/时间），全部不可变。pack/task/order及packline/allocation/order、shipment/pack/task/order复合外键阻止错单错仓；SQL检查当前CHECKED及完成事实、全项最新CHECK和精确装包数量、领取人/当前本仓角色，不能仅插一张空打包或出库事实。
+
+出库每个原allocation产生唯一REDEMPTION_SHIP:<allocationId>员工主流水，delta_on_hand=delta_reserved=-quantity、delta_blocked=0；恰一条同原库位位置流水，数量/员工/请求须与出库事实一致。延迟约束要求出库对应全部原分配消费且未释放；消费必须有出库事实，带该动作前缀的孤立流水也拒绝。各层库存与主/位置流水原有配平约束继续执行。
+
+锁序保持授权/仓库→商品→库存→兑换单→Outbox→任务；阶段由订单和任务锁串行，原拣货版本不改变，打包/出库唯一事实分别推进阶段。出库、指针、各层计数/流水、审计、幂等结果同事务；审计后重查授权和真实时钟效期，晚失败全回滚。原单ACTIVE及配额、扣积分事实保留，不误作现金销售/退款或取消释放。出库后的历史读取只对未消费分配要求预占，仍可显示当前源资格告警。
+
+须迁移后部署匹配API/Worker/双端。存在消费事实后不得盲退旧SDK/API：旧读取不认识消费指针，会把已出库误读为预占中/待打包；旧SQL更新模型也不兼容新增消费列。关闭作业/Worker写入并保留兼容查询及取消保护，不删除库存事实、不通过回滚把消费改成取消释放。业务主库、生产及现有.env未修改。

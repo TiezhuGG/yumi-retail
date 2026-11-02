@@ -69,6 +69,8 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionPacks RedemptionPack[]
+ redemptionShipments RedemptionShipment[]
  redemptionPickingWork RedemptionPickingWork[]
  redemptionPickingOwned RedemptionPickingTask[]
  redemptionPickingEvents RedemptionPickingEvent[]
@@ -333,6 +335,7 @@ model StockLot {
 }
 
 model StockLedger {
+ redemptionConsumptions RedemptionAllocation[] @relation("redemptionConsume")
  redemptionReserves RedemptionAllocation[] @relation("redemptionReserve")
  redemptionReleases RedemptionAllocation[] @relation("redemptionRelease")
   id              String            @id @db.Uuid
@@ -1427,6 +1430,9 @@ model RedemptionOrder {
  @@map("redemption_orders")
 }
 model RedemptionAllocation {
+ packLine RedemptionPackLine?
+ consumeLedgerId String? @unique @map("consume_ledger_id") @db.Uuid
+ consume StockLedger? @relation("redemptionConsume",fields:[consumeLedgerId,warehouseId,skuId,lotId],references:[id,warehouseId,skuId,lotId],onDelete:Restrict,onUpdate:NoAction)
  work RedemptionPickingWork[]
  @@unique([id,orderId])
  id String @id @db.Uuid
@@ -1474,6 +1480,7 @@ model RedemptionEvent {
 }
 
 model RedemptionPickingTask {
+ pack RedemptionPack?
  work RedemptionPickingWork[]
  id String @id @db.Uuid
  orderId String @unique @map("order_id") @db.Uuid
@@ -1544,4 +1551,48 @@ model RedemptionPickingWork {
  resolution RedemptionPickingWork? @relation("workIssue")
  @@unique([taskId,version])
  @@map("redemption_picking_work")
+}
+
+model RedemptionPack {
+ id String @id @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ taskVersion Int @map("task_version")
+ packageCount Int @map("package_count")
+ actorId String @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ task RedemptionPickingTask @relation(fields:[taskId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ lines RedemptionPackLine[]
+ shipment RedemptionShipment?
+ @@unique([id,orderId])
+ @@unique([id,taskId,orderId])
+ @@unique([taskId,orderId])
+ @@map("redemption_packs")
+}
+model RedemptionPackLine {
+ packId String @map("pack_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ allocationId String @unique @map("allocation_id") @db.Uuid
+ quantity Int
+ pack RedemptionPack @relation(fields:[packId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ allocation RedemptionAllocation @relation(fields:[allocationId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ @@id([packId,allocationId])
+ @@unique([allocationId,orderId])
+ @@map("redemption_pack_lines")
+}
+model RedemptionShipment {
+ id String @id @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ packId String @unique @map("pack_id") @db.Uuid
+ taskVersion Int @map("task_version")
+ actorId String @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ pack RedemptionPack @relation(fields:[packId,taskId,orderId],references:[id,taskId,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([packId,taskId,orderId])
+ @@map("redemption_shipments")
 }

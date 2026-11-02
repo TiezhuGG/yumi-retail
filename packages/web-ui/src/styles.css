@@ -3076,3 +3076,41 @@ small {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.picking-pack-form,
+.picking-pack-proof {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #dce6de;
+  border-radius: 14px;
+  background: white;
+}
+.picking-pack-form label {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+  max-width: 540px;
+}
+.picking-pack-form input[type='number'] {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #dce6de;
+  border-radius: 8px;
+}
+.picking-pack-form label.picking-physical {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.picking-physical input {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+@media (max-width: 680px) {
+  .picking-pack-form button {
+    width: 100%;
+  }
+}

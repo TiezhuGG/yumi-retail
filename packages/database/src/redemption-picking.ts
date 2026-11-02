@@ -61,6 +61,7 @@ const sourceInclude = {
     include: {
       owner: { select: { displayName: true } },
       work: { orderBy: { version: 'asc' as const } },
+      pack: { include: { lines: true, shipment: true } },
     },
   },
   reward: {
@@ -97,7 +98,8 @@ export async function redemptionPickingReadiness(tx: Tx, id: string) {
     !balance ||
     balance.inventoryHold ||
     balance.activeCountId ||
-    balance.reserved < order.quantity
+    balance.reserved <
+      order.allocations.filter((a) => !a.consumeLedgerId).reduce((n, a) => n + a.quantity, 0)
   )
     blockers.push('INVENTORY_HELD');
   if (
@@ -106,15 +108,18 @@ export async function redemptionPickingReadiness(tx: Tx, id: string) {
   )
     blockers.push('ALLOCATION_INCOMPLETE');
   const lots = new Map<string, number>();
-  for (const a of order.allocations) lots.set(a.lotId, (lots.get(a.lotId) ?? 0) + a.quantity);
+  for (const a of order.allocations.filter((a) => !a.consumeLedgerId))
+    lots.set(a.lotId, (lots.get(a.lotId) ?? 0) + a.quantity);
   for (const a of order.allocations) {
     const p = a.position,
       l = p.lot;
     if (a.releaseLedgerId) blockers.push('ALLOCATION_RELEASED');
+    if (a.consumeLedgerId && !order.pickingTask?.pack?.shipment)
+      blockers.push('CONSUMPTION_UNVERIFIED');
     if (!p.location.enabled) blockers.push('LOCATION_DISABLED');
     if (l.expiresAt && l.expiresAt <= at) blockers.push('LOT_EXPIRED');
     if (
-      p.reserved < a.quantity ||
+      p.reserved < (a.consumeLedgerId ? 0 : a.quantity) ||
       l.reserved < (lots.get(l.id) ?? 0) ||
       p.onHand - p.blocked < p.reserved ||
       l.onHand - l.blocked < l.reserved

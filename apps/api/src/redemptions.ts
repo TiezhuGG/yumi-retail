@@ -501,7 +501,12 @@ export class RedemptionService {
     });
   }
   private dto(
-    row: Prisma.RedemptionOrderGetPayload<{ include: { outbox: true; pickingTask: true } }>,
+    row: Prisma.RedemptionOrderGetPayload<{
+      include: {
+        outbox: true;
+        pickingTask: { include: { pack: { include: { shipment: true } } } };
+      };
+    }>,
     consumer: boolean,
   ) {
     return {
@@ -521,17 +526,21 @@ export class RedemptionService {
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
-          : row.pickingTask?.state === 'CHECKED'
-            ? 'PICKED_WAIT_PACK'
-            : row.pickingTask?.state === 'CLAIMED'
-              ? 'PICKING'
-              : row.pickingTask?.state === 'READY'
-                ? 'READY_TO_PICK'
-                : row.outbox?.state === 'FAILED'
-                  ? 'REVIEW_REQUIRED'
-                  : row.outbox
-                    ? 'PENDING'
-                    : 'MISSING',
+          : row.pickingTask?.pack?.shipment
+            ? 'SHIPPED_WAIT_HANDOFF'
+            : row.pickingTask?.pack
+              ? 'PACKED_WAIT_SHIP'
+              : row.pickingTask?.state === 'CHECKED'
+                ? 'PICKED_WAIT_PACK'
+                : row.pickingTask?.state === 'CLAIMED'
+                  ? 'PICKING'
+                  : row.pickingTask?.state === 'READY'
+                    ? 'READY_TO_PICK'
+                    : row.outbox?.state === 'FAILED'
+                      ? 'REVIEW_REQUIRED'
+                      : row.outbox
+                        ? 'PENDING'
+                        : 'MISSING',
       ...(consumer
         ? {
             address: this.privateData.decrypt<ConsumerOrderAddress>(
@@ -569,7 +578,10 @@ export class RedemptionService {
         where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
         orderBy: { id: 'asc' },
         take: 21,
-        include: { outbox: true, pickingTask: true },
+        include: {
+          outbox: true,
+          pickingTask: { include: { pack: { include: { shipment: true } } } },
+        },
       });
       if (id && !rows.length) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');
       const items = rows.slice(0, 20).map((row) => this.dto(row, !admin));
@@ -582,7 +594,10 @@ export class RedemptionService {
       const warehouseId = await this.staff.authorize(r, tx);
       const row = await tx.redemptionOrder.findFirst({
         where: { id, warehouseId },
-        include: { outbox: true, pickingTask: true },
+        include: {
+          outbox: true,
+          pickingTask: { include: { pack: { include: { shipment: true } } } },
+        },
       });
       if (!row) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');
       const allocations = await tx.redemptionAllocation.findMany({
@@ -591,6 +606,7 @@ export class RedemptionService {
         select: {
           quantity: true,
           releaseLedgerId: true,
+          consumeLedgerId: true,
           position: {
             select: {
               location: { select: { code: true, name: true } },
@@ -613,6 +629,7 @@ export class RedemptionService {
           locationCode: a.position.location.code,
           reserved: true,
           released: !!a.releaseLedgerId,
+          consumed: !!a.consumeLedgerId,
         })),
         events: events.map((e) => ({ type: e.type, createdAt: e.createdAt.toISOString() })),
       };

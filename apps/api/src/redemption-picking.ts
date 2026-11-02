@@ -40,7 +40,14 @@ export class RedemptionPickingService {
       title: o.title,
       spec: o.spec,
       quantity: o.quantity,
-      state: o.status === 'CANCELED' ? 'CANCELED' : (task?.state ?? j.state),
+      state:
+        o.status === 'CANCELED'
+          ? 'CANCELED'
+          : task?.pack?.shipment
+            ? 'SHIPPED'
+            : task?.pack
+              ? 'PACKED'
+              : (task?.state ?? j.state),
       task: task
         ? {
             id: task.id,
@@ -72,6 +79,29 @@ export class RedemptionPickingService {
             (a) => task.work.filter((e) => e.allocationId === a.id).at(-1)?.action === 'CHECK',
           ),
       },
+      packing: {
+        canPack: task?.state === 'CHECKED' && !task.pack && !blockers.length,
+        canShip: !!task?.pack && !task.pack.shipment && !blockers.length,
+        pack: task?.pack
+          ? {
+              id: task.pack.id,
+              packageCount: task.pack.packageCount,
+              actorId: task.pack.actorId,
+              createdAt: task.pack.createdAt.toISOString(),
+              lines: task.pack.lines.map((l) => ({
+                allocationId: l.allocationId,
+                quantity: l.quantity,
+              })),
+            }
+          : null,
+        shipment: task?.pack?.shipment
+          ? {
+              id: task.pack.shipment.id,
+              actorId: task.pack.shipment.actorId,
+              createdAt: task.pack.shipment.createdAt.toISOString(),
+            }
+          : null,
+      },
       history: (task?.work ?? []).map((e) => ({
         id: e.id,
         action: e.action,
@@ -101,7 +131,19 @@ export class RedemptionPickingService {
     const b = fields(q, ['cursor', 'status', 'mine']),
       cursor = b.cursor === undefined ? null : uuid(b.cursor),
       status = b.status === undefined ? '' : str(b.status, 16);
-    if (status && !['READY', 'CLAIMED', 'CHECKED', 'CANCELED', 'FAILED', 'QUEUED'].includes(status))
+    if (
+      status &&
+      ![
+        'READY',
+        'CLAIMED',
+        'CHECKED',
+        'PACKED',
+        'SHIPPED',
+        'CANCELED',
+        'FAILED',
+        'QUEUED',
+      ].includes(status)
+    )
       throw failure(400, 'VALIDATION_ERROR', '任务筛选无效');
     if (b.mine !== undefined && b.mine !== '1')
       throw failure(400, 'VALIDATION_ERROR', '本人筛选无效');
@@ -113,10 +155,17 @@ export class RedemptionPickingService {
           ...(id ? { id } : {}),
           ...(b.mine ? { pickingTask: { ownerId: r.staffContext!.staffId } } : {}),
           ...(status === 'CANCELED' ? { status: 'CANCELED' } : status ? { status: 'ACTIVE' } : {}),
-          ...(['READY', 'CLAIMED', 'CHECKED'].includes(status)
+          ...(['READY', 'CLAIMED', 'CHECKED', 'PACKED', 'SHIPPED'].includes(status)
             ? {
                 pickingTask: {
-                  state: status,
+                  state: ['PACKED', 'SHIPPED'].includes(status) ? 'CHECKED' : status,
+                  ...(status === 'CHECKED'
+                    ? { pack: null }
+                    : status === 'PACKED'
+                      ? { pack: { shipment: null } }
+                      : status === 'SHIPPED'
+                        ? { pack: { shipment: { isNot: null } } }
+                        : {}),
                   ...(b.mine ? { ownerId: r.staffContext!.staffId } : {}),
                 },
               }
@@ -351,6 +400,191 @@ export class RedemptionPickingService {
       },
     );
   }
+  async packing(
+    r: ApiRequest,
+    w: string,
+    id: string,
+    action: 'pack' | 'ship',
+    k: string,
+    input: unknown,
+  ) {
+    const b = fields(
+      input,
+      action === 'pack'
+        ? ['version', 'packageCount', 'lines']
+        : ['version', 'packId', 'physicalConfirmed'],
+    );
+    if (action === 'ship' && b.physicalConfirmed !== true)
+      throw failure(400, 'PHYSICAL_CONFIRMATION_REQUIRED', '须确认核验包裹及原预占实物后出库');
+    const version = integer(b.version, 2, 2147483646),
+      packId = action === 'ship' ? uuid(b.packId) : null;
+    const packageCount = action === 'pack' ? integer(b.packageCount, 1, 100) : null;
+    const lines: Array<{ allocationId: string; quantity: number }> = [];
+    if (action === 'pack') {
+      if (!Array.isArray(b.lines) || !b.lines.length || b.lines.length > 1000)
+        throw failure(400, 'VALIDATION_ERROR', '须提交每项原预占装包件数');
+      for (const v of b.lines) {
+        const l = fields(v, ['allocationId', 'quantity']);
+        lines.push({
+          allocationId: uuid(l.allocationId),
+          quantity: integer(l.quantity, 1, 100000),
+        });
+      }
+      lines.sort((a, b) => a.allocationId.localeCompare(b.allocationId));
+      if (new Set(lines.map((l) => l.allocationId)).size !== lines.length)
+        throw failure(400, 'VALIDATION_ERROR', '同一预占项不能重复');
+    }
+    await this.authorize(this.catalog.db, r, w, action === 'ship');
+    if (!this.enabled) throw failure(503, 'REDEMPTION_PICKING_DISABLED', '兑换拣货作业尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_PICKING_' + action,
+      w + ':' + id,
+      k,
+      { version, packId, packageCount, lines },
+      async (tx) => {
+        await this.authorize(tx, r, w, action === 'ship');
+        const initial = await tx.redemptionOrder.findFirst({ where: { id, warehouseId: w } });
+        if (!initial) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到本仓兑换单');
+        await metadataLocks(tx, [initial.skuId]);
+        await inventoryLocks(tx, w, [initial.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT order_id FROM redemption_outbox WHERE order_id=${id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${id}::uuid FOR UPDATE`;
+        const { order: o, blockers } = await redemptionPickingReadiness(tx, id),
+          t = o?.pickingTask;
+        if (
+          !o ||
+          o.status !== 'ACTIVE' ||
+          o.outbox?.state !== 'COMPLETED' ||
+          !t ||
+          t.state !== 'CHECKED' ||
+          t.version !== version
+        )
+          throw failure(409, 'VERSION_CONFLICT', '须使用当前已完成拣货任务，请刷新');
+        if (action === 'pack' && t.ownerId !== r.staffContext!.staffId)
+          throw failure(403, 'PICKING_OWNER_REQUIRED', '仅原领取人可确认打包');
+        if ((action === 'pack' && t.pack) || t.pack?.shipment)
+          throw failure(409, 'STAGE_ALREADY_RECORDED', '打包或出库已记录，不能重复执行');
+        if (
+          action === 'ship' &&
+          (!t.pack || t.pack.id !== packId || t.pack.taskVersion !== version)
+        )
+          throw failure(409, 'PACK_REQUIRED', '须选择本单当前打包凭据');
+        if (
+          !o.allocations.length ||
+          !t.work.some((e) => e.action === 'COMPLETE' && e.version === version) ||
+          o.allocations.some(
+            (a) =>
+              a.releaseLedgerId ||
+              a.consumeLedgerId ||
+              t.work.filter((e) => e.allocationId === a.id).at(-1)?.action !== 'CHECK',
+          )
+        )
+          throw failure(409, 'PICKING_INCOMPLETE', '原预占未全部核对或已结算，不能打包或出库');
+        if (blockers.length)
+          throw failure(409, 'PICKING_BLOCKED', '当前冻结、效期或预占资格变化，不能打包或出库');
+        if (action === 'pack') {
+          if (
+            lines.length !== o.allocations.length ||
+            o.allocations.some(
+              (a) => !lines.some((l) => l.allocationId === a.id && l.quantity === a.quantity),
+            )
+          )
+            throw failure(
+              409,
+              'PACK_QUANTITY_MISMATCH',
+              '装包须逐项等于原预占完整件数，不能漏项、换项或部分出库',
+            );
+          const packed = await tx.redemptionPack.create({
+            data: {
+              id: randomUUID(),
+              taskId: t.id,
+              orderId: id,
+              taskVersion: version,
+              packageCount: packageCount!,
+              actorId: r.staffContext!.staffId,
+              requestId: r.requestId,
+            },
+          });
+          await tx.redemptionPackLine.createMany({
+            data: lines.map((l) => ({ ...l, packId: packed.id, orderId: id })),
+          });
+        } else {
+          await tx.redemptionShipment.create({
+            data: {
+              id: randomUUID(),
+              taskId: t.id,
+              orderId: id,
+              packId: packId!,
+              taskVersion: version,
+              actorId: r.staffContext!.staffId,
+              requestId: r.requestId,
+            },
+          });
+          for (const a of o.allocations) {
+            const consumeLedgerId = randomUUID();
+            await tx.stockPosition.update({
+              where: { id: a.positionId },
+              data: {
+                onHand: { decrement: a.quantity },
+                reserved: { decrement: a.quantity },
+                version: { increment: 1 },
+              },
+            });
+            await tx.stockLot.update({
+              where: { id: a.lotId },
+              data: { onHand: { decrement: a.quantity }, reserved: { decrement: a.quantity } },
+            });
+            await tx.stockBalance.update({
+              where: { warehouseId_skuId: { warehouseId: w, skuId: o.skuId } },
+              data: {
+                onHand: { decrement: a.quantity },
+                reserved: { decrement: a.quantity },
+                version: { increment: 1 },
+              },
+            });
+            await tx.stockLedger.create({
+              data: {
+                id: consumeLedgerId,
+                warehouseId: w,
+                skuId: a.skuId,
+                lotId: a.lotId,
+                actionKey: 'REDEMPTION_SHIP:' + a.id,
+                deltaOnHand: -a.quantity,
+                deltaReserved: -a.quantity,
+                deltaBlocked: 0,
+                actorId: r.staffContext!.staffId,
+                requestId: r.requestId,
+              },
+            });
+            await tx.positionLedger.create({
+              data: {
+                id: randomUUID(),
+                warehouseId: w,
+                skuId: a.skuId,
+                lotId: a.lotId,
+                positionId: a.positionId,
+                stockLedgerId: consumeLedgerId,
+                deltaOnHand: -a.quantity,
+                deltaReserved: -a.quantity,
+                deltaBlocked: 0,
+              },
+            });
+            await tx.redemptionAllocation.update({
+              where: { id: a.id },
+              data: { consumeLedgerId },
+            });
+          }
+        }
+        await this.catalog.audit(tx, r, 'REDEMPTION_PICKING_' + action.toUpperCase(), id, w);
+        await this.authorize(tx, r, w, action === 'ship');
+        if ((await redemptionPickingReadiness(tx, id)).blockers.length)
+          throw failure(409, 'PICKING_BLOCKED', '处理期间批次或预占资格变化，本次打包/出库回滚');
+        return { id };
+      },
+    );
+  }
 }
 const n = { type: 'integer' as const, minimum: 0 },
   positive = { ...n, minimum: 1 },
@@ -382,6 +616,21 @@ const task = object({
     leaseUntil: nullable,
   }),
   readiness: object({ ready: { type: 'boolean' }, blockers: { type: 'array', items: text } }),
+  packing: object({
+    canPack: { type: 'boolean' },
+    canShip: { type: 'boolean' },
+    pack: {
+      ...object({
+        id: text,
+        packageCount: n,
+        actorId: text,
+        createdAt: text,
+        lines: { type: 'array', items: object({ allocationId: text, quantity: n }) },
+      }),
+      nullable: true,
+    },
+    shipment: { ...object({ id: text, actorId: text, createdAt: text }), nullable: true },
+  }),
   work: object({ complete: { type: 'boolean' }, canComplete: { type: 'boolean' } }),
   history: {
     type: 'array',
@@ -419,7 +668,7 @@ export class RedemptionPickingController {
   @ApiQuery({
     name: 'status',
     required: false,
-    enum: ['READY', 'CLAIMED', 'CHECKED', 'CANCELED', 'FAILED', 'QUEUED'],
+    enum: ['READY', 'CLAIMED', 'CHECKED', 'PACKED', 'SHIPPED', 'CANCELED', 'FAILED', 'QUEUED'],
   })
   @ApiQuery({ name: 'mine', required: false, enum: ['1'] })
   @Permissions('redemption-picking.read')
@@ -566,5 +815,57 @@ export class RedemptionPickingController {
   ) {
     fields(q, []);
     return success(r, await this.service.work(r, uuid(w), uuid(id), 'complete', key(r), b));
+  }
+  @Post(':id/pack')
+  @HttpCode(200)
+  @Permissions('redemption-picking.work')
+  @ApiBody({
+    schema: object({
+      version: positive,
+      packageCount: { type: 'integer', minimum: 1, maximum: 100 },
+      lines: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 1000,
+        items: object({ allocationId: text, quantity: positive }),
+      },
+    }),
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async pack(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.packing(r, uuid(w), uuid(id), 'pack', key(r), b));
+  }
+
+  @Post(':id/ship')
+  @HttpCode(200)
+  @Permissions('redemption-picking.ship')
+  @ApiBody({
+    schema: object({
+      version: positive,
+      packId: text,
+      physicalConfirmed: { type: 'boolean', enum: [true] },
+    }),
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async ship(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.packing(r, uuid(w), uuid(id), 'ship', key(r), b));
   }
 }

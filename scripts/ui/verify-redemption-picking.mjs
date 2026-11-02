@@ -55,7 +55,7 @@ try {
   );
   await writeFile(
     dir + '/main.tsx',
-    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 隔离验收 · 真实兑换来源拣货 · 尚未出库</div>{mini?(location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 兑换拣货与出库 · 非生产操作</div>{mini?(location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</>);`,
   );
   const config = {
     configFile: false,
@@ -286,6 +286,101 @@ try {
     await f.runtime.db.redemptionPickingWork.count({ where: { orderId: id, action: 'COMPLETE' } }),
     1,
   );
+
+  // P4c: original owner confirms every packed quantity; only manager consumes real reservations.
+  const packQuantity = ops.getByRole('spinbutton', { name: /装包件数/ });
+  await packQuantity.fill('2');
+  await ops.getByLabel('包裹数', { exact: true }).fill('1');
+  assert.equal(
+    await ops.getByRole('button', { name: '确认完整装包', exact: true }).isEnabled(),
+    false,
+  );
+  await packQuantity.fill('1');
+  await f.runtime.db.stockBalance.update({
+    where: { warehouseId_skuId: { warehouseId: f.warehouseId, skuId: f.catalog.skuIds[0] } },
+    data: { inventoryHold: true },
+  });
+  await ops.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await ops.getByText('库存冻结或预占不足', { exact: true }).waitFor();
+  assert.equal(
+    await ops.getByRole('button', { name: '确认完整装包', exact: true }).isEnabled(),
+    false,
+  );
+  await shot('OPS-PACK-BLOCKED', ops);
+  await f.runtime.db.stockBalance.update({
+    where: { warehouseId_skuId: { warehouseId: f.warehouseId, skuId: f.catalog.skuIds[0] } },
+    data: { inventoryHold: false },
+  });
+  await ops.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await ops.getByRole('status').waitFor({ state: 'hidden' });
+  await ops.getByRole('spinbutton', { name: /装包件数/ }).fill('1');
+  await ops.getByLabel('包裹数', { exact: true }).fill('1');
+  await shot('OPS-PACK-FORM', ops);
+  let dropPack = true;
+  await ops.route('**/api/v1/warehouse/warehouses/*/redemption-picking/*/pack', async (route) => {
+    if (dropPack) {
+      dropPack = false;
+      await route.fetch();
+      await route.abort();
+    } else await route.continue();
+  });
+  await ops.getByRole('button', { name: '确认完整装包', exact: true }).click();
+  await ops.getByRole('alert').waitFor();
+  await shot('OPS-PACK-UNKNOWN', ops);
+  await ops.reload();
+  await ops.getByRole('button', { name: '使用原请求核实打包', exact: true }).click();
+  await ops.locator('.picking-state').filter({ hasText: '已打包 · 待出库' }).waitFor();
+  assert.equal(await ops.getByRole('button', { name: '确认真实出库', exact: true }).count(), 0);
+  await shot('OPS-PACKED', ops);
+  await mini.reload();
+  await mini.getByText('已打包，等待仓库出库；尚未配送。', { exact: true }).waitFor();
+  await shot('MINI-PACKED', mini);
+  await page.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await page.locator('.picking-state').filter({ hasText: '已打包 · 待出库' }).waitFor();
+  assert.equal(
+    await page.getByRole('button', { name: '确认真实出库', exact: true }).isEnabled(),
+    false,
+  );
+  await shot('ADMIN-PACKED');
+  await page.getByLabel('已核验包裹及原预占实物，确认出库', { exact: true }).check();
+  let dropShip = true;
+  await page.route('**/api/v1/warehouse/warehouses/*/redemption-picking/*/ship', async (route) => {
+    if (dropShip) {
+      dropShip = false;
+      await route.fetch();
+      await route.abort();
+    } else await route.continue();
+  });
+  await page.getByRole('button', { name: '确认真实出库', exact: true }).click();
+  await page.getByRole('alert').waitFor();
+  await shot('ADMIN-SHIP-UNKNOWN');
+  await page.reload();
+  await page.getByRole('button', { name: '使用原请求核实出库', exact: true }).click();
+  await page.locator('.picking-state').filter({ hasText: '已出库 · 待骑手接货' }).waitFor();
+  await shot('ADMIN-SHIPPED');
+  await ops.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await ops.locator('.picking-state').filter({ hasText: '已出库 · 待骑手接货' }).waitFor();
+  await shot('OPS-SHIPPED', ops);
+  await mini.reload();
+  await mini.getByText('已出库，等待骑手接货；尚未开始配送。', { exact: true }).waitFor();
+  assert.equal(
+    await mini.getByRole('button', { name: '取消兑换并退还 120 积分', exact: true }).count(),
+    0,
+  );
+  await shot('MINI-SHIPPED', mini);
+  assert.equal(await f.runtime.db.redemptionPack.count({ where: { orderId: id } }), 1);
+  assert.equal(await f.runtime.db.redemptionShipment.count({ where: { orderId: id } }), 1);
+  assert.equal(
+    await f.runtime.db.redemptionAllocation.count({
+      where: { orderId: id, consumeLedgerId: { not: null } },
+    }),
+    1,
+  );
+  await page.getByRole('button', { name: '积分兑换订单', exact: true }).click();
+  await page.getByRole('button', { name: '查看兑换凭据', exact: true }).click();
+  await page.getByText('已出库消耗预占', { exact: false }).waitFor();
+  await shot('ADMIN-ORDER-CONSUMED');
+  await page.getByRole('button', { name: '兑换拣货', exact: true }).click();
   const second = await f.order();
   await runRedemptionPickingOnce(f.runtime.db);
   await mini.goto('http://127.0.0.1:5188/?mini&view=order&id=' + second);

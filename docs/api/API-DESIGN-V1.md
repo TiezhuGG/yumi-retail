@@ -775,3 +775,23 @@ OpenAPI 0.44.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption
 version为当前任务版本，每个动作递增一次。相同员工/动作/订单/键及完全相同输入返回历史结果；改体同键409；失权后拒绝重放。GET列表新增status=CHECKED，详情/列表项增work.complete/canComplete、lines[].checked/issue及history[]（事实id、action、allocationId、quantity、actorId、createdAt）。history保留已处置异常，quantity在COMPLETE为空。消费者及后台订单fulfillmentState增PICKED_WAIT_PACK；既有客户端须升级后部署，不能把新状态误当可直接取消。
 
 错误包括400 VALIDATION_ERROR；403 PICKING_OWNER_REQUIRED/FORBIDDEN；409 VERSION_CONFLICT、ALLOCATION_INVALID、QUANTITY_MISMATCH、PICKING_ISSUE_OPEN、ISSUE_CHANGED、ALREADY_CHECKED、PICKING_INCOMPLETE、PICKING_BLOCKED；503 REDEMPTION_PICKING_DISABLED/RETRYABLE_CONFLICT。未知网络/5xx保留原键及完整原始输入，刷新或重载后同键核实，不能自动另建请求。
+
+
+## 2026-11-02 P4c原预占打包与真实幂等出库
+
+领取人逐项原批次/库位完整装包、本仓负责人/仓管核验实物出库已实现，本地验证见[P4c记录](../verification/P4C-REDEMPTION-PACKING-2026-11-02.md)。打包只写不可变凭据；出库同事务写唯一出库凭据、每项原预占消费指针、库位/批次/仓库on_hand与reserved等量扣减及主/位置流水、审计和幂等结果。冻结、盘点、失效来源、停用库位、过期、数量/完整性不符均阻断，晚失败全部回滚。出库不再扣积分、不退积分、不释放累计限兑/总配额；兑换单仍ACTIVE，履约由真实事实展示PACKED_WAIT_SHIP或SHIPPED_WAIT_HANDOFF。消费者不能直接取消已开始履约的单。仍为本机默认关闭的开发能力，未操作业务主库或生产，未接骑手配送、售后或协调取消；P4/P5未整体验收。下一项P4d真实兑换骑手分配与接货，后续继续配送、异常、售后及经营上线门禁。领取人停用接续/重派、已领取消及打包后异常恢复仍是上线前必需能力。
+
+OpenAPI 0.45.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-picking`，新增：
+
+|动作|请求体|权限/行为|
+|---|---|---|
+|POST /:id/pack|version、packageCount、lines:[{allocationId,quantity}]|redemption-picking.work；原领取人，当前CHECKED，全部原分配逐项精确数量；唯一打包事实|
+|POST /:id/ship|version、packId、physicalConfirmed:true|redemption-picking.ship；本仓SUPER_ADMIN/WAREHOUSE_MANAGER，当前有效打包及同一拣货版本，明确核验实物，全部出库一次|
+
+员工Cookie、Origin/CSRF、Idempotency-Key、事务内有效会话/角色/仓库均需通过。version使用完成拣货任务的当前版本，阶段事实不重写原拣货核对；packId必须当前本单打包凭据，普通用户界面自动选择。packageCount为1..100整数，lines为1..1000个不同原分配；每项quantity为1..100000整数且必须等于原分配完整件数；这些是开发技术保护上限，不是已确认经营参数。不接部分出库/换批/拆单；同仓跨单分配也拒绝。
+
+同员工/动作/订单/原键可恢复同一结果；内容改变409，pack lines按allocationId规范排序。新键重复阶段409 STAGE_ALREADY_RECORDED；未核验实物400 PHYSICAL_CONFIRMATION_REQUIRED；漏项/换项/件数不符409 PACK_QUANTITY_MISMATCH；尚无匹配打包409 PACK_REQUIRED；其余沿用VERSION_CONFLICT、PICKING_OWNER_REQUIRED、PICKING_INCOMPLETE、PICKING_BLOCKED与默认关闭503。未知5xx或网络结果保留原始完整输入/键，不能自动换键再出库。失权后拒绝重放；同一员工兼具领取及仓管角色可打包和出库，本轮未新增独立审批业务规则。
+
+GET列表增加互斥status=PACKED/SHIPPED；CHECKED只筛拣货完成但尚未打包。列表/详情新增packing.canPack/canShip（阶段和源资格条件，不代替员工权限校验）、packing.pack（id、包裹数、执行人、时间及逐项件数）、packing.shipment（id、执行人、时间）。顶层state是事实派生PACKED/SHIPPED，task.state仍CHECKED表示原拣货完成事实；实际阶段以顶层state和packing读取。
+
+消费者及后台订单fulfillmentState增加PACKED_WAIT_SHIP、SHIPPED_WAIT_HANDOFF；出库后不声称开始配送。后台分配增加consumed布尔，released仍为取消释放，reserved沿用历史已预占凭据含义；显示优先consumed→released→预占中。出库后的当前待预占量按未消费分配计算，不错误要求已消费预占仍留在reserved。新旧客户端和服务端应匹配部署。

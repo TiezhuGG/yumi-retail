@@ -846,6 +846,8 @@ export interface RedemptionOrderView {
     | 'READY_TO_PICK'
     | 'PICKING'
     | 'PICKED_WAIT_PACK'
+    | 'PACKED_WAIT_SHIP'
+    | 'SHIPPED_WAIT_HANDOFF'
     | 'REVIEW_REQUIRED';
   address?: ConsumerOrderAddress;
   allocations?: Array<{
@@ -855,6 +857,7 @@ export interface RedemptionOrderView {
     locationCode: string;
     reserved: boolean;
     released: boolean;
+    consumed: boolean;
   }>;
   events?: Array<{ type: string; createdAt: string }>;
 }
@@ -887,6 +890,18 @@ export interface RedemptionPickingView {
     leaseUntil: string | null;
   };
   readiness: { ready: boolean; blockers: string[] };
+  packing: {
+    canPack: boolean;
+    canShip: boolean;
+    pack: null | {
+      id: string;
+      packageCount: number;
+      actorId: string;
+      createdAt: string;
+      lines: Array<{ allocationId: string; quantity: number }>;
+    };
+    shipment: null | { id: string; actorId: string; createdAt: string };
+  };
   work: { complete: boolean; canComplete: boolean };
   history: Array<{
     id: string;

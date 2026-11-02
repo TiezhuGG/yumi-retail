@@ -15,6 +15,8 @@ const states: Record<string, string> = {
   CLAIMED: '已领取 · 待逐项核对',
   CANCELED: '已取消',
   CHECKED: '拣货完成 · 待打包',
+  PACKED: '已打包 · 待出库',
+  SHIPPED: '已出库 · 待骑手接货',
 };
 const reasons: Record<string, string> = {
   WAREHOUSE_PAUSED: '仓库暂停',
@@ -30,7 +32,7 @@ const reasons: Record<string, string> = {
   ALLOCATION_INCOMPLETE: '预占件数不完整',
   POINTS_EVIDENCE_MISSING: '积分扣除证据异常',
 };
-type Action = 'claim' | 'retry' | 'check' | 'report' | 'resolve' | 'complete';
+type Action = 'claim' | 'retry' | 'check' | 'report' | 'resolve' | 'complete' | 'pack' | 'ship';
 type Intent = {
   id: string;
   action: Action;
@@ -69,7 +71,7 @@ export function RedemptionPickingWorkbench({ profile }: { profile: StaffProfile 
   return (
     <section aria-label="兑换拣货作业">
       <div className="notice">
-        来自已扣积分、已预占实物的兑换单。领取后按原预占批次和库位核对。缺货或破损须上报，仓管确认原需求备齐后重新核对；完成拣货后等待打包。
+        来自已扣积分、已预占实物的兑换单。领取后按原预占批次和库位核对。缺货或破损须上报，仓管确认原需求备齐后重新核对；完成拣货后逐项确认装包，再由仓管核验实物并出库。
       </div>
       {error && (
         <p role="alert">
@@ -124,7 +126,9 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['claim', 'retry', 'check', 'report', 'resolve', 'complete'].includes(v.action) ||
+      !['claim', 'retry', 'check', 'report', 'resolve', 'complete', 'pack', 'ship'].includes(
+        v.action,
+      ) ||
       !Number.isInteger(v.version)
     )
       throw Error('原作业操作记录无法读取，请保留并核实');
@@ -241,6 +245,8 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             <option value="READY">待领取</option>
             <option value="CLAIMED">已领取</option>
             <option value="CHECKED">拣货完成 · 待打包</option>
+            <option value="PACKED">已打包 · 待出库</option>
+            <option value="SHIPPED">已出库 · 待骑手接货</option>
             <option value="FAILED">创建失败</option>
             <option value="CANCELED">已取消</option>
           </select>
@@ -378,6 +384,8 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     report: '上报',
                     resolve: '处置',
                     complete: '完成拣货',
+                    pack: '打包',
+                    ship: '出库',
                   }[intent.action]}
             </button>
           ) : (
@@ -416,6 +424,53 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             <div className="notice">
               原预占逐项核对已完成，等待打包。尚未出库或配送，实物预占和积分保持不变。
             </div>
+          )}
+          {detail.state === 'CHECKED' && detail.task?.ownerId === profile.id && (
+            <RedemptionPackForm
+              key={detail.id}
+              detail={detail}
+              disabled={busy || loading || !!intent || !enabled || corrupt}
+              write={write}
+            />
+          )}
+          {detail.packing.pack && (
+            <section className="picking-pack-proof" aria-label="打包出库凭据">
+              <h3>打包与出库</h3>
+              <p>
+                已确认 {detail.packing.pack.packageCount} 个包裹，原预占 {detail.quantity}{' '}
+                件全部装包。
+              </p>
+              <p>
+                打包时间：
+                {new Date(detail.packing.pack.createdAt).toLocaleString('zh-CN', {
+                  timeZone: 'Asia/Shanghai',
+                })}
+                （北京时间）
+              </p>
+              {detail.packing.shipment ? (
+                <div className="notice">
+                  已按原预占批次和库位完成出库，实物与预占已同步扣减。等待骑手接货，尚未开始配送。
+                  <p>
+                    出库时间：
+                    {new Date(detail.packing.shipment.createdAt).toLocaleString('zh-CN', {
+                      timeZone: 'Asia/Shanghai',
+                    })}
+                    （北京时间）
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p>已打包，等待本仓负责人或仓管核验实物出库。</p>
+                  {profile.permissions.includes('redemption-picking.ship') && (
+                    <RedemptionShipForm
+                      detail={detail}
+                      disabled={busy || loading || !!intent || !enabled || corrupt}
+                      write={write}
+                    />
+                  )}
+                </>
+              )}
+            </section>
           )}
           {!!detail.history.length && (
             <details>
@@ -599,5 +654,112 @@ function AllocationWork({
             </form>
           )}
     </div>
+  );
+}
+
+function RedemptionPackForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionPickingView;
+  disabled: boolean;
+  write: (action: Action, body?: Record<string, unknown>) => Promise<void>;
+}) {
+  const [packageCount, setPackageCount] = useState(''),
+    [quantities, setQuantities] = useState<Record<string, string>>({});
+  const valid =
+    /^[1-9]\d*$/.test(packageCount) &&
+    Number(packageCount) <= 100 &&
+    detail.lines.every(
+      (l) => /^[1-9]\d*$/.test(quantities[l.id] ?? '') && Number(quantities[l.id]) === l.quantity,
+    );
+  return (
+    <form
+      className="picking-pack-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid)
+          void write('pack', {
+            packageCount: Number(packageCount),
+            lines: detail.lines.map((l) => ({
+              allocationId: l.id,
+              quantity: Number(quantities[l.id]),
+            })),
+          });
+      }}
+    >
+      <h3>确认原预占完整装包</h3>
+      <p>逐项清点原批次与库位货品。数量不符请停止打包并联系仓管核查。</p>
+      {detail.lines.map((l) => (
+        <label key={l.id}>
+          {l.batchNo} · {l.locationName}（应装 {l.quantity} 件）
+          <input
+            aria-label={'装包件数 ' + l.batchNo + ' ' + l.locationCode}
+            type="number"
+            min="1"
+            max={l.quantity}
+            step="1"
+            value={quantities[l.id] ?? ''}
+            disabled={disabled}
+            onChange={(e) => setQuantities((old) => ({ ...old, [l.id]: e.target.value }))}
+          />
+        </label>
+      ))}
+      <label>
+        包裹数
+        <input
+          aria-label="包裹数"
+          type="number"
+          min="1"
+          max="100"
+          step="1"
+          value={packageCount}
+          disabled={disabled}
+          onChange={(e) => setPackageCount(e.target.value)}
+        />
+      </label>
+      <button className="primary-button" disabled={disabled || !valid || !detail.packing.canPack}>
+        确认完整装包
+      </button>
+    </form>
+  );
+}
+function RedemptionShipForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionPickingView;
+  disabled: boolean;
+  write: (action: Action, body?: Record<string, unknown>) => Promise<void>;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <form
+      className="picking-pack-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (confirmed)
+          void write('ship', { packId: detail.packing.pack!.id, physicalConfirmed: true });
+      }}
+    >
+      <label className="picking-physical">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          disabled={disabled}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        已核验包裹及原预占实物，确认出库
+      </label>
+      <p>出库将一次性扣减原库位、批次及仓库实物与预占。数量、批次或实物不符时请停止操作。</p>
+      <button
+        className="primary-button"
+        disabled={disabled || !confirmed || !detail.packing.canShip}
+      >
+        确认真实出库
+      </button>
+    </form>
   );
 }

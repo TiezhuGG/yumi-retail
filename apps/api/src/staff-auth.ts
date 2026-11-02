@@ -10,6 +10,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
     'redemption-picking.retry',
     'redemption-picking.resolve',
+    'redemption-picking.ship',
     'points.read',
     'points.write',
     'redemption-picking.read',
@@ -68,6 +69,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
   WAREHOUSE_MANAGER: [
     'redemption-picking.retry',
     'redemption-picking.resolve',
+    'redemption-picking.ship',
     'redemption-picking.read',
     'redemption-picking.claim',
     'redemption-picking.work',
