@@ -1179,6 +1179,7 @@ model PickingLabDispatch {
 }
 
 model DeliveryLabAssignment {
+ handoff DeliveryLabHandoff?
  id String @id @db.Uuid
  dispatchId String @unique @map("dispatch_id") @db.Uuid
  riderId String @map("rider_id") @db.Uuid
@@ -1192,4 +1193,14 @@ model DeliveryLabAssignment {
  actor Staff @relation("deliveryAssigner",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@index([riderId],map:"delivery_assignments_rider")
  @@map("delivery_lab_assignments")
+}
+
+model DeliveryLabHandoff {
+ id String @id @db.Uuid
+ assignmentId String @unique @map("assignment_id") @db.Uuid
+ key String @db.Uuid
+ packageCount Int @map("package_count")
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ assignment DeliveryLabAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("delivery_lab_handoffs")
 }

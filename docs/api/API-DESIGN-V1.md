@@ -679,3 +679,13 @@ SUPER_ADMIN/WAREHOUSE_MANAGER新增delivery-lab.read及assign；RIDER仅read。�
 资格阻断码：LAB_DISABLED、UNASSIGNED、RIDER_DISABLED、RIDER_ROLE_REMOVED、RIDER_WAREHOUSE_REMOVED、PICKING_NOT_READY。账号/角色/范围来自当前数据库快照；列表/详情在RepeatableRead事务中读取，不把历史分配等同持续有效资格。
 
 写入先锁原任务，已成功原人员/键先恢复，改骑手409 IDEMPOTENCY_CONFLICT；换键/人员重复阶段409 DELIVERY_ALREADY_ASSIGNED；无合成出库404 DELIVERY_LAB_NOT_FOUND；原快照不满足409 DELIVERY_NOT_READY；目标骑手不合格409 RIDER_INELIGIBLE。当前仓库/权限403，格式或额外字段400，默认关闭503。未知网络/5xx不得视为未提交，原请求应保留恢复；资格撤销后原成功请求仍返回原凭据和当前阻断信息。没有接货、送达、改派或通用状态修改接口。
+
+## 2026-11-02 合成骑手接货增量（待运行验证）
+
+已编写本人合成接货实现：POST /api/v1/delivery-lab/:id/accept?warehouseId=…，请求严格限定key(UUID)、packageCount(1–100整数)，需CSRF与delivery-lab.accept（仅RIDER角色授予）。服务端按当前仓库及本人分配过滤；未分配/他人任务404，包裹数与原合成出库不一致409。提交锁原合成任务，重新锁定核验当前启用账号/RIDER/仓库范围及出库快照、未决缺货。
+
+新增delivery_lab_handoffs，assignment_id唯一外键、原请求键、核对数量、创建时间；骑手身份取不可变分配，不接受客户端操作者。原本人/键/数量重试恢复，新键或数量改变409；凭据与DELIVERY_LAB_ACCEPT审计同事务。数据库触发器复核数量/资格/快照，拒绝凭据更新删除。响应新增可空handoff{id,packageCount,createdAt}，不暴露原键。历史分配不补造接货。
+
+骑手详情提供独立数量核对与原请求重试，仓管只读接货凭据；仍无真实订单/库存/支付/配送送达动作，演练沿用默认关闭及生产拒启。迁移202611020002_delivery_handoffs尚未应用；先迁移、生成Prisma Client再部署。回退须关闭演练并保留凭据，禁止旧服务重复交接。
+
+本次环境无项目依赖/本地配置，未找到Node/npm，故PG集成测试、构建、OpenAPI自动导出和浏览器截图未运行。本节是实现契约及待验证说明，不是业务或UI验收通过声明；OpenAPI JSON待实际应用导出。

@@ -96,7 +96,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'stock.read',
   ],
   DISPATCHER: ['warehouse.read'],
-  RIDER: ['rider.tasks.self', 'delivery-lab.read'],
+  RIDER: ['rider.tasks.self', 'delivery-lab.read', 'delivery-lab.accept'],
   CUSTOMER_SERVICE: [],
 };
 export interface StaffContext {

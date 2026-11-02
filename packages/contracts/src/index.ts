@@ -773,6 +773,7 @@ export type DeliveryLabTask = {
   dispatchedAt: string;
   syntheticOnly: true;
   assignment: null | { id: string; riderName: string; actorName: string; createdAt: string };
+  handoff: null | { id: string; packageCount: number; createdAt: string };
   handoffReadiness: { ready: boolean; blockers: string[] };
 };
 export type DeliveryLabList = {
