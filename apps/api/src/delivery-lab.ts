@@ -12,7 +12,7 @@ const include = {
   pack: { include: { task: { include: { shortages: true } } } },
   assignment: {
     include: {
-      exception: true,
+      exception: { include: { resolution: true } },
       journeyFacts: true,
       handoff: true,
       rider: { include: { roles: true, warehouses: true } },
@@ -78,6 +78,13 @@ const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
       ? {
           id: a.exception.id,
           reason: a.exception.reason,
+          resolution: a.exception.resolution
+            ? {
+                id: a.exception.resolution.id,
+                actorName: a.exception.resolution.actorName,
+                createdAt: a.exception.resolution.createdAt.toISOString(),
+              }
+            : null,
           createdAt: a.exception.createdAt.toISOString(),
         }
       : null,
@@ -118,7 +125,19 @@ const taskSchema = object({
     },
   }),
   exception: {
-    ...object({ id: text, reason: text, createdAt: { type: 'string', format: 'date-time' } }),
+    ...object({
+      id: text,
+      reason: text,
+      resolution: {
+        ...object({
+          id: text,
+          actorName: text,
+          createdAt: { type: 'string', format: 'date-time' },
+        }),
+        nullable: true,
+      },
+      createdAt: { type: 'string', format: 'date-time' },
+    }),
     nullable: true,
   },
   handoffReadiness: object({ ready: { type: 'boolean' }, blockers: strings }),
@@ -207,6 +226,49 @@ export class DeliveryLabService {
           select: { id: true, displayName: true },
           orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
         }),
+      };
+    });
+  }
+  async resolve(r: ApiRequest, w: string, id: string, key: string, exceptionId: string) {
+    if (!this.enabled) throw failure(503, 'PICKING_LAB_DISABLED', '本机配送演练写入尚未开启');
+    return this.catalog.db.$transaction(async (tx) => {
+      await this.catalog.warehouse(tx, r, w);
+      await tx.$queryRaw`SELECT t.id FROM picking_lab_tasks t JOIN picking_lab_packs p ON p.task_id=t.id JOIN picking_lab_dispatches d ON d.pack_id=p.id WHERE d.id=${id}::uuid AND t.warehouse_id=${w}::uuid FOR UPDATE OF t`;
+      const d = await tx.pickingLabDispatch.findFirst({
+        where: { id, pack: { task: { warehouseId: w } } },
+        include,
+      });
+      if (!d) throw failure(404, 'DELIVERY_LAB_NOT_FOUND', '合成配送任务不存在');
+      const e = d.assignment?.exception;
+      if (!e || e.id !== exceptionId)
+        throw failure(409, 'DELIVERY_EXCEPTION_CHANGED', '请刷新并选择当前合成异常');
+      if (e.resolution) {
+        if (e.resolution.key !== key || e.resolution.actorId !== r.staffContext!.staffId)
+          throw failure(409, 'DELIVERY_EXCEPTION_RESOLVED', '此异常已有处置凭据');
+        return { task: dto(d, this.enabled), duplicate: true };
+      }
+      if (!dto(d, this.enabled).handoffReadiness.ready)
+        throw failure(409, 'DELIVERY_NOT_READY', '骑手或任务资格不满足恢复条件');
+      await tx.deliveryLabResolution.create({
+        data: {
+          id: randomUUID(),
+          exceptionId,
+          assignmentId: d.assignment!.id,
+          actorId: r.staffContext!.staffId,
+          actorName: r.staffContext!.displayName,
+          key,
+        },
+      });
+      await this.catalog.audit(tx, r, 'DELIVERY_LAB_RESOLVE', id, w, null, {
+        syntheticOnly: true,
+        exceptionId,
+      });
+      return {
+        task: dto(
+          await tx.pickingLabDispatch.findUniqueOrThrow({ where: { id }, include }),
+          this.enabled,
+        ),
+        duplicate: false,
       };
     });
   }
@@ -310,7 +372,7 @@ export class DeliveryLabService {
         (kind === 'COMPLETE' && !d.assignment.journeyFacts.some((f) => f.kind === 'START'))
       )
         throw failure(409, 'DELIVERY_STAGE_NOT_READY', '请先完成合成接货及开始配送');
-      if (d.assignment.exception)
+      if (d.assignment.exception && !d.assignment.exception.resolution)
         throw failure(409, 'DELIVERY_EXCEPTION_OPEN', '合成异常尚未处理，禁止继续配送阶段');
       await tx.deliveryLabJourneyFact.create({
         data: { id: randomUUID(), assignmentId: d.assignment.id, key, kind },
@@ -489,6 +551,34 @@ export class DeliveryLabController {
   @ApiResult(object({ enabled: { type: 'boolean' }, task: taskSchema }), [400, 401, 403, 404, 500])
   async detail(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string) {
     return success(r, await this.service.detail(r, query(q).w, uuid(id)));
+  }
+  @Post(':id/resolve-exception')
+  @HttpCode(200)
+  @Permissions('delivery-lab.read', 'delivery-lab.assign')
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      key: { type: 'string', format: 'uuid' },
+      exceptionId: { type: 'string', format: 'uuid' },
+    }),
+  })
+  @ApiResult(
+    object({ task: taskSchema, duplicate: { type: 'boolean' } }),
+    [400, 401, 403, 404, 409, 503, 500],
+  )
+  async resolve(
+    @Req() r: ApiRequest,
+    @Query() q: unknown,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const b = fields(body, ['key', 'exceptionId']);
+    return success(
+      r,
+      await this.service.resolve(r, query(q).w, uuid(id), uuid(b.key), uuid(b.exceptionId)),
+    );
   }
   @Post(':id/report-exception')
   @HttpCode(200)

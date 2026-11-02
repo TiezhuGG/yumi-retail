@@ -627,7 +627,10 @@ function JourneyPanel({
               busy ||
               !enabled ||
               (!pending &&
-                (!task.handoff || !!task.exception || !confirmed || !task.handoffReadiness.ready))
+                (!task.handoff ||
+                  (!!task.exception && !task.exception.resolution) ||
+                  !confirmed ||
+                  !task.handoffReadiness.ready))
             }
           >
             {busy
@@ -706,10 +709,14 @@ function ExceptionPanel({
       <h3>合成配送异常</h3>
       {task.exception && (
         <p role="status">
-          未决异常：{exceptionNames[task.exception.reason]} · {date(task.exception.createdAt)}
-          。禁止继续配送阶段；本轮尚无处置入口。
+          {task.exception.resolution ? '已处置异常：' : '未决异常：'}
+          {exceptionNames[task.exception.reason]} · {date(task.exception.createdAt)}
+          {task.exception.resolution
+            ? '。原异常保留，可由本人继续合成配送。'
+            : '。禁止继续配送阶段，请本仓负责人或仓管处置。'}
         </p>
       )}
+      <ResolvePanel task={task} w={w} profile={profile} enabled={enabled} onResult={onResult} />
       {message && <p role="status">{message}</p>}
       {profile.permissions.includes('delivery-lab.work') && (!task.exception || pending) && (
         <form
@@ -740,6 +747,101 @@ function ExceptionPanel({
           )}
           <button className="primary-button" disabled={busy || !enabled}>
             {pending ? '按原异常请求重试' : '上报合成配送异常'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+const resolvePending = new Map<string, { key: string; exceptionId: string }>();
+function ResolvePanel({
+  task,
+  w,
+  profile,
+  enabled,
+  onResult,
+}: {
+  task: DeliveryLabTask;
+  w: string;
+  profile: StaffProfile;
+  enabled: boolean;
+  onResult: (t: DeliveryLabTask) => void;
+}) {
+  const scope = profile.id + ':' + profile.csrfToken + ':' + w + ':' + task.id;
+  const [pending, setPending] = useState(resolvePending.get(scope)),
+    [confirmed, setConfirmed] = useState(false),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState('');
+  const running = useRef(false);
+  async function submit() {
+    if (running.current || !task.exception) return;
+    const op = pending ?? { key: crypto.randomUUID(), exceptionId: task.exception.id };
+    running.current = true;
+    setBusy(true);
+    resolvePending.set(scope, op);
+    setPending(op);
+    try {
+      const v = await staffRequest<{ task: DeliveryLabTask; duplicate: boolean }>(
+        '/delivery-lab/' + task.id + '/resolve-exception?warehouseId=' + w,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify(op),
+        },
+      );
+      resolvePending.delete(scope);
+      setPending(undefined);
+      onResult(v.task);
+      setMessage(v.duplicate ? '原处置凭据已恢复。' : '合成处置已记录，未自动推进配送。');
+    } catch (e) {
+      if (e instanceof StaffRequestError && [400, 401, 403, 404, 409].includes(e.status)) {
+        resolvePending.delete(scope);
+        setPending(undefined);
+      }
+      setMessage(e instanceof Error ? e.message : '处置结果未确认');
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
+  }
+  if (!task.exception) return null;
+  const resolution = task.exception.resolution;
+  return (
+    <div>
+      {resolution && (
+        <p>
+          不可变合成处置凭据 · {resolution.actorName} · {date(resolution.createdAt)}
+        </p>
+      )}
+      {message && <p role="status">{message}</p>}
+      {profile.permissions.includes('delivery-lab.assign') && (!resolution || pending) && (
+        <form
+          className="picking-check-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          {pending ? (
+            <p>处置结果未确认，请恢复原请求。</p>
+          ) : (
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                disabled={busy || !enabled}
+              />
+              确认本次合成异常已处理并允许继续
+            </label>
+          )}
+          <p>只解除隔离演练阻断，不代表已退款、退货、换货或实物处理。</p>
+          <button
+            className="primary-button"
+            disabled={busy || !enabled || (!pending && !confirmed)}
+          >
+            {pending ? '按原处置请求重试' : '确认合成异常处置'}
           </button>
         </form>
       )}

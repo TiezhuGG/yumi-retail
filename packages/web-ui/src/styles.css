@@ -2768,3 +2768,13 @@ small {
 .delivery-workbench .picking-check-form select {
   width: 100%;
 }
+
+.delivery-workbench .picking-check-form input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  margin: 0 8px 0 0;
+  vertical-align: middle;
+  accent-color: #008b48;
+}

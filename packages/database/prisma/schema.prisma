@@ -66,6 +66,7 @@ model Warehouse {
 }
 
 model Staff {
+ deliveryResolutions DeliveryLabResolution[]
  deliveryLabAssigned DeliveryLabAssignment[] @relation("deliveryAssigner")
  deliveryLabTasks DeliveryLabAssignment[] @relation("deliveryRider")
  pickingLabPacks PickingLabPack[] @relation("pickingPacker")
@@ -1219,6 +1220,7 @@ model DeliveryLabJourneyFact {
 }
 
 model DeliveryLabException {
+ resolution DeliveryLabResolution?
  id String @id @db.Uuid
  assignmentId String @unique @map("assignment_id") @db.Uuid
  kind String @default("EXCEPTION") @db.VarChar(16)
@@ -1227,4 +1229,18 @@ model DeliveryLabException {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  assignment DeliveryLabAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("delivery_lab_exceptions")
+}
+
+model DeliveryLabResolution {
+ id String @id @db.Uuid
+ exceptionId String @unique @map("exception_id") @db.Uuid
+ assignmentId String @map("assignment_id") @db.Uuid
+ kind String @default("RESOLVE") @db.VarChar(16)
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ key String @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ exception DeliveryLabException @relation(fields:[exceptionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("delivery_lab_resolutions")
 }

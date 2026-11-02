@@ -1,0 +1,46 @@
+BEGIN;
+CREATE TABLE delivery_lab_resolutions (
+ id UUID PRIMARY KEY,exception_id UUID NOT NULL UNIQUE REFERENCES delivery_lab_exceptions(id) ON DELETE RESTRICT,
+ assignment_id UUID NOT NULL REFERENCES delivery_lab_assignments(id) ON DELETE RESTRICT,
+ kind VARCHAR(16) NOT NULL DEFAULT 'RESOLVE' CHECK(kind='RESOLVE'),
+ actor_id UUID NOT NULL REFERENCES staff(id) ON DELETE RESTRICT,actor_name VARCHAR(80) NOT NULL,
+ key UUID NOT NULL,created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER delivery_resolution_immutable BEFORE UPDATE OR DELETE ON delivery_lab_resolutions FOR EACH ROW EXECUTE FUNCTION yumi_reject_fact_mutation();
+CREATE OR REPLACE FUNCTION yumi_delivery_journey_gate() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE a record; t record; d record;
+BEGIN
+ SELECT task.* INTO t FROM delivery_lab_assignments x JOIN picking_lab_dispatches dispatch ON dispatch.id=x.dispatch_id
+ JOIN picking_lab_packs p ON p.id=dispatch.pack_id JOIN picking_lab_tasks task ON task.id=p.task_id
+ WHERE x.id=NEW.assignment_id FOR UPDATE OF task;
+ SELECT * INTO a FROM delivery_lab_assignments WHERE id=NEW.assignment_id;
+ SELECT * INTO d FROM picking_lab_dispatches WHERE id=a.dispatch_id;
+ IF t.id IS NULL OR t.state<>'CHECKED' OR t.version<>d.task_version OR t.exception_version<>d.exception_version
+ OR EXISTS(SELECT 1 FROM picking_lab_shortages WHERE task_id=t.id AND state='OPEN')
+ OR NOT EXISTS(SELECT 1 FROM delivery_lab_handoffs WHERE assignment_id=a.id) THEN
+ RAISE EXCEPTION 'Valid synthetic handoff required'; END IF;
+ IF NEW.kind='COMPLETE' AND NOT EXISTS(SELECT 1 FROM delivery_lab_journey_facts WHERE assignment_id=a.id AND kind='START') THEN
+ RAISE EXCEPTION 'Synthetic start required before completion'; END IF;
+ IF TG_TABLE_NAME='delivery_lab_exceptions' THEN
+ IF EXISTS(SELECT 1 FROM delivery_lab_journey_facts WHERE assignment_id=a.id AND kind='COMPLETE') THEN RAISE EXCEPTION 'Completed task cannot report exception'; END IF;
+ ELSIF TG_TABLE_NAME='delivery_lab_resolutions' THEN
+ IF NOT EXISTS(SELECT 1 FROM delivery_lab_exceptions WHERE id=NEW.exception_id AND assignment_id=a.id) THEN RAISE EXCEPTION 'Matching exception required'; END IF;
+ PERFORM 1 FROM staff WHERE id=NEW.actor_id AND enabled FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Enabled resolver required'; END IF;
+ PERFORM 1 FROM staff_roles WHERE staff_id=NEW.actor_id AND role_code IN ('SUPER_ADMIN','WAREHOUSE_MANAGER') FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Manager role required'; END IF;
+ PERFORM 1 FROM staff_warehouses WHERE staff_id=NEW.actor_id AND warehouse_id=t.warehouse_id FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Resolver warehouse required'; END IF;
+ ELSE
+ IF EXISTS(SELECT 1 FROM delivery_lab_exceptions e WHERE e.assignment_id=a.id AND NOT EXISTS(SELECT 1 FROM delivery_lab_resolutions x WHERE x.exception_id=e.id)) THEN RAISE EXCEPTION 'Unresolved exception blocks progress'; END IF;
+ END IF;
+ PERFORM 1 FROM staff WHERE id=a.rider_id AND enabled FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Enabled rider required'; END IF;
+ PERFORM 1 FROM staff_roles WHERE staff_id=a.rider_id AND role_code='RIDER' FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Rider role required'; END IF;
+ PERFORM 1 FROM staff_warehouses WHERE staff_id=a.rider_id AND warehouse_id=t.warehouse_id FOR SHARE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Rider warehouse required'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER delivery_resolution_gate BEFORE INSERT ON delivery_lab_resolutions FOR EACH ROW EXECUTE FUNCTION yumi_delivery_journey_gate();
+COMMIT;

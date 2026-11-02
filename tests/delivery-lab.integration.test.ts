@@ -656,3 +656,100 @@ test('exception competes with completion; audit rollback and disabled switch rem
   f = await pickingFixture();
   assert.equal((await reportException(randomUUID(), body)).status, 503);
 });
+
+async function resolveException(id: string, body: unknown, cookie = f.cookies[1]!) {
+  const res = await fetch(
+    f.base + '/api/v1/delivery-lab/' + id + '/resolve-exception?warehouseId=' + f.warehouseId,
+    {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'http://127.0.0.1:5188',
+        'X-CSRF-Token': await csrf(cookie),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  return { status: res.status, ...(await res.json()) };
+}
+test('manager resolution is immutable, concurrent original retry recovers and rider alone resumes', async () => {
+  const id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  await reportException(id, { key: randomUUID(), reason: 'DAMAGED' });
+  const db = f.runtime.db,
+    e = await db.deliveryLabException.findFirstOrThrow(),
+    body = { key: randomUUID(), exceptionId: e.id };
+  assert.equal((await resolveException(id, body, f.extraCookies[1]!)).status, 403);
+  assert.equal((await resolveException(id, { ...body, exceptionId: randomUUID() })).status, 409);
+  assert.equal((await resolveException(id, { ...body, state: 'COMPLETE' })).status, 400);
+  const res = await Promise.all([resolveException(id, body), resolveException(id, body)]);
+  assert.deepEqual(
+    res.map((v) => v.status),
+    [200, 200],
+  );
+  assert.equal(res.filter((v) => v.data.duplicate).length, 1);
+  assert.equal(await db.deliveryLabResolution.count(), 1);
+  assert.equal(await db.businessAudit.count({ where: { action: 'DELIVERY_LAB_RESOLVE' } }), 1);
+  assert.equal((await resolveException(id, { ...body, key: randomUUID() })).status, 409);
+  assert.equal((await resolveException(id, body, f.extraCookies[0]!)).status, 409);
+  const fact = await db.deliveryLabResolution.findFirstOrThrow();
+  await assert.rejects(
+    db.deliveryLabResolution.update({ where: { id: fact.id }, data: { key: randomUUID() } }),
+  );
+  await assert.rejects(db.deliveryLabResolution.delete({ where: { id: fact.id } }));
+  assert.equal(await db.deliveryLabJourneyFact.count(), 0);
+  assert.equal((await stage(id, 'start', { key: randomUUID() })).status, 200);
+  assert.equal((await stage(id, 'complete', { key: randomUUID() })).status, 200);
+  assert.equal((await resolveException(id, body)).data.duplicate, true);
+  assert.equal(await db.deliveryLabException.count(), 1);
+});
+test('resolution audit rollback and gate protect matching exception, resolver scope and unchanged formal facts', async () => {
+  await f.create();
+  const db = f.runtime.db;
+  const snapshot = async () => ({
+    orders: await db.consumerOrder.findMany(),
+    stock: await db.stockPosition.findMany(),
+    balance: await db.stockBalance.findMany(),
+    lots: await db.stockLot.findMany(),
+    allocations: await db.orderAllocation.findMany(),
+    ledger: await db.stockLedger.findMany(),
+    payment: await db.paymentPreparation.findMany(),
+  });
+  const before = await snapshot();
+  const id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  await stage(id, 'start', { key: randomUUID() });
+  await reportException(id, { key: randomUUID(), reason: 'REFUSED' });
+  const e = await db.deliveryLabException.findFirstOrThrow(),
+    body = { key: randomUUID(), exceptionId: e.id };
+  const riderId = await rider();
+  await assert.rejects(
+    db.deliveryLabResolution.create({
+      data: {
+        id: randomUUID(),
+        exceptionId: e.id,
+        assignmentId: e.assignmentId,
+        actorId: riderId,
+        actorName: '合成骑手',
+        key: randomUUID(),
+      },
+    }),
+  );
+  await db.$executeRawUnsafe(
+    "CREATE FUNCTION fail_resolution_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='DELIVERY_LAB_RESOLVE' THEN RAISE EXCEPTION 'Synthetic fail'; END IF; RETURN NEW; END $$",
+  );
+  await db.$executeRawUnsafe(
+    'CREATE TRIGGER fail_resolution_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_resolution_audit()',
+  );
+  assert.equal((await resolveException(id, body)).status, 500);
+  assert.equal(await db.deliveryLabResolution.count(), 0);
+  assert.equal((await stage(id, 'complete', { key: randomUUID() })).status, 409);
+  await db.$executeRawUnsafe('DROP TRIGGER fail_resolution_audit ON business_audits');
+  assert.equal((await resolveException(id, body)).status, 200);
+  assert.equal((await stage(id, 'complete', { key: randomUUID() })).status, 200);
+  assert.deepEqual(await snapshot(), before);
+  await f.cleanup();
+  f = await pickingFixture();
+  assert.equal((await resolveException(randomUUID(), body)).status, 503);
+});
