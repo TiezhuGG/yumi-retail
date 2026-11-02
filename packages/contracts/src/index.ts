@@ -778,6 +778,7 @@ export type DeliveryLabTask = {
     start: null | { id: string; createdAt: string };
     completion: null | { id: string; createdAt: string };
   };
+  exception: null | { id: string; reason: string; createdAt: string };
   handoffReadiness: { ready: boolean; blockers: string[] };
 };
 export type DeliveryLabList = {

@@ -357,6 +357,15 @@ function DeliveryPanel({
                     }
                   />
                 )}
+                <ExceptionPanel
+                  task={task}
+                  w={w}
+                  profile={profile}
+                  enabled={enabled}
+                  onResult={(result) =>
+                    setTask((current) => (current?.id === result.id ? result : current))
+                  }
+                />
                 <JourneyPanel
                   task={task}
                   w={w}
@@ -617,7 +626,8 @@ function JourneyPanel({
             disabled={
               busy ||
               !enabled ||
-              (!pending && (!task.handoff || !confirmed || !task.handoffReadiness.ready))
+              (!pending &&
+                (!task.handoff || !!task.exception || !confirmed || !task.handoffReadiness.ready))
             }
           >
             {busy
@@ -627,6 +637,109 @@ function JourneyPanel({
                 : action === 'start'
                   ? '记录合成配送开始'
                   : '记录合成送达'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+const exceptionPending = new Map<string, { key: string; reason: string }>();
+const exceptionNames: Record<string, string> = {
+  UNREACHABLE: '无法联系（合成）',
+  REFUSED: '拒收（合成）',
+  DAMAGED: '包裹破损（合成）',
+};
+function ExceptionPanel({
+  task,
+  w,
+  profile,
+  enabled,
+  onResult,
+}: {
+  task: DeliveryLabTask;
+  w: string;
+  profile: StaffProfile;
+  enabled: boolean;
+  onResult: (t: DeliveryLabTask) => void;
+}) {
+  const scope = profile.id + ':' + profile.csrfToken + ':' + w + ':' + task.id;
+  const [pending, setPending] = useState(exceptionPending.get(scope)),
+    [reason, setReason] = useState('UNREACHABLE'),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState('');
+  const running = useRef(false);
+  async function submit() {
+    if (running.current) return;
+    const op = pending ?? { key: crypto.randomUUID(), reason };
+    running.current = true;
+    setBusy(true);
+    exceptionPending.set(scope, op);
+    setPending(op);
+    try {
+      const r = await staffRequest<{ task: DeliveryLabTask; duplicate: boolean }>(
+        '/delivery-lab/' + task.id + '/report-exception?warehouseId=' + w,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify(op),
+        },
+      );
+      exceptionPending.delete(scope);
+      setPending(undefined);
+      onResult(r.task);
+      setMessage(r.duplicate ? '原异常凭据已恢复。' : '合成异常已记录，后续阶段已阻断。');
+    } catch (e) {
+      if (e instanceof StaffRequestError && [400, 401, 403, 404, 409].includes(e.status)) {
+        exceptionPending.delete(scope);
+        setPending(undefined);
+      }
+      setMessage(e instanceof Error ? e.message : '结果未确认');
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
+  }
+  if (!task.exception && (!task.handoff || task.journey.completion)) return null;
+  return (
+    <div className="picking-line">
+      <h3>合成配送异常</h3>
+      {task.exception && (
+        <p role="status">
+          未决异常：{exceptionNames[task.exception.reason]} · {date(task.exception.createdAt)}
+          。禁止继续配送阶段；本轮尚无处置入口。
+        </p>
+      )}
+      {message && <p role="status">{message}</p>}
+      {profile.permissions.includes('delivery-lab.work') && (!task.exception || pending) && (
+        <form
+          className="picking-check-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          {pending ? (
+            <p>异常结果未确认，请按原请求恢复。</p>
+          ) : (
+            <label>
+              合成异常类型
+              <select
+                aria-label="合成异常类型"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                disabled={busy || !enabled}
+              >
+                {Object.entries(exceptionNames).map(([v, n]) => (
+                  <option key={v} value={v}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button className="primary-button" disabled={busy || !enabled}>
+            {pending ? '按原异常请求重试' : '上报合成配送异常'}
           </button>
         </form>
       )}

@@ -580,3 +580,79 @@ test('journey audit failures roll back each stage and complete flow leaves forma
   }
   assert.deepEqual(await snapshot(), before);
 });
+
+async function reportException(id: string, body: unknown, cookie = f.extraCookies[1]!) {
+  const r = await fetch(
+    f.base + '/api/v1/delivery-lab/' + id + '/report-exception?warehouseId=' + f.warehouseId,
+    {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'http://127.0.0.1:5188',
+        'X-CSRF-Token': await csrf(cookie),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  return { status: r.status, ...(await r.json()) };
+}
+test('exception owner, prerequisites, strict reason, original retry and database progress blocking', async () => {
+  const id = await assignedForJourney(),
+    body = { key: randomUUID(), reason: 'DAMAGED' };
+  assert.equal((await reportException(id, body)).status, 409);
+  assert.equal((await reportException(id, body, f.cookies[1]!)).status, 403);
+  const other = await otherRider();
+  assert.equal((await reportException(id, body, other.cookie)).status, 404);
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  assert.equal((await reportException(id, { ...body, reason: 'OTHER' })).status, 400);
+  const r = await Promise.all([reportException(id, body), reportException(id, body)]);
+  assert.deepEqual(
+    r.map((v) => v.status),
+    [200, 200],
+  );
+  assert.equal(r.filter((v) => v.data.duplicate).length, 1);
+  assert.equal((await reportException(id, { ...body, reason: 'REFUSED' })).status, 409);
+  assert.equal((await reportException(id, { ...body, key: randomUUID() })).status, 409);
+  assert.equal((await stage(id, 'start', { key: randomUUID() })).status, 409);
+  const db = f.runtime.db,
+    e = await db.deliveryLabException.findFirstOrThrow();
+  await assert.rejects(
+    db.deliveryLabJourneyFact.create({
+      data: { id: randomUUID(), assignmentId: e.assignmentId, key: randomUUID(), kind: 'START' },
+    }),
+  );
+  await assert.rejects(db.deliveryLabException.delete({ where: { id: e.id } }));
+  await assert.rejects(
+    db.deliveryLabException.update({ where: { id: e.id }, data: { reason: 'REFUSED' } }),
+  );
+});
+test('exception competes with completion; audit rollback and disabled switch remain safe', async () => {
+  const id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  await stage(id, 'start', { key: randomUUID() });
+  const db = f.runtime.db,
+    body = { key: randomUUID(), reason: 'UNREACHABLE' };
+  await db.$executeRawUnsafe(
+    "CREATE FUNCTION fail_exception_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='DELIVERY_LAB_EXCEPTION' THEN RAISE EXCEPTION 'Synthetic fail'; END IF; RETURN NEW; END $$",
+  );
+  await db.$executeRawUnsafe(
+    'CREATE TRIGGER fail_exception_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_exception_audit()',
+  );
+  assert.equal((await reportException(id, body)).status, 500);
+  assert.equal(await db.deliveryLabException.count(), 0);
+  await db.$executeRawUnsafe('DROP TRIGGER fail_exception_audit ON business_audits');
+  const r = await Promise.all([
+    reportException(id, body),
+    stage(id, 'complete', { key: randomUUID() }),
+  ]);
+  assert.deepEqual(r.map((v) => v.status).sort(), [200, 409]);
+  assert.equal(
+    (await db.deliveryLabException.count()) +
+      (await db.deliveryLabJourneyFact.count({ where: { kind: 'COMPLETE' } })),
+    1,
+  );
+  await f.cleanup();
+  f = await pickingFixture();
+  assert.equal((await reportException(randomUUID(), body)).status, 503);
+});

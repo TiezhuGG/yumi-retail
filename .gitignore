@@ -13,3 +13,10 @@ packages/database/src/generated/
 
 # Taro/SWC platform compiler cache
 apps/consumer-mini/.swc/
+
+# Local verification screenshots (keep source UI assets tracked)
+/docs/verification/**/*.png
+/docs/verification/**/*.jpg
+/docs/verification/**/*.jpeg
+/docs/verification/**/*.webp
+/docs/verification/**/*.gif

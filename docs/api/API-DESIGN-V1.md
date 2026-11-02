@@ -699,3 +699,9 @@ SUPER_ADMIN/WAREHOUSE_MANAGER新增delivery-lab.read及assign；RIDER仅read。�
 新增delivery_lab_journey_facts，assignment_id+kind唯一，kind限定START/COMPLETE；数据库复核接货/开始前置与当前资格并拒绝修改删除。DTO新增journey.start/completion可空{id,createdAt}，旧记录不补造。骑手详情明确勾选合成动作并支持未知结果原请求恢复，仓管只读进度。不涉及真实顾客签收、照片/定位、订单/库存扣减或支付；PICKING_LAB_ENABLED仍默认关闭/生产拒启。
 
 迁移202611020003_delivery_journey仅在真实PG临时schema应用验证，正式开发库未部署；目标部署先迁移、生成Prisma Client、重建服务，回退关闭演练且保留事实。OpenAPI0.33.0已导出，24项PG及1项配置检查、实际API桌面/手机UI通过；微信真机/真实交付仍未验收。详见S7-DELIVERY-JOURNEY-2026-11-02记录。
+
+## 2026-11-02 合成配送异常基础
+
+已接货且未合成送达的本人任务可POST /delivery-lab/:id/report-exception（warehouseId查询参数，key UUID、reason限定UNREACHABLE/REFUSED/DAMAGED），需delivery-lab.work及CSRF。每分配最多一份不可变未决异常，原键/原原因恢复，改原因或新键409。异常与送达锁同一任务串行竞争；未决异常阻断新开始/送达，已有凭据原键恢复只读不改变阶段。本轮无处置/退款/改派/退回入库。
+
+新增delivery_lab_exceptions及202611020004_delivery_exceptions，DB阶段门禁同时复核接货/完成和异常；凭据/审计同事务且事实不可修改删除。DTO新增可空exception{id,reason,createdAt}，OpenAPI0.34.0；历史任务不补造。迁移仅临时PG schema验证，部署先迁移并重建，回退关闭演练保留事实。18项PG与实际API桌面/手机UI通过，真实配送/微信真机/生产仍未验收。截图仅本地保留并由Git忽略，详见S7-DELIVERY-EXCEPTION-2026-11-02记录。
