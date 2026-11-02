@@ -1,3 +1,5 @@
+2026-11-02本机准备接续：独立PG17.11开发/测试库已应用36项迁移，预检/临时schema重建与built preview完成，4项配置+1项PG测试及本机UI通过；API3000、后台5173、作业5174运行中。默认交易/演练/支付关闭，业务资料为空，真实联调门禁未通过。见[操作指南](docs/operations/REAL-FULFILLMENT-PREFLIGHT.md)和[记录](docs/verification/LOCAL-FULFILLMENT-PREFLIGHT-2026-11-02.md)。
+
 2026-11-02履约回归接续：补齐分配人事务内撤权保护及DB门禁；53项PG、1配置、构建类型规范与桌面/手机弱网注入回归通过。增量迁移仅临时schema验证，真实履约/真机/生产未验。下一项真实联调前门禁和本机环境准备，见[记录](docs/verification/S6-FULFILLMENT-REGRESSION-2026-11-02.md)。
 
 2026-11-02配送导航接续：异常卡片直达时间线事实、返回原筛选/已加载页数/来源焦点及503重试完成，实际PG浏览器/构建类型规范通过。无迁移或API变化，真实履约/真机未验，截图本地忽略。下一项合成履约权限与弱网回归收尾，见[记录](docs/verification/S7-DELIVERY-NAVIGATION-2026-11-02.md)。

@@ -115,7 +115,14 @@
     "pretest:picking-packing": "npm run build:server",
     "test:picking-packing": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/picking-packing.integration.test.ts",
     "pretest:delivery-lab": "npm run build:server",
-    "test:delivery-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/delivery-lab.integration.test.ts"
+    "test:delivery-lab": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/delivery-lab.integration.test.ts",
+    "check:fulfillment:local": "node --env-file-if-exists=.env scripts/check-fulfillment-local.mjs",
+    "verify:fulfillment:rebuild": "node --env-file-if-exists=.env scripts/check-fulfillment-local.mjs --rehearse",
+    "test:fulfillment:local": "node --test tests/fulfillment-local.test.mjs",
+    "check:fulfillment:database": "node --env-file-if-exists=.env scripts/check-fulfillment-local.mjs --database",
+    "preview:admin:local": "node scripts/preview-local.mjs",
+    "preview:ops:local": "node scripts/preview-local.mjs --ops",
+    "test:fulfillment:rebuild": "node --env-file-if-exists=.env --test tests/fulfillment-rebuild.integration.test.mjs"
   },
   "pnpm": {
     "overrides": {
