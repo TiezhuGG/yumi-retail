@@ -98,7 +98,7 @@ export default function Points() {
               <View className="account-card">
                 <Text className="account-card-title">积分明细</Text>
                 <Text className="account-copy">
-                  积分不兑换现金。积分发放与商品兑换功能正在准备中。
+                  积分不兑换现金。发放记录以到账明细为准，商品兑换正在准备中。
                 </Text>
                 {items.length === 0 && <Text>暂无积分记录</Text>}
               </View>

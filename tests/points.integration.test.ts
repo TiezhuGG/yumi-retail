@@ -167,3 +167,171 @@ test('database rejects unbalanced writes and immutable ledger edits', async () =
   assert.equal(r.status, 200);
   assert.equal(r.data.items.length, 1);
 });
+
+test('grant budget, independent approval, idempotency and concurrent spending', async () => {
+  const user = await db.consumerUser.findFirstOrThrow();
+  const prefix = '/admin/points/grants/';
+  const create = async (amount: string, actor = 1) => {
+    const r = await call(
+      prefix + 'store/create',
+      { userId: user.id, amount, reason: '合成发放申请', reference: 'TEST-ONLY' },
+      actor,
+    );
+    assert.equal(r.status, 200, JSON.stringify(r));
+    return (r.data as unknown as { id: string }).id;
+  };
+  assert.equal(
+    (
+      await call(
+        prefix + 'store/policy',
+        { version: 0, enabled: true, singleLimit: '100', dailyLimit: '100', reason: '合成规则' },
+        1,
+      )
+    ).status,
+    403,
+  );
+  const first = await create('40');
+  assert.equal(
+    (await call(prefix + first + '/approve', { version: 0, reason: '核验依据' }, 0)).status,
+    409,
+  );
+  assert.equal(
+    (
+      await call(
+        prefix + 'store/policy',
+        { version: 0, enabled: true, singleLimit: '100', dailyLimit: '100', reason: '合成规则' },
+        0,
+      )
+    ).status,
+    200,
+  );
+  const self = await create('1', 0);
+  assert.equal(
+    (await call(prefix + self + '/approve', { version: 0, reason: '不能自审' }, 0)).status,
+    403,
+  );
+  const k = randomUUID();
+  const a = await Promise.all([
+    call(prefix + first + '/approve', { version: 0, reason: '凭据核验通过' }, 0, k),
+    call(prefix + first + '/approve', { version: 0, reason: '凭据核验通过' }, 0, k),
+  ]);
+  assert.deepEqual(
+    a.map((x) => x.status),
+    [200, 200],
+  );
+  assert.equal(
+    (await call(prefix + first + '/approve', { version: 0, reason: '不同内容' }, 0, k)).status,
+    409,
+  );
+  const second = await create('40'),
+    third = await create('40');
+  const rs = await Promise.all([
+    call(prefix + second + '/approve', { version: 0, reason: '合成审批' }, 0),
+    call(prefix + third + '/approve', { version: 0, reason: '合成审批' }, 0),
+  ]);
+  assert.deepEqual(rs.map((r) => r.status).sort(), [200, 409]);
+  const rejected = await create('10');
+  assert.equal(
+    (await call(prefix + rejected + '/reject', { version: 0, reason: '凭据不符' }, 0)).status,
+    200,
+  );
+  assert.equal(
+    (await call(prefix + rejected + '/approve', { version: 1, reason: '终态不能再批' }, 0)).status,
+    409,
+  );
+  const canceled = await create('10');
+  assert.equal(
+    (await call(prefix + canceled + '/cancel', { version: 0, reason: '本人撤销' }, 0)).status,
+    403,
+  );
+  assert.equal(
+    (await call(prefix + canceled + '/cancel', { version: 0, reason: '本人撤销' }, 1)).status,
+    200,
+  );
+  const evidence = await db.$queryRaw<
+    Array<{ count: bigint }>
+  >`SELECT COUNT(*)::bigint AS count FROM points_ledger WHERE action_key LIKE 'GRANT:%'`;
+  assert.equal(evidence[0]!.count, 2n);
+});
+test('grant audit late failure rolls back balance, ledger, budget and intent', async () => {
+  const user = await db.consumerUser.findFirstOrThrow();
+  const r = await call(
+    '/admin/points/grants/store/create',
+    { userId: user.id, amount: '10', reason: '回滚夹具', reference: 'ROLLBACK' },
+    1,
+  );
+  assert.equal(r.status, 200);
+  const id = (r.data as unknown as { id: string }).id,
+    k = randomUUID();
+  await admin.query(
+    `CREATE FUNCTION fail_grant_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='POINTS_APPROVE' THEN RAISE EXCEPTION 'synthetic late failure'; END IF; RETURN NEW; END $$`,
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_grant_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_grant_audit()',
+  );
+  assert.equal(
+    (
+      await call(
+        '/admin/points/grants/' + id + '/approve',
+        { version: 0, reason: '回滚测试' },
+        0,
+        k,
+      )
+    ).status,
+    500,
+  );
+  assert.equal(
+    (
+      await db.$queryRaw<
+        Array<{ status: string }>
+      >`SELECT status FROM points_grants WHERE id=${id}::uuid`
+    )[0]!.status,
+    'SUBMITTED',
+  );
+  assert.equal(
+    (
+      await db.$queryRaw<
+        Array<{ n: bigint }>
+      >`SELECT COUNT(*)::bigint AS n FROM points_ledger WHERE action_key=${'GRANT:' + id}`
+    )[0]!.n,
+    0n,
+  );
+  await admin.query('DROP TRIGGER fail_grant_audit ON business_audits');
+  assert.equal(
+    (
+      await call(
+        '/admin/points/grants/' + id + '/approve',
+        { version: 0, reason: '回滚测试' },
+        0,
+        k,
+      )
+    ).status,
+    200,
+  );
+});
+
+test('grant writes require CSRF and current role; finalized facts cannot be rewritten', async () => {
+  const user = await db.consumerUser.findFirstOrThrow();
+  assert.equal(
+    (
+      await call(
+        '/admin/points/grants/store/create',
+        { userId: user.id, amount: '1', reason: '安全测试', reference: 'TEST' },
+        1,
+        randomUUID(),
+        { 'X-CSRF-Token': '' },
+      )
+    ).status,
+    403,
+  );
+  await db.staffRole.deleteMany({ where: { staffId: staffIds[1]!, roleCode: 'OPERATIONS' } });
+  assert.equal((await call('/admin/points/grants', undefined, 1)).status, 403);
+  await db.staffRole.create({ data: { staffId: staffIds[1]!, roleCode: 'OPERATIONS' } });
+  const final = await db.$queryRaw<
+    Array<{ id: string }>
+  >`SELECT id FROM points_grants WHERE status='APPROVED' LIMIT 1`;
+  await assert.rejects(
+    db.$executeRaw`UPDATE points_grants SET amount=amount+1 WHERE id=${final[0]!.id}::uuid`,
+  );
+  await assert.rejects(db.$executeRaw`DELETE FROM points_grants WHERE id=${final[0]!.id}::uuid`);
+});

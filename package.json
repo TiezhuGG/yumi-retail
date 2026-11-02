@@ -126,7 +126,9 @@
     "pretest:points": "npm run build:server",
     "test:points": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/points.integration.test.ts",
     "preverify:points:ui": "npm run build:server",
-    "verify:points:ui": "node --env-file=.env --import tsx scripts/ui/verify-points.mjs"
+    "verify:points:ui": "node --env-file=.env --import tsx scripts/ui/verify-points.mjs",
+    "preverify:points:grants": "npm run build:server",
+    "verify:points:grants": "node --env-file=.env --import tsx scripts/ui/verify-points-grants.mjs"
   },
   "pnpm": {
     "overrides": {

@@ -47,6 +47,8 @@ model ValidationLedger {
 }
 
 model Warehouse {
+ pointsGrantPolicy PointsGrantPolicy?
+ pointsGrants PointsGrant[]
   pickingLabTasks PickingLabTask[]
   id          String              @id @db.Uuid
   code        String              @unique
@@ -66,6 +68,8 @@ model Warehouse {
 }
 
 model Staff {
+ pointsGrantsCreated PointsGrant[] @relation("grantCreator")
+ pointsGrantsReviewed PointsGrant[] @relation("grantReviewer")
   pointsEntries PointsEntry[]
  deliveryResolutions DeliveryLabResolution[]
  deliveryLabAssigned DeliveryLabAssignment[] @relation("deliveryAssigner")
@@ -614,6 +618,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ pointsGrants PointsGrant[]
   pointsAccount PointsAccount?
   id          String   @id @db.Uuid
   provider    String   @db.VarChar(16)
@@ -1267,4 +1272,35 @@ model PointsEntry {
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@index([userId,id],map:"points_ledger_owner_idx")
  @@map("points_ledger")
+}
+
+model PointsGrantPolicy {
+ warehouseId String @id @map("warehouse_id") @db.Uuid
+ enabled Boolean @default(false)
+ singleLimit BigInt @map("single_limit")
+ dailyLimit BigInt @map("daily_limit")
+ version Int @default(0)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("points_grant_policies")
+}
+model PointsGrant {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ amount BigInt
+ reason String @db.VarChar(300)
+ reference String @db.VarChar(120)
+ creatorId String @map("creator_id") @db.Uuid
+ reviewerId String? @map("reviewer_id") @db.Uuid
+ status String @default("SUBMITTED") @db.VarChar(16)
+ decisionReason String? @map("decision_reason") @db.VarChar(300)
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ creator Staff @relation("grantCreator",fields:[creatorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ reviewer Staff? @relation("grantReviewer",fields:[reviewerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([warehouseId,id],map:"points_grants_scope_idx")
+ @@map("points_grants")
 }

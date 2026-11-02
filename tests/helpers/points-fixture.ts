@@ -60,7 +60,27 @@ export async function pointsFixture() {
           await tx.$executeRaw`INSERT INTO points_ledger(id,user_id,delta,action_key,reason,actor_id,created_at) VALUES(${`20000000-0000-4000-8000-${String(i).padStart(12, '0')}`}::uuid,${f.identity.user.id}::uuid,10,${'ui-' + i},${'合成验证流水 ' + String(i).padStart(2, '0')} ,${staffId}::uuid,'2026-11-02T02:30:00Z')`;
       });
     }
-    return { ...f, cookie, identityB, seed };
+    async function reviewer() {
+      const id = randomUUID();
+      await db.staff.create({
+        data: {
+          id,
+          loginName: 'points-reviewer',
+          displayName: '合成独立审批员',
+          passwordHash: await hashPassword(password),
+          roles: { create: { roleCode: 'SUPER_ADMIN' } },
+          warehouses: { create: { warehouseId: f.warehouseId } },
+        },
+      });
+      const r = await fetch(f.base + '/api/v1/staff/auth/session', {
+        method: 'POST',
+        headers: { Origin: 'http://127.0.0.1:5188', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginName: 'points-reviewer', password }),
+      });
+      if (r.status !== 200) throw Error('Reviewer login failed');
+      return r.headers.get('set-cookie')!.split(';')[0]!;
+    }
+    return { ...f, cookie, identityB, seed, reviewer };
   } catch (e) {
     await f.cleanup();
     throw e;

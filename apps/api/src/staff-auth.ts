@@ -9,6 +9,7 @@ export const STAFF_COOKIE = 'yumi_staff_session';
 export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
     'points.read',
+    'points.write',
     'picking.read',
     'picking-lab.read',
     'picking-lab.create',
@@ -49,6 +50,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
   ],
   OPERATIONS: [
     'points.read',
+    'points.write',
     'order.read',
     'warehouse.read',
     'catalog.read',

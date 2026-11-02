@@ -66,7 +66,9 @@ export function PointsWorkbench() {
   const rows = selected ? entries : accounts;
   return (
     <section className="points-workbench" aria-label="积分账户查询">
-      <div className="notice">积分发放审批与商品兑换正在准备中，当前可查询账户余额与明细。</div>
+      <div className="notice">
+        积分发放请前往积分发放审批，商品兑换正在准备中。此处查询账户余额与明细。
+      </div>
       {selected ? (
         <div className="points-toolbar">
           <button

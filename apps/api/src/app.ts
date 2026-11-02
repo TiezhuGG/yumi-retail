@@ -1,3 +1,4 @@
+import { PointsGrantController, PointsGrantService } from './points-grants.js';
 import { PointsService, ConsumerPointsController, AdminPointsController } from './points.js';
 import { DeliveryLabController, DeliveryLabService } from './delivery-lab.js';
 import { PickingPackingController, PickingPackingService } from './picking-packing.js';
@@ -136,6 +137,7 @@ export async function createApplication(
     controllers: [
       HealthController,
       ConsumerPointsController,
+      PointsGrantController,
       AdminPointsController,
       ConsumerController,
       ConsumerCartController,
@@ -175,6 +177,7 @@ export async function createApplication(
       ReceiptReversalController,
     ],
     providers: [
+      { provide: PointsGrantService, useValue: new PointsGrantService(catalog) },
       { provide: PointsService, useValue: new PointsService(catalog) },
       { provide: StaffAuthService, useValue: auth },
       { provide: ConsumerAuthService, useValue: consumer },
@@ -303,7 +306,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.38.0')
+      .setVersion('0.39.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

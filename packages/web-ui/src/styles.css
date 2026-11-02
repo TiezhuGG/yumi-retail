@@ -2888,3 +2888,24 @@ small {
     padding: 8px 10px;
   }
 }
+.points-toolbar select,
+.points-toolbar textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line, #dce6df);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink, #20382b);
+  background: white;
+}
+.points-toolbar textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+.points-toolbar input[type='checkbox'] {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+}
