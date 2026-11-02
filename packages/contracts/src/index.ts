@@ -787,6 +787,7 @@ export type DeliveryLabTask = {
   handoffReadiness: { ready: boolean; blockers: string[] };
 };
 export type DeliveryLabList = {
+  summary: { all: number; open: number; resolved: number; none: number; readAt: string };
   enabled: boolean;
   selfOnly: boolean;
   items: DeliveryLabTask[];

@@ -146,6 +146,13 @@ const listSchema = object({
   enabled: { type: 'boolean' },
   selfOnly: { type: 'boolean' },
   items: { type: 'array', items: taskSchema },
+  summary: object({
+    all: { type: 'integer' },
+    open: { type: 'integer' },
+    resolved: { type: 'integer' },
+    none: { type: 'integer' },
+    readAt: { type: 'string', format: 'date-time' },
+  }),
   nextCursor: { type: 'string', nullable: true },
 });
 export class DeliveryLabService {
@@ -159,11 +166,39 @@ export class DeliveryLabService {
       ...(!manager(r) ? { assignment: { riderId: r.staffContext!.staffId } } : {}),
     };
   }
-  async list(r: ApiRequest, w: string, cursor?: string) {
+  async list(r: ApiRequest, w: string, cursor?: string, exceptionState = 'ALL') {
     return this.catalog.db.$transaction(
       async (tx) => {
         await this.catalog.warehouse(tx, r, w);
-        const where = this.scope(r, w);
+        const scope = this.scope(r, w);
+        const open: Prisma.PickingLabDispatchWhereInput = {
+          assignment: { exception: { is: { resolution: { is: null } } } },
+        };
+        const resolved: Prisma.PickingLabDispatchWhereInput = {
+          assignment: { exception: { is: { resolution: { isNot: null } } } },
+        };
+        const none: Prisma.PickingLabDispatchWhereInput = {
+          OR: [{ assignment: { is: null } }, { assignment: { exception: { is: null } } }],
+        };
+        const where: Prisma.PickingLabDispatchWhereInput = {
+          AND: [
+            scope,
+            ...(exceptionState === 'OPEN'
+              ? [open]
+              : exceptionState === 'RESOLVED'
+                ? [resolved]
+                : exceptionState === 'NONE'
+                  ? [none]
+                  : []),
+          ],
+        };
+        const summary = {
+          all: await tx.pickingLabDispatch.count({ where: scope }),
+          open: await tx.pickingLabDispatch.count({ where: { AND: [scope, open] } }),
+          resolved: await tx.pickingLabDispatch.count({ where: { AND: [scope, resolved] } }),
+          none: await tx.pickingLabDispatch.count({ where: { AND: [scope, none] } }),
+          readAt: new Date().toISOString(),
+        };
         let anchor;
         if (cursor) {
           anchor = await tx.pickingLabDispatch.findFirst({ where: { ...where, id: cursor } });
@@ -192,6 +227,7 @@ export class DeliveryLabService {
         return {
           enabled: this.enabled,
           selfOnly: !manager(r),
+          summary,
           items: rows.slice(0, 20).map((d) => dto(d, this.enabled)),
           nextCursor: rows.length > 20 ? rows[19]!.id : null,
         };
@@ -510,7 +546,17 @@ export class DeliveryLabService {
 }
 function query(q: unknown, extra: string[] = []) {
   const b = fields(q, ['warehouseId', ...extra]);
-  return { w: uuid(b.warehouseId), cursor: b.cursor === undefined ? undefined : uuid(b.cursor) };
+  if (
+    b.exceptionState !== undefined &&
+    (typeof b.exceptionState !== 'string' ||
+      !['ALL', 'OPEN', 'RESOLVED', 'NONE'].includes(b.exceptionState))
+  )
+    throw failure(400, 'VALIDATION_ERROR', '异常筛选无效');
+  return {
+    w: uuid(b.warehouseId),
+    cursor: b.cursor === undefined ? undefined : uuid(b.cursor),
+    exceptionState: b.exceptionState === undefined ? 'ALL' : String(b.exceptionState),
+  };
 }
 @ApiTags('合成配送分配与交接资格')
 @ApiCookieAuth('staffSession')
@@ -540,10 +586,11 @@ export class DeliveryLabController {
   @Get()
   @ApiQuery({ name: 'warehouseId', required: true, type: String })
   @ApiQuery({ name: 'cursor', required: false, type: String })
+  @ApiQuery({ name: 'exceptionState', required: false, enum: ['ALL', 'OPEN', 'RESOLVED', 'NONE'] })
   @ApiResult(listSchema, [400, 401, 403, 404, 500])
   async list(@Req() r: ApiRequest, @Query() q: unknown) {
-    const v = query(q, ['cursor']);
-    return success(r, await this.service.list(r, v.w, v.cursor));
+    const v = query(q, ['cursor', 'exceptionState']);
+    return success(r, await this.service.list(r, v.w, v.cursor, v.exceptionState));
   }
   @Get(':id')
   @ApiParam({ name: 'id', type: String })

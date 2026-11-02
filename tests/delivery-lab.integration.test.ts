@@ -753,3 +753,63 @@ test('resolution audit rollback and gate protect matching exception, resolver sc
   f = await pickingFixture();
   assert.equal((await resolveException(randomUUID(), body)).status, 503);
 });
+
+test('exception summary covers scoped tasks once, stays independent of filtering and follows resolution', async () => {
+  const openId = await assignedForJourney();
+  await accept(openId, { key: randomUUID(), packageCount: 1 });
+  await reportException(openId, { key: randomUUID(), reason: 'DAMAGED' });
+  const resolvedId = await assignedForJourney();
+  await accept(resolvedId, { key: randomUUID(), packageCount: 1 });
+  await reportException(resolvedId, { key: randomUUID(), reason: 'REFUSED' });
+  const e = await f.runtime.db.deliveryLabException.findFirstOrThrow({
+    where: { assignment: { dispatchId: resolvedId } },
+  });
+  await resolveException(resolvedId, { key: randomUUID(), exceptionId: e.id });
+  const noneId = await ready();
+  for (const [state, ids] of [
+    ['ALL', [openId, resolvedId, noneId]],
+    ['OPEN', [openId]],
+    ['RESOLVED', [resolvedId]],
+    ['NONE', [noneId]],
+  ] as const) {
+    const r = await read('?exceptionState=' + state);
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.data.items.map((v: { id: string }) => v.id).sort(), [...ids].sort());
+    assert.deepEqual(
+      { ...r.data.summary, readAt: '' },
+      { all: 3, open: 1, resolved: 1, none: 1, readAt: '' },
+    );
+    assert.ok(Number.isFinite(Date.parse(r.data.summary.readAt)));
+  }
+  const riderList = await read('?exceptionState=ALL', f.extraCookies[1]!);
+  assert.equal(riderList.data.summary.all, 2);
+  assert.equal(riderList.data.summary.none, 0);
+  assert.equal((await read('?exceptionState=NONE&cursor=' + openId)).status, 404);
+  for (const value of ['INVALID', 'open', '', 'ALL&exceptionState=ALL'])
+    assert.equal((await read('?exceptionState=' + value)).status, 400);
+  const ex = await f.runtime.db.deliveryLabException.findFirstOrThrow({
+    where: { assignment: { dispatchId: openId } },
+  });
+  await resolveException(openId, { key: randomUUID(), exceptionId: ex.id });
+  const after = await read('?exceptionState=OPEN');
+  assert.equal(after.data.items.length, 0);
+  assert.equal(after.data.summary.open, 0);
+  assert.equal(after.data.summary.resolved, 2);
+});
+test('filtered pagination has global counts and rejects cross-filter cursor', async () => {
+  for (let i = 0; i < 21; i++) await ready();
+  const first = await read('?exceptionState=NONE');
+  assert.equal(first.data.items.length, 20);
+  assert.equal(first.data.summary.none, 21);
+  const next = await read('?exceptionState=NONE&cursor=' + first.data.nextCursor);
+  assert.equal(next.data.items.length, 1);
+  assert.equal(next.data.summary.all, 21);
+  assert.equal(
+    new Set([...first.data.items, ...next.data.items].map((v: { id: string }) => v.id)).size,
+    21,
+  );
+  const empty = await read('?exceptionState=OPEN');
+  assert.equal(empty.data.items.length, 0);
+  assert.equal(empty.data.summary.none, 21);
+  assert.equal((await read('?exceptionState=OPEN&cursor=' + first.data.nextCursor)).status, 404);
+});

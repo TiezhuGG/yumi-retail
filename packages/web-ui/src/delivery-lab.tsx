@@ -97,7 +97,8 @@ function DeliveryPanel({
     [enabled, setEnabled] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('');
+    [message, setMessage] = useState(''),
+    [filter, setFilter] = useState('ALL');
   const seq = useRef(0),
     running = useRef(false);
   const manage = profile.permissions.includes('delivery-lab.assign'),
@@ -117,12 +118,16 @@ function DeliveryPanel({
       setBusy(false);
     }
   }
-  async function load(cursor?: string) {
+  async function load(cursor?: string, state = filter) {
     const n = start();
     if (n === null) return;
+    if (state !== filter) {
+      setFilter(state);
+      setList(null);
+    }
     try {
       const r = await staffRequest<DeliveryLabList>(
-        base + query + (cursor ? '&cursor=' + cursor : ''),
+        base + query + '&exceptionState=' + state + (cursor ? '&cursor=' + cursor : ''),
       );
       if (n === seq.current) {
         setList((old) => (cursor && old ? { ...r, items: [...old.items, ...r.items] } : r));
@@ -238,6 +243,38 @@ function DeliveryPanel({
               刷新配送列表
             </button>
           </div>
+          <div className="toolbar" aria-label="异常清单筛选">
+            {(
+              [
+                ['ALL', '全部任务'],
+                ['OPEN', '待处置异常'],
+                ['RESOLVED', '已处置异常'],
+                ['NONE', '无异常'],
+              ] as const
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                className={filter === v ? 'primary-button' : 'secondary-button'}
+                aria-pressed={filter === v}
+                disabled={busy}
+                onClick={() => void load(undefined, v)}
+              >
+                {label}
+                {list
+                  ? ' · ' +
+                    list.summary[
+                      ({ ALL: 'all', OPEN: 'open', RESOLVED: 'resolved', NONE: 'none' } as const)[v]
+                    ]
+                  : ''}
+              </button>
+            ))}
+          </div>
+          {list && (
+            <p>
+              读取时间 {date(list.summary.readAt)} · 当前{list.selfOnly ? '本人' : '授权仓库'}
+              全部合成出库任务的异常概览，各类互斥；统计不受分页或筛选影响。
+            </p>
+          )}
           {!list && busy ? (
             <div className="empty-state" role="status">
               正在读取配送任务…
@@ -246,7 +283,11 @@ function DeliveryPanel({
             <div className="empty-state">尚未读取配送任务，请重试。</div>
           ) : !list.items.length ? (
             <div className="empty-state">
-              {manage ? '暂无已出库的合成任务' : '暂无分配给你的合成任务'}
+              {filter !== 'ALL'
+                ? '当前筛选无匹配任务'
+                : manage
+                  ? '暂无已出库的合成任务'
+                  : '暂无分配给你的合成任务'}
             </div>
           ) : (
             <div className="picking-order-grid">
@@ -264,6 +305,12 @@ function DeliveryPanel({
                             ? '已分配 · 尚未交接'
                             : '待分配骑手'}
                   </span>
+                  {t.exception && (
+                    <p className="badge amber">
+                      {t.exception.resolution ? '已处置异常' : '待处置异常'} ·{' '}
+                      {exceptionNames[t.exception.reason]}
+                    </p>
+                  )}
                   <p>
                     {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
                   </p>

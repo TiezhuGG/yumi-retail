@@ -709,3 +709,7 @@ SUPER_ADMIN/WAREHOUSE_MANAGER新增delivery-lab.read及assign；RIDER仅read。�
 ## 2026-11-02 合成异常处置与恢复
 
 本仓负责人/仓管通过resolve-exception显式确认合成异常已处理，请求仅key、exceptionId UUID，需assign权限/CSRF/仓库范围。新增不可变delivery_lab_resolutions（异常唯一、分配/处置人FK及姓名/键/时间），原人原键恢复、新人/键冲突；原异常保留，未决条件改为缺少处置凭据。处置与审计同事务，DB复核当前处置人/骑手资格及异常归属，只解除隔离阻断，不自动推进阶段或改变真实库存资金。OpenAPI0.35.0、迁移202611020005仅临时PG schema验证，部署先迁移并重建，回退关闭演练保留事实。20项PG及实际桌面/手机UI通过；真实配送/微信真机/生产未验。详见S7-DELIVERY-RESOLUTION-2026-11-02记录。
+
+## 2026-11-02 合成异常清单与概览
+
+配送GET列表新增exceptionState=ALL/OPEN/RESOLVED/NONE（默认ALL），当前授权仓库/骑手本人范围内过滤；游标也校验筛选。summary返回all/open/resolved/none/readAt，三类互斥覆盖全部，统计不受分页/筛选影响并与当前页同一RepeatableRead快照。异常已处置不等于送达。UI计数筛选、原因标识、空/错态和详情返回刷新完成。OpenAPI0.36.0，无迁移和新写入动作；22项PG及实际桌面/手机UI验证通过，截图仅本地忽略。完整边界见S7-DELIVERY-EXCEPTION-LIST-2026-11-02记录。
