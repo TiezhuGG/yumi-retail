@@ -10,7 +10,13 @@ import { failure, success, type ApiRequest } from './http.js';
 import { object, text, strings, items, warehouseSchema, ApiResult } from './api-result.js';
 const include = {
   pack: { include: { task: { include: { shortages: true } } } },
-  assignment: { include: { handoff: true, rider: { include: { roles: true, warehouses: true } } } },
+  assignment: {
+    include: {
+      journeyFacts: true,
+      handoff: true,
+      rider: { include: { roles: true, warehouses: true } },
+    },
+  },
 };
 type Row = Prisma.PickingLabDispatchGetPayload<{ include: typeof include }>;
 const manager = (r: ApiRequest) => r.staffContext!.permissions.includes('delivery-lab.assign');
@@ -53,6 +59,20 @@ const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
           createdAt: a.handoff.createdAt.toISOString(),
         }
       : null,
+    journey: {
+      start: a?.journeyFacts.find((f) => f.kind === 'START')
+        ? {
+            id: a.journeyFacts.find((f) => f.kind === 'START')!.id,
+            createdAt: a.journeyFacts.find((f) => f.kind === 'START')!.createdAt.toISOString(),
+          }
+        : null,
+      completion: a?.journeyFacts.find((f) => f.kind === 'COMPLETE')
+        ? {
+            id: a.journeyFacts.find((f) => f.kind === 'COMPLETE')!.id,
+            createdAt: a.journeyFacts.find((f) => f.kind === 'COMPLETE')!.createdAt.toISOString(),
+          }
+        : null,
+    },
     handoffReadiness: { ready: blockers.length === 0, blockers },
   };
 };
@@ -79,6 +99,16 @@ const taskSchema = object({
     }),
     nullable: true,
   },
+  journey: object({
+    start: {
+      ...object({ id: text, createdAt: { type: 'string', format: 'date-time' } }),
+      nullable: true,
+    },
+    completion: {
+      ...object({ id: text, createdAt: { type: 'string', format: 'date-time' } }),
+      nullable: true,
+    },
+  }),
   handoffReadiness: object({ ready: { type: 'boolean' }, blockers: strings }),
 });
 const listSchema = object({
@@ -165,6 +195,70 @@ export class DeliveryLabService {
           select: { id: true, displayName: true },
           orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
         }),
+      };
+    });
+  }
+  async progress(r: ApiRequest, w: string, id: string, key: string, kind: 'START' | 'COMPLETE') {
+    if (!this.enabled) throw failure(503, 'PICKING_LAB_DISABLED', '本机配送演练写入尚未开启');
+    return this.catalog.db.$transaction(async (tx) => {
+      await this.catalog.warehouse(tx, r, w);
+      await tx.$queryRaw`SELECT t.id FROM picking_lab_tasks t JOIN picking_lab_packs p ON p.task_id=t.id JOIN picking_lab_dispatches d ON d.pack_id=p.id WHERE d.id=${id}::uuid AND t.warehouse_id=${w}::uuid FOR UPDATE OF t`;
+      const d = await tx.pickingLabDispatch.findFirst({
+        where: {
+          id,
+          pack: { task: { warehouseId: w } },
+          assignment: { riderId: r.staffContext!.staffId },
+        },
+        include,
+      });
+      if (!d || !d.assignment)
+        throw failure(404, 'DELIVERY_LAB_NOT_FOUND', '本人合成配送任务不存在');
+      const h = d.assignment.journeyFacts.find((f) => f.kind === kind);
+      if (h) {
+        if (h.key !== key)
+          throw failure(409, 'DELIVERY_STAGE_ALREADY_RECORDED', '此合成阶段已记录，不能重复提交');
+        return { task: dto(d, this.enabled), duplicate: true };
+      }
+      // Lock current qualifications before re-reading them; revocation serializes with this receipt.
+      const people = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM staff WHERE id=${d.assignment.riderId}::uuid AND enabled FOR SHARE`;
+      const roles = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_roles WHERE staff_id=${d.assignment.riderId}::uuid AND role_code='RIDER' FOR SHARE`;
+      const scopes = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_warehouses WHERE staff_id=${d.assignment.riderId}::uuid AND warehouse_id=${w}::uuid FOR SHARE`;
+      if (
+        !people.length ||
+        !roles.length ||
+        !scopes.length ||
+        !dto(d, this.enabled).handoffReadiness.ready
+      )
+        throw failure(409, 'DELIVERY_NOT_READY', '当前骑手或任务不满足接货资格');
+      if (
+        !d.assignment.handoff ||
+        (kind === 'COMPLETE' && !d.assignment.journeyFacts.some((f) => f.kind === 'START'))
+      )
+        throw failure(409, 'DELIVERY_STAGE_NOT_READY', '请先完成合成接货及开始配送');
+      await tx.deliveryLabJourneyFact.create({
+        data: { id: randomUUID(), assignmentId: d.assignment.id, key, kind },
+      });
+      await this.catalog.audit(
+        tx,
+        r,
+        kind === 'START' ? 'DELIVERY_LAB_START' : 'DELIVERY_LAB_COMPLETE',
+        id,
+        w,
+        null,
+        { syntheticOnly: true },
+      );
+      return {
+        task: dto(
+          await tx.pickingLabDispatch.findUniqueOrThrow({ where: { id }, include }),
+          this.enabled,
+        ),
+        duplicate: false,
       };
     });
   }
@@ -324,6 +418,49 @@ export class DeliveryLabController {
   @ApiResult(object({ enabled: { type: 'boolean' }, task: taskSchema }), [400, 401, 403, 404, 500])
   async detail(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string) {
     return success(r, await this.service.detail(r, query(q).w, uuid(id)));
+  }
+  @Post(':id/start')
+  @HttpCode(200)
+  @Permissions('delivery-lab.read', 'delivery-lab.work')
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({ schema: object({ key: { type: 'string', format: 'uuid' } }) })
+  @ApiResult(
+    object({ task: taskSchema, duplicate: { type: 'boolean' } }),
+    [400, 401, 403, 404, 409, 503, 500],
+  )
+  async start(
+    @Req() r: ApiRequest,
+    @Query() q: unknown,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const b = fields(body, ['key']);
+    return success(r, await this.service.progress(r, query(q).w, uuid(id), uuid(b.key), 'START'));
+  }
+  @Post(':id/complete')
+  @HttpCode(200)
+  @Permissions('delivery-lab.read', 'delivery-lab.work')
+  @ApiParam({ name: 'id', type: String })
+  @ApiQuery({ name: 'warehouseId', required: true, type: String })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({ schema: object({ key: { type: 'string', format: 'uuid' } }) })
+  @ApiResult(
+    object({ task: taskSchema, duplicate: { type: 'boolean' } }),
+    [400, 401, 403, 404, 409, 503, 500],
+  )
+  async complete(
+    @Req() r: ApiRequest,
+    @Query() q: unknown,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const b = fields(body, ['key']);
+    return success(
+      r,
+      await this.service.progress(r, query(q).w, uuid(id), uuid(b.key), 'COMPLETE'),
+    );
   }
   @Post(':id/accept')
   @HttpCode(200)

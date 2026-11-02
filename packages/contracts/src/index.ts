@@ -774,6 +774,10 @@ export type DeliveryLabTask = {
   syntheticOnly: true;
   assignment: null | { id: string; riderName: string; actorName: string; createdAt: string };
   handoff: null | { id: string; packageCount: number; createdAt: string };
+  journey: {
+    start: null | { id: string; createdAt: string };
+    completion: null | { id: string; createdAt: string };
+  };
   handoffReadiness: { ready: boolean; blockers: string[] };
 };
 export type DeliveryLabList = {

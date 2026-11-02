@@ -536,3 +536,11 @@ BEFORE INSERT触发器锁对应合成任务，检查已核对且无未决缺货�
 本次环境无项目依赖/本地配置，未找到Node/npm，故PG集成测试、构建、OpenAPI自动导出和浏览器截图未运行。本节是实现契约及待验证说明，不是业务或UI验收通过声明；OpenAPI JSON待实际应用导出。
 
 2026-11-02验证更新：本节接货实现已通过37项相关PG、1项配置及实际API浏览器检查；OpenAPI0.32.0已自动导出。前述无Node/未运行说明已由后续恢复环境和验证覆盖；迁移仅应用临时测试schema，正式开发库未启用。完整检查及剩余微信/真实交接边界见S7-DELIVERY-HANDOFF-2026-11-02验收记录。
+
+## 2026-11-02 合成配送开始与送达
+
+已实现本人合成接货→开始→送达的显式动作接口start/complete，仅请求key(UUID)，需delivery-lab.work（仅RIDER授予）、CSRF和本仓本人归属。跳步409、他人404、无权限403；首次提交重验账号/角色/仓库及出库快照，事务内锁任务并生成凭据/审计，同阶段原键恢复、新键409，完成后仍可恢复原开始凭据而不回退阶段。
+
+新增delivery_lab_journey_facts，assignment_id+kind唯一，kind限定START/COMPLETE；数据库复核接货/开始前置与当前资格并拒绝修改删除。DTO新增journey.start/completion可空{id,createdAt}，旧记录不补造。骑手详情明确勾选合成动作并支持未知结果原请求恢复，仓管只读进度。不涉及真实顾客签收、照片/定位、订单/库存扣减或支付；PICKING_LAB_ENABLED仍默认关闭/生产拒启。
+
+迁移202611020003_delivery_journey仅在真实PG临时schema应用验证，正式开发库未部署；目标部署先迁移、生成Prisma Client、重建服务，回退关闭演练且保留事实。OpenAPI0.33.0已导出，24项PG及1项配置检查、实际API桌面/手机UI通过；微信真机/真实交付仍未验收。详见S7-DELIVERY-JOURNEY-2026-11-02记录。

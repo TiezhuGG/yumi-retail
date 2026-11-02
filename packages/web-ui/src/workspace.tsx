@@ -142,7 +142,7 @@ const routes: Array<{
     id: 'delivery-lab',
     name: '配送演练',
     glyph: '◇',
-    hint: '合成任务分配、资格核验与本人接货',
+    hint: '合成任务分配、接货与配送进度',
     permission: 'delivery-lab.read',
   },
   {

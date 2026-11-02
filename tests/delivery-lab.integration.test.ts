@@ -449,3 +449,134 @@ test('default-off handoff refuses writes without creating a receipt', async () =
   assert.equal((await accept(randomUUID(), { key: randomUUID(), packageCount: 1 })).status, 503);
   assert.equal(await f.runtime.db.deliveryLabHandoff.count(), 0);
 });
+
+async function stage(
+  id: string,
+  action: 'start' | 'complete',
+  body: unknown,
+  cookie = f.extraCookies[1]!,
+  token?: string,
+) {
+  const r = await fetch(
+    f.base + '/api/v1/delivery-lab/' + id + '/' + action + '?warehouseId=' + f.warehouseId,
+    {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'http://127.0.0.1:5188',
+        'X-CSRF-Token': token ?? (await csrf(cookie)),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  return { status: r.status, ...(await r.json()) };
+}
+async function assignedForJourney() {
+  const id = await ready();
+  assert.equal((await assign(id, { key: randomUUID(), riderId: await rider() })).status, 200);
+  return id;
+}
+test('journey requires handoff then start; owner, role, CSRF and strict inputs are enforced', async () => {
+  const id = await assignedForJourney(),
+    body = { key: randomUUID() };
+  assert.equal((await stage(id, 'start', body)).status, 409);
+  assert.equal((await stage(id, 'complete', body)).status, 409);
+  assert.equal((await stage(id, 'start', body, f.cookies[1]!)).status, 403);
+  const other = await otherRider();
+  assert.equal((await stage(id, 'start', body, other.cookie)).status, 404);
+  assert.equal((await stage(id, 'start', body, f.extraCookies[1]!, '')).status, 403);
+  for (const bad of [{ ...body, state: 'DELIVERED' }, { key: 'invalid' }, {}])
+    assert.equal((await stage(id, 'start', bad)).status, 400);
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  assert.equal((await stage(id, 'complete', body)).status, 409);
+  assert.equal((await stage(id, 'start', body)).status, 200);
+  assert.equal((await stage(id, 'complete', { key: randomUUID() })).status, 200);
+  const task = (await read('/' + id)).data.task;
+  assert.ok(task.journey.start && task.journey.completion);
+  assert.equal(JSON.stringify(task).includes(body.key), false);
+});
+test('each journey stage serializes concurrent keys and restores original request even after completion', async () => {
+  const id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  const start = { key: randomUUID() },
+    complete = { key: randomUUID() };
+  let r = await Promise.all([stage(id, 'start', start), stage(id, 'start', start)]);
+  assert.deepEqual(
+    r.map((v) => v.status),
+    [200, 200],
+  );
+  assert.equal(r.filter((v) => v.data.duplicate).length, 1);
+  r = await Promise.all([
+    stage(id, 'complete', complete),
+    stage(id, 'complete', { key: randomUUID() }),
+  ]);
+  assert.deepEqual(r.map((v) => v.status).sort(), [200, 409]);
+  const db = f.runtime.db,
+    rows = await db.deliveryLabJourneyFact.findMany();
+  assert.equal(rows.length, 2);
+  const fact = rows.find((v) => v.kind === 'COMPLETE')!;
+  assert.equal((await stage(id, 'complete', { key: fact.key })).data.duplicate, true);
+  assert.equal((await stage(id, 'start', start)).data.duplicate, true);
+  assert.equal(
+    await db.businessAudit.count({
+      where: { action: { in: ['DELIVERY_LAB_START', 'DELIVERY_LAB_COMPLETE'] } },
+    }),
+    2,
+  );
+  await assert.rejects(
+    db.deliveryLabJourneyFact.update({ where: { id: fact.id }, data: { key: randomUUID() } }),
+  );
+  await assert.rejects(db.deliveryLabJourneyFact.delete({ where: { id: fact.id } }));
+});
+test('database journey gate rejects skipped phases and revoked qualification; default-off blocks both actions', async () => {
+  const id = await assignedForJourney(),
+    db = f.runtime.db,
+    a = await db.deliveryLabAssignment.findFirstOrThrow();
+  const data = { id: randomUUID(), assignmentId: a.id, key: randomUUID(), kind: 'START' };
+  await assert.rejects(db.deliveryLabJourneyFact.create({ data }));
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  await assert.rejects(db.deliveryLabJourneyFact.create({ data: { ...data, kind: 'COMPLETE' } }));
+  await assert.rejects(db.deliveryLabJourneyFact.create({ data: { ...data, kind: 'ANY_STATE' } }));
+  await db.staffRole.deleteMany({ where: { staffId: a.riderId, roleCode: 'RIDER' } });
+  await assert.rejects(db.deliveryLabJourneyFact.create({ data }));
+  assert.equal((await stage(id, 'start', { key: randomUUID() })).status, 403);
+  await f.cleanup();
+  f = await pickingFixture();
+  for (const action of ['start', 'complete'] as const)
+    assert.equal((await stage(randomUUID(), action, { key: randomUUID() })).status, 503);
+  assert.equal(await f.runtime.db.deliveryLabJourneyFact.count(), 0);
+});
+test('journey audit failures roll back each stage and complete flow leaves formal facts unchanged', async () => {
+  await f.create();
+  const db = f.runtime.db;
+  const snapshot = async () => ({
+    orders: await db.consumerOrder.findMany(),
+    stock: await db.stockPosition.findMany(),
+    balances: await db.stockBalance.findMany(),
+    lots: await db.stockLot.findMany(),
+    allocations: await db.orderAllocation.findMany(),
+    ledger: await db.stockLedger.findMany(),
+    payment: await db.paymentPreparation.findMany(),
+  });
+  const before = await snapshot(),
+    id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  for (const [action, audit] of [
+    ['start', 'DELIVERY_LAB_START'],
+    ['complete', 'DELIVERY_LAB_COMPLETE'],
+  ] as const) {
+    await db.$executeRawUnsafe(
+      `CREATE OR REPLACE FUNCTION fail_journey_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='${audit}' THEN RAISE EXCEPTION 'Synthetic journey audit fail'; END IF; RETURN NEW; END $$`,
+    );
+    await db.$executeRawUnsafe(
+      'CREATE TRIGGER fail_journey_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_journey_audit()',
+    );
+    const body = { key: randomUUID() };
+    assert.equal((await stage(id, action, body)).status, 500);
+    assert.equal(await db.deliveryLabJourneyFact.count(), action === 'start' ? 0 : 1);
+    await db.$executeRawUnsafe('DROP TRIGGER fail_journey_audit ON business_audits');
+    assert.equal((await stage(id, action, body)).status, 200);
+  }
+  assert.deepEqual(await snapshot(), before);
+});

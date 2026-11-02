@@ -1179,6 +1179,7 @@ model PickingLabDispatch {
 }
 
 model DeliveryLabAssignment {
+ journeyFacts DeliveryLabJourneyFact[]
  handoff DeliveryLabHandoff?
  id String @id @db.Uuid
  dispatchId String @unique @map("dispatch_id") @db.Uuid
@@ -1203,4 +1204,15 @@ model DeliveryLabHandoff {
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  assignment DeliveryLabAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("delivery_lab_handoffs")
+}
+
+model DeliveryLabJourneyFact {
+ id String @id @db.Uuid
+ assignmentId String @map("assignment_id") @db.Uuid
+ kind String @db.VarChar(16)
+ key String @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ assignment DeliveryLabAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([assignmentId,kind])
+ @@map("delivery_lab_journey_facts")
 }

@@ -47,7 +47,7 @@ export function DeliveryLabWorkbench({ profile }: { profile: StaffProfile }) {
     <div className="picking-workbench delivery-workbench">
       <div className="notice">
         配送隔离演练 ·
-        分配合成出库任务、核验资格并记录本人合成接货，不关联真实订单、顾客地址或库存，不代表实物交接或送达。
+        记录合成任务分配、接货、配送开始及送达凭据，不关联真实订单、顾客地址或库存，不代表实物交接或送达。
       </div>
       {error ? (
         <div className="notice task-error" role="alert">
@@ -254,11 +254,15 @@ function DeliveryPanel({
                 <article className="readiness-check picking-order-card" key={t.id}>
                   <h3>{t.label}</h3>
                   <span className={'badge ' + (t.assignment ? 'green' : 'amber')}>
-                    {t.handoff
-                      ? '合成接货已记录'
-                      : t.assignment
-                        ? '已分配 · 尚未交接'
-                        : '待分配骑手'}
+                    {t.journey.completion
+                      ? '合成送达已记录'
+                      : t.journey.start
+                        ? '合成配送中'
+                        : t.handoff
+                          ? '合成接货已记录'
+                          : t.assignment
+                            ? '已分配 · 尚未交接'
+                            : '待分配骑手'}
                   </span>
                   <p>
                     {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
@@ -329,7 +333,7 @@ function DeliveryPanel({
                     ))}
                   </ul>
                   <p>
-                    合成接货须由被分配骑手本人核对数量。资格随账号、角色和仓库权限变化，提交时重新校验；不执行真实配送或送达。
+                    合成接货须由被分配骑手本人核对数量。资格随账号、角色和仓库权限变化，提交时重新校验；只记录合成配送与送达，不代表实物履约。
                   </p>
                 </div>
                 {task.handoff ? (
@@ -353,6 +357,15 @@ function DeliveryPanel({
                     }
                   />
                 )}
+                <JourneyPanel
+                  task={task}
+                  w={w}
+                  profile={profile}
+                  enabled={enabled}
+                  onResult={(result) =>
+                    setTask((current) => (current?.id === result.id ? result : current))
+                  }
+                />
                 {task.assignment ? (
                   <div className="picking-line">
                     <h3>不可变分配凭据</h3>
@@ -465,6 +478,7 @@ function AcceptForm({
       setBusy(false);
     }
   }
+  if (task.handoff && !pending && !message) return null;
   return (
     <form
       className="picking-line picking-check-form"
@@ -504,5 +518,118 @@ function AcceptForm({
         </button>
       )}
     </form>
+  );
+}
+
+const journeyPending = new Map<string, { key: string; action: 'start' | 'complete' }>();
+function JourneyPanel({
+  task,
+  w,
+  profile,
+  enabled,
+  onResult,
+}: {
+  task: DeliveryLabTask;
+  w: string;
+  profile: StaffProfile;
+  enabled: boolean;
+  onResult: (t: DeliveryLabTask) => void;
+}) {
+  const scope = profile.id + ':' + profile.csrfToken + ':' + w + ':' + task.id;
+  const [pending, setPending] = useState(journeyPending.get(scope));
+  const [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(''),
+    [confirmed, setConfirmed] = useState(false);
+  const running = useRef(false);
+  const canWork = profile.permissions.includes('delivery-lab.work');
+  const action = task.journey.start ? 'complete' : 'start';
+  async function submit() {
+    if (running.current) return;
+    const op = pending ?? { key: crypto.randomUUID(), action };
+    running.current = true;
+    setBusy(true);
+    setMessage('');
+    journeyPending.set(scope, op);
+    setPending(op);
+    try {
+      const r = await staffRequest<{ task: DeliveryLabTask; duplicate: boolean }>(
+        '/delivery-lab/' + task.id + '/' + op.action + '?warehouseId=' + w,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify({ key: op.key }),
+        },
+      );
+      journeyPending.delete(scope);
+      setPending(undefined);
+      setConfirmed(false);
+      onResult(r.task);
+      setMessage(r.duplicate ? '原阶段凭据已恢复，未重复记录。' : '合成阶段凭据已记录。');
+    } catch (e) {
+      if (e instanceof StaffRequestError && [400, 401, 403, 404, 409].includes(e.status)) {
+        journeyPending.delete(scope);
+        setPending(undefined);
+      }
+      setMessage(e instanceof Error ? e.message : '阶段结果未确认，请按原请求重试');
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="picking-line">
+      <h3>合成配送进度</h3>
+      <p>
+        {task.journey.completion
+          ? '合成送达已记录'
+          : task.journey.start
+            ? '合成配送中'
+            : task.handoff
+              ? '已合成接货，待开始'
+              : '请先完成本人合成接货'}
+      </p>
+      {task.journey.start && <p>开始凭据 · {date(task.journey.start.createdAt)}</p>}
+      {task.journey.completion && <p>送达凭据 · {date(task.journey.completion.createdAt)}</p>}
+      <p>仅验证隔离流程，不代表顾客签收或真实送达。</p>
+      {message && <p role="status">{message}</p>}
+      {canWork && pending && <p>阶段结果未确认；请恢复原请求，不能用下一阶段替代。</p>}
+      {canWork && (!task.journey.completion || pending) && (
+        <form
+          className="picking-check-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          {!pending && task.handoff && (
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                disabled={busy || !enabled}
+              />
+              {action === 'start' ? '确认开始本次合成配送' : '确认本次合成送达演练完成'}
+            </label>
+          )}
+          <button
+            className="primary-button"
+            disabled={
+              busy ||
+              !enabled ||
+              (!pending && (!task.handoff || !confirmed || !task.handoffReadiness.ready))
+            }
+          >
+            {busy
+              ? '正在记录…'
+              : pending
+                ? '按原阶段请求重试'
+                : action === 'start'
+                  ? '记录合成配送开始'
+                  : '记录合成送达'}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }
