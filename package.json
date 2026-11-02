@@ -122,7 +122,11 @@
     "check:fulfillment:database": "node --env-file-if-exists=.env scripts/check-fulfillment-local.mjs --database",
     "preview:admin:local": "node scripts/preview-local.mjs",
     "preview:ops:local": "node scripts/preview-local.mjs --ops",
-    "test:fulfillment:rebuild": "node --env-file-if-exists=.env --test tests/fulfillment-rebuild.integration.test.mjs"
+    "test:fulfillment:rebuild": "node --env-file-if-exists=.env --test tests/fulfillment-rebuild.integration.test.mjs",
+    "pretest:points": "npm run build:server",
+    "test:points": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/points.integration.test.ts",
+    "preverify:points:ui": "npm run build:server",
+    "verify:points:ui": "node --env-file=.env --import tsx scripts/ui/verify-points.mjs"
   },
   "pnpm": {
     "overrides": {

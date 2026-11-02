@@ -2778,3 +2778,113 @@ small {
   vertical-align: middle;
   accent-color: #008b48;
 }
+
+.points-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin: 24px 0;
+}
+.points-toolbar label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  width: 280px;
+  max-width: 100%;
+}
+.points-toolbar input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--line, #dce6df);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  color: var(--ink, #20382b);
+}
+.points-toolbar h2 {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.points-toolbar p {
+  margin: 0;
+}
+.points-table-wrap {
+  overflow-x: auto;
+  background: white;
+  border: 1px solid var(--line, #dce6df);
+  border-radius: 12px;
+  margin: 20px 0;
+}
+.points-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+.points-table th,
+.points-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--line, #dce6df);
+  overflow-wrap: anywhere;
+}
+.points-table th {
+  background: #f4f8f5;
+  color: var(--muted);
+  font-weight: 500;
+}
+.points-table td:last-child {
+  width: 112px;
+}
+.points-table tr:last-child td {
+  border: 0;
+}
+.points-table td:first-child {
+  max-width: 240px;
+}
+.points-table button {
+  white-space: nowrap;
+}
+.points-empty {
+  padding: 48px 20px;
+  border: 1px dashed var(--line, #dce6df);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--muted);
+  margin: 24px 0;
+}
+.points-entry {
+  padding: 20px;
+  margin: 12px 0;
+  border: 1px solid var(--line, #dce6df);
+  border-radius: 12px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+.points-entry p {
+  line-height: 1.6;
+}
+.points-entry time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.points-credit {
+  color: #008a42;
+}
+.points-debit {
+  color: #975020;
+}
+@media (max-width: 600px) {
+  .points-table th,
+  .points-table td {
+    padding: 12px 8px;
+  }
+  .points-table td:last-child {
+    width: 88px;
+  }
+  .points-table .secondary-button {
+    padding: 8px 10px;
+  }
+}

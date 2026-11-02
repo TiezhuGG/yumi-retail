@@ -66,6 +66,7 @@ model Warehouse {
 }
 
 model Staff {
+  pointsEntries PointsEntry[]
  deliveryResolutions DeliveryLabResolution[]
  deliveryLabAssigned DeliveryLabAssignment[] @relation("deliveryAssigner")
  deliveryLabTasks DeliveryLabAssignment[] @relation("deliveryRider")
@@ -613,6 +614,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+  pointsAccount PointsAccount?
   id          String   @id @db.Uuid
   provider    String   @db.VarChar(16)
   subject     String   @db.VarChar(64)
@@ -1243,4 +1245,26 @@ model DeliveryLabResolution {
  exception DeliveryLabException @relation(fields:[exceptionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("delivery_lab_resolutions")
+}
+
+model PointsAccount {
+ userId String @id @map("user_id") @db.Uuid
+ balance BigInt @default(0)
+ version Int @default(0)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ entries PointsEntry[]
+ @@map("points_accounts")
+}
+model PointsEntry {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ delta BigInt
+ actionKey String @unique @map("action_key") @db.VarChar(160)
+ reason String @db.VarChar(300)
+ actorId String @map("actor_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ account PointsAccount @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([userId,id],map:"points_ledger_owner_idx")
+ @@map("points_ledger")
 }

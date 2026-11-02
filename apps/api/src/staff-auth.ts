@@ -8,6 +8,7 @@ import type { ApiRequest } from './http.js';
 export const STAFF_COOKIE = 'yumi_staff_session';
 export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
+    'points.read',
     'picking.read',
     'picking-lab.read',
     'picking-lab.create',
@@ -47,6 +48,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'reversal.post',
   ],
   OPERATIONS: [
+    'points.read',
     'order.read',
     'warehouse.read',
     'catalog.read',

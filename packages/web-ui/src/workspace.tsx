@@ -1,3 +1,4 @@
+import { PointsWorkbench } from './points.js';
 import { DeliveryLabWorkbench } from './delivery-lab.js';
 import { PickingLabWorkbench } from './picking-lab.js';
 import { PickingReadinessWorkbench } from './picking-readiness.js';
@@ -18,6 +19,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'points'
   | 'delivery-lab'
   | 'picking-lab'
   | 'picking-readiness'
@@ -47,6 +49,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'points',
+    name: '积分账户',
+    glyph: '◇',
+    hint: '查询用户积分余额与明细',
+    permission: 'points.read',
+  },
   {
     id: 'overview',
     name: '工作台',
@@ -428,6 +437,8 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'points' ? (
+            <PointsWorkbench />
           ) : activeView === 'service-area' ? (
             <ServiceAreaWorkbench profile={profile} />
           ) : (

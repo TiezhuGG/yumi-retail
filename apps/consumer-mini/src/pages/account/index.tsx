@@ -40,6 +40,11 @@ export default function Account() {
         </View>
       </View>
       <View className="account-content">
+        <View className="account-card">
+          <Text className="account-card-title">我的积分</Text>
+          <Text className="account-copy">查看积分余额与收支明细</Text>
+          <Button onClick={() => Taro.navigateTo({ url: '/pages/points/index' })}>查看积分</Button>
+        </View>
         {error && (
           <View className="account-error">
             <Text>{error}</Text>
