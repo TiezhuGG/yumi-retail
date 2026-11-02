@@ -854,3 +854,112 @@ test('timeline uses saved facts, source links and immutable names; never invents
   const other = await otherRider();
   assert.equal((await read('/' + id, other.cookie)).status, 404);
 });
+
+for (const mode of ['role', 'scope', 'enabled'] as const) {
+  test(
+    'in-flight assignment rejects assigner ' + mode + ' revocation after request guard',
+    async () => {
+      const id = await ready(),
+        rid = await rider(),
+        db = f.runtime.db,
+        managerId = (await f.staff('/staff/me', f.cookies[1]!)).data.id;
+      const { DeliveryLabService } = await import('../apps/api/dist/delivery-lab.js');
+      const service = f.runtime.app.get(DeliveryLabService),
+        original = service.assign.bind(service);
+      let entered!: () => void, release!: () => void;
+      const arrival = new Promise<void>((r) => {
+          entered = r;
+        }),
+        gate = new Promise<void>((r) => {
+          release = r;
+        });
+      service.assign = async (...args: Parameters<typeof original>) => {
+        entered();
+        await gate;
+        return original(...args);
+      };
+      const request = assign(id, { key: randomUUID(), riderId: rid });
+      try {
+        await Promise.race([
+          arrival,
+          request.then(() => {
+            throw Error('Request did not reach transaction gate');
+          }),
+        ]);
+        if (mode === 'role') await db.staffRole.deleteMany({ where: { staffId: managerId } });
+        if (mode === 'scope')
+          await db.staffWarehouse.deleteMany({
+            where: { staffId: managerId, warehouseId: f.warehouseId },
+          });
+        if (mode === 'enabled')
+          await db.staff.update({ where: { id: managerId }, data: { enabled: false } });
+        release();
+        assert.equal((await request).status, 403);
+        assert.equal(await db.deliveryLabAssignment.count(), 0);
+        assert.equal(await db.businessAudit.count({ where: { action: 'DELIVERY_LAB_ASSIGN' } }), 0);
+      } finally {
+        release();
+        service.assign = original;
+        await request;
+      }
+    },
+  );
+}
+test('database assignment gate rejects a rider assigning and manager without warehouse scope', async () => {
+  const id = await ready(),
+    rid = await rider(),
+    db = f.runtime.db;
+  const data = {
+    id: randomUUID(),
+    dispatchId: id,
+    riderId: rid,
+    riderName: '合成骑手',
+    actorId: rid,
+    actorName: '合成操作人',
+    key: randomUUID(),
+  };
+  await assert.rejects(db.deliveryLabAssignment.create({ data }));
+  const actorId = (await f.staff('/staff/me', f.cookies[1]!)).data.id;
+  await db.staffWarehouse.deleteMany({ where: { staffId: actorId, warehouseId: f.warehouseId } });
+  await assert.rejects(db.deliveryLabAssignment.create({ data: { ...data, actorId } }));
+  assert.equal(await db.deliveryLabAssignment.count(), 0);
+});
+test('in-flight rider progress rejects scope revocation after guard without stage or audit', async () => {
+  const id = await assignedForJourney();
+  await accept(id, { key: randomUUID(), packageCount: 1 });
+  const db = f.runtime.db,
+    rid = await rider();
+  const { DeliveryLabService } = await import('../apps/api/dist/delivery-lab.js');
+  const service = f.runtime.app.get(DeliveryLabService),
+    original = service.progress.bind(service);
+  let entered!: () => void, release!: () => void;
+  const arrival = new Promise<void>((r) => {
+      entered = r;
+    }),
+    gate = new Promise<void>((r) => {
+      release = r;
+    });
+  service.progress = async (...args: Parameters<typeof original>) => {
+    entered();
+    await gate;
+    return original(...args);
+  };
+  const request = stage(id, 'start', { key: randomUUID() });
+  try {
+    await Promise.race([
+      arrival,
+      request.then(() => {
+        throw Error('No progress gate');
+      }),
+    ]);
+    await db.staffWarehouse.deleteMany({ where: { staffId: rid, warehouseId: f.warehouseId } });
+    release();
+    assert.equal((await request).status, 409);
+    assert.equal(await db.deliveryLabJourneyFact.count(), 0);
+    assert.equal(await db.businessAudit.count({ where: { action: 'DELIVERY_LAB_START' } }), 0);
+  } finally {
+    release();
+    service.progress = original;
+    await request;
+  }
+});

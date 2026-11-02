@@ -557,6 +557,18 @@ export class DeliveryLabService {
     if (!this.enabled) throw failure(503, 'PICKING_LAB_DISABLED', '本机配送演练写入尚未开启');
     return this.catalog.db.$transaction(async (tx) => {
       await this.catalog.warehouse(tx, r, w);
+      const actor = r.staffContext!.staffId;
+      const active = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM staff WHERE id=${actor}::uuid AND enabled FOR SHARE`;
+      const assignerRoles = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_roles WHERE staff_id=${actor}::uuid AND role_code IN ('SUPER_ADMIN','WAREHOUSE_MANAGER') FOR SHARE`;
+      const scopes = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_warehouses WHERE staff_id=${actor}::uuid AND warehouse_id=${w}::uuid FOR SHARE`;
+      if (!active.length || !assignerRoles.length || !scopes.length)
+        throw failure(403, 'FORBIDDEN', '当前账号已无本仓分配权限，请刷新身份');
       await tx.$queryRaw`SELECT t.id FROM picking_lab_tasks t JOIN picking_lab_packs p ON p.task_id=t.id JOIN picking_lab_dispatches d ON d.pack_id=p.id WHERE d.id=${id}::uuid AND t.warehouse_id=${w}::uuid FOR UPDATE OF t`;
       const d = await tx.pickingLabDispatch.findFirst({
         where: { id, pack: { task: { warehouseId: w } } },

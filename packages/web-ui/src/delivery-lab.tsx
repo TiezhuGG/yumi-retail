@@ -118,6 +118,60 @@ function DeliveryPanel({
       setBusy(false);
     }
   }
+  const origin = useRef<{ id: string; source: string; scroll: number } | null>(null),
+    pages = useRef(1);
+  const [entry, setEntry] = useState<string | undefined>(),
+    [restoreError, setRestoreError] = useState(false);
+  async function restoreList() {
+    const n = start();
+    if (n === null) return;
+    setRestoreError(false);
+    try {
+      let result: DeliveryLabList | null = null;
+      for (let i = 0; i < pages.current; i++) {
+        const cursor: string | null | undefined = result?.nextCursor;
+        if (i > 0 && !cursor) break;
+        const next: DeliveryLabList = await staffRequest<DeliveryLabList>(
+          base + query + '&exceptionState=' + filter + (cursor ? '&cursor=' + cursor : ''),
+        );
+        result = result ? { ...next, items: [...result.items, ...next.items] } : next;
+      }
+      if (n === seq.current && result) {
+        setList(result);
+        setEnabled(result.enabled);
+        setSelected(null);
+        setTask(null);
+        const source = origin.current,
+          exists = result.items.some((t) => t.id === source?.id);
+        setMessage(
+          exists
+            ? '已按原筛选刷新并恢复已加载页。'
+            : '原任务不在当前已加载结果中，已保留筛选并刷新列表。',
+        );
+        requestAnimationFrame(() => {
+          window.scrollTo(0, source?.scroll ?? 0);
+          const el = document.getElementById(
+            exists
+              ? 'delivery-source-' + source!.id + '-' + source!.source
+              : 'delivery-list-heading',
+          );
+          el?.focus({ preventScroll: true });
+        });
+      }
+    } catch (e) {
+      if (n === seq.current) {
+        setRestoreError(true);
+        setError(e instanceof Error ? e.message : '返回列表读取失败');
+        if (e instanceof StaffRequestError && [401, 403].includes(e.status)) {
+          setList(null);
+          setTask(null);
+          setSelected(null);
+        }
+      }
+    } finally {
+      finish(n);
+    }
+  }
   async function load(cursor?: string, state = filter) {
     const n = start();
     if (n === null) return;
@@ -132,6 +186,7 @@ function DeliveryPanel({
       if (n === seq.current) {
         setList((old) => (cursor && old ? { ...r, items: [...old.items, ...r.items] } : r));
         setEnabled(r.enabled);
+        pages.current = cursor ? pages.current + 1 : 1;
       }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '配送列表读取失败');
@@ -139,9 +194,14 @@ function DeliveryPanel({
       finish(n);
     }
   }
-  async function open(id: string) {
+  async function open(id: string, source = 'detail') {
     const n = start();
     if (n === null) return;
+    if (!selected) {
+      origin.current = { id, source, scroll: window.scrollY };
+      setRestoreError(false);
+      setEntry(source === 'detail' ? undefined : source);
+    }
     setSelected(id);
     setTask(null);
     setRiders([]);
@@ -210,7 +270,10 @@ function DeliveryPanel({
       {error && (
         <div className="notice task-error" role="alert">
           {error}
-          <button disabled={busy} onClick={() => void (selected ? open(selected) : load())}>
+          <button
+            disabled={busy}
+            onClick={() => void (restoreError ? restoreList() : selected ? open(selected) : load())}
+          >
             重试配送读取
           </button>
         </div>
@@ -232,7 +295,9 @@ function DeliveryPanel({
         <section className="surface" aria-label="合成配送任务列表">
           <div className="service-area-list-heading">
             <div>
-              <h2>{manage ? '合成配送分配' : '我的合成配送任务'}</h2>
+              <h2 id="delivery-list-heading" tabIndex={-1}>
+                {manage ? '合成配送分配' : '我的合成配送任务'}
+              </h2>
               <p>
                 {manage
                   ? '仅列出已完成合成出库的任务。'
@@ -314,9 +379,31 @@ function DeliveryPanel({
                   <p>
                     {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
                   </p>
-                  <button className="text-button" disabled={busy} onClick={() => void open(t.id)}>
+                  <button
+                    id={'delivery-source-' + t.id + '-detail'}
+                    className="text-button"
+                    disabled={busy}
+                    onClick={() => void open(t.id)}
+                  >
                     查看合成配送
                   </button>
+                  {t.exception && (
+                    <button
+                      id={
+                        'delivery-source-' +
+                        t.id +
+                        '-' +
+                        (t.exception.resolution ? 'RESOLVE' : 'EXCEPTION')
+                      }
+                      className="text-button"
+                      disabled={busy}
+                      onClick={() =>
+                        void open(t.id, t.exception!.resolution ? 'RESOLVE' : 'EXCEPTION')
+                      }
+                    >
+                      追溯当前异常凭据
+                    </button>
+                  )}
                 </article>
               ))}
             </div>
@@ -335,15 +422,7 @@ function DeliveryPanel({
         <section className="surface" aria-label="合成配送详情">
           <div className="service-area-list-heading">
             <h2>合成配送详情</h2>
-            <button
-              className="secondary-button"
-              disabled={busy}
-              onClick={() => {
-                setSelected(null);
-                setTask(null);
-                void load();
-              }}
-            >
+            <button className="secondary-button" disabled={busy} onClick={() => void restoreList()}>
               返回配送列表
             </button>
             <button
@@ -364,7 +443,7 @@ function DeliveryPanel({
                 <h3 id={task.id + '--dispatch'} tabIndex={-1}>
                   {task.label}
                 </h3>
-                <DeliveryTimeline key={task.id} task={task} />
+                <DeliveryTimeline key={task.id} task={task} entry={entry} />
                 <p>
                   {task.packageCount} 个合成包裹 · 合成出库时间 {date(task.dispatchedAt)}
                 </p>
@@ -910,8 +989,18 @@ function ResolvePanel({
   );
 }
 
-function DeliveryTimeline({ task }: { task: DeliveryLabTask }) {
-  const [filter, setFilter] = useState('ALL');
+function DeliveryTimeline({ task, entry }: { task: DeliveryLabTask; entry?: string }) {
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!entry || focused.current) return;
+    const e = task.timeline.find((e) => e.kind === entry);
+    if (!e) return;
+    focused.current = true;
+    const el = document.getElementById('timeline-' + e.id);
+    el?.scrollIntoView({ block: 'center' });
+    el?.focus({ preventScroll: true });
+  }, [entry, task]);
+  const [filter, setFilter] = useState(entry ? 'EXCEPTION' : 'ALL');
   const names: Record<string, string> = {
     DISPATCH: '合成出库',
     ASSIGN: '骑手分配',
@@ -958,7 +1047,7 @@ function DeliveryTimeline({ task }: { task: DeliveryLabTask }) {
       ) : (
         <ol>
           {rows.map((e) => (
-            <li key={e.id}>
+            <li key={e.id} id={'timeline-' + e.id} tabIndex={-1}>
               <strong>{names[e.kind]}</strong>
               <p>
                 {date(e.createdAt)} · {e.actorName}
