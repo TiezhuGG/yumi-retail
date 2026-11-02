@@ -128,7 +128,9 @@
     "preverify:points:ui": "npm run build:server",
     "verify:points:ui": "node --env-file=.env --import tsx scripts/ui/verify-points.mjs",
     "preverify:points:grants": "npm run build:server",
-    "verify:points:grants": "node --env-file=.env --import tsx scripts/ui/verify-points-grants.mjs"
+    "verify:points:grants": "node --env-file=.env --import tsx scripts/ui/verify-points-grants.mjs",
+    "preverify:points:corrections": "npm run build:server",
+    "verify:points:corrections": "node --env-file=.env --import tsx scripts/ui/verify-points-corrections.mjs"
   },
   "pnpm": {
     "overrides": {

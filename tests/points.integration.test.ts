@@ -335,3 +335,162 @@ test('grant writes require CSRF and current role; finalized facts cannot be rewr
   );
   await assert.rejects(db.$executeRaw`DELETE FROM points_grants WHERE id=${final[0]!.id}::uuid`);
 });
+
+test('correction source quota, independence, pending reservation and idempotent debit', async () => {
+  const source = (
+    await db.$queryRaw<
+      Array<{ id: string; user_id: string; amount: bigint }>
+    >`SELECT id,user_id,amount FROM points_grants WHERE status='APPROVED' AND amount=40 ORDER BY id LIMIT 1`
+  )[0]!;
+  const prefix = '/admin/points/corrections/';
+  const body = { grantId: source.id, amount: '30', reason: '合成误发核查', reference: 'CORR-TEST' };
+  assert.equal(
+    (await call(prefix + 'store/create', { ...body, userId: randomUUID() }, 1)).status,
+    400,
+  );
+  assert.equal((await call(prefix + 'store/create', body, 4)).status, 403);
+  const rs = await Promise.all([
+    call(prefix + 'store/create', body, 1),
+    call(prefix + 'store/create', body, 1),
+  ]);
+  assert.deepEqual(rs.map((r) => r.status).sort(), [200, 409]);
+  const id = (rs.find((r) => r.status === 200)!.data as unknown as { id: string }).id;
+  assert.equal(
+    (await call(prefix + id + '/approve', { version: 0, reason: '普通运营不可审批' }, 1)).status,
+    403,
+  );
+  assert.equal(
+    (await call(prefix + id + '/cancel', { version: 0, reason: '本人撤销' }, 1)).status,
+    200,
+  );
+  const own = await call(prefix + 'store/create', { ...body, amount: '40' }, 0);
+  assert.equal(own.status, 200);
+  const ownId = (own.data as unknown as { id: string }).id;
+  assert.equal(
+    (await call(prefix + ownId + '/approve', { version: 0, reason: '禁止自审' }, 0)).status,
+    403,
+  );
+  assert.equal(
+    (await call(prefix + ownId + '/cancel', { version: 0, reason: '取消自建' }, 0)).status,
+    200,
+  );
+  const made = await call(prefix + 'store/create', { ...body, amount: '40' }, 1);
+  assert.equal(made.status, 200);
+  const correctionId = (made.data as unknown as { id: string }).id,
+    k = randomUUID();
+  const before = await db.pointsAccount.findUniqueOrThrow({ where: { userId: source.user_id } });
+  const results = await Promise.all([
+    call(prefix + correctionId + '/approve', { version: 0, reason: '误发冲正通过' }, 0, k),
+    call(prefix + correctionId + '/approve', { version: 0, reason: '误发冲正通过' }, 0, k),
+  ]);
+  assert.deepEqual(
+    results.map((r) => r.status),
+    [200, 200],
+  );
+  assert.equal(
+    (await db.pointsAccount.findUniqueOrThrow({ where: { userId: source.user_id } })).balance,
+    before.balance - 40n,
+  );
+  assert.equal((await call(prefix + 'store/create', { ...body, amount: '1' }, 1)).status, 409);
+  assert.equal(
+    (await call(prefix + correctionId + '/approve', { version: 0, reason: '改请求' }, 0, k)).status,
+    409,
+  );
+  const linked = (
+    await db.$queryRaw<
+      Array<{ delta: bigint }>
+    >`SELECT delta FROM points_ledger WHERE action_key=${'CORRECTION:' + correctionId}`
+  )[0]!;
+  assert.equal(linked.delta, -40n);
+  const ledger = await call('/admin/points/accounts/' + source.user_id + '/ledger');
+  const entry = (
+    ledger.data.items as unknown as Array<{
+      entryKind: string;
+      sourceAmount: string;
+      relatedEntryId: string;
+    }>
+  ).find((x) => x.entryKind === 'GRANT_REVERSAL');
+  assert.equal(entry?.sourceAmount, '40');
+  assert.ok(entry?.relatedEntryId);
+  await assert.rejects(
+    db.$executeRaw`UPDATE points_corrections SET grant_id=${randomUUID()}::uuid WHERE id=${correctionId}::uuid`,
+  );
+  await assert.rejects(
+    db.$executeRaw`DELETE FROM points_corrections WHERE id=${correctionId}::uuid`,
+  );
+});
+test('insufficient correction stays pending; late audit failure rolls back and original key recovers', async () => {
+  const source = (
+    await db.$queryRaw<
+      Array<{ id: string; user_id: string }>
+    >`SELECT g.id,g.user_id FROM points_grants g WHERE g.status='APPROVED' AND g.amount=40 AND NOT EXISTS(SELECT 1 FROM points_corrections c WHERE c.grant_id=g.id AND c.status='APPROVED') LIMIT 1`
+  )[0]!;
+  // Synthetic spend fixture, not an implemented exchange or production adjustment.
+  const balance = (await db.pointsAccount.findUniqueOrThrow({ where: { userId: source.user_id } }))
+    .balance;
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`UPDATE points_accounts SET balance=0 WHERE user_id=${source.user_id}::uuid`;
+    await tx.$executeRaw`INSERT INTO points_ledger(id,user_id,delta,action_key,reason,actor_id) VALUES(${randomUUID()}::uuid,${source.user_id}::uuid,${-balance},'fixture-spend','合成积分消耗',${staffIds[0]}::uuid)`;
+  });
+  const created = await call(
+    '/admin/points/corrections/store/create',
+    { grantId: source.id, amount: '20', reason: '余额不足夹具', reference: 'LOW-BALANCE' },
+    1,
+  );
+  assert.equal(created.status, 200);
+  const id = (created.data as unknown as { id: string }).id,
+    k = randomUUID(),
+    path = '/admin/points/corrections/' + id + '/approve',
+    body = { version: 0, reason: '合成冲正批准' };
+  assert.equal((await call(path, body, 0, k)).error?.code, 'POINTS_INSUFFICIENT');
+  assert.equal(
+    (
+      await db.$queryRaw<
+        Array<{ status: string }>
+      >`SELECT status FROM points_corrections WHERE id=${id}::uuid`
+    )[0]!.status,
+    'SUBMITTED',
+  );
+  await db.$transaction(async (tx) => {
+    await tx.$executeRaw`UPDATE points_accounts SET balance=20 WHERE user_id=${source.user_id}::uuid`;
+    await tx.$executeRaw`INSERT INTO points_ledger(id,user_id,delta,action_key,reason,actor_id) VALUES(${randomUUID()}::uuid,${source.user_id}::uuid,20,'fixture-restore','合成消耗恢复',${staffIds[0]}::uuid)`;
+  });
+  await admin.query(
+    `CREATE FUNCTION fail_correction_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='POINTS_CORRECTION_APPROVE' THEN RAISE EXCEPTION 'synthetic failure'; END IF; RETURN NEW; END $$`,
+  );
+  await admin.query(
+    'CREATE TRIGGER fail_correction_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_correction_audit()',
+  );
+  assert.equal((await call(path, body, 0, k)).status, 500);
+  assert.equal(
+    (await db.pointsAccount.findUniqueOrThrow({ where: { userId: source.user_id } })).balance,
+    20n,
+  );
+  await admin.query('DROP TRIGGER fail_correction_audit ON business_audits');
+  assert.equal((await call(path, body, 0, k)).status, 200);
+  assert.equal(
+    (await db.pointsAccount.findUniqueOrThrow({ where: { userId: source.user_id } })).balance,
+    0n,
+  );
+  const totals = await db.$queryRaw<
+    Array<{ used: bigint }>
+  >`SELECT SUM(amount)::bigint AS used FROM points_grants WHERE status='APPROVED'`;
+  assert.equal(totals[0]!.used, 90n);
+  const rejected = await call(
+    '/admin/points/corrections/store/create',
+    { grantId: source.id, amount: '20', reason: '释放额度', reference: 'REJECT' },
+    1,
+  );
+  assert.equal(rejected.status, 200);
+  const rejectId = (rejected.data as unknown as { id: string }).id;
+  assert.equal(
+    (
+      await call(
+        '/admin/points/corrections/' + rejectId + '/reject',
+        { version: 0, reason: '凭据不足' },
+        0,
+      )
+    ).status,
+    200,
+  );
+});

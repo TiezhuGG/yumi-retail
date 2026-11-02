@@ -68,6 +68,8 @@ model Warehouse {
 }
 
 model Staff {
+ pointsCorrectionsCreated PointsCorrection[] @relation("correctionCreator")
+ pointsCorrectionsReviewed PointsCorrection[] @relation("correctionReviewer")
  pointsGrantsCreated PointsGrant[] @relation("grantCreator")
  pointsGrantsReviewed PointsGrant[] @relation("grantReviewer")
   pointsEntries PointsEntry[]
@@ -1284,6 +1286,8 @@ model PointsGrantPolicy {
  @@map("points_grant_policies")
 }
 model PointsGrant {
+ corrections PointsCorrection[]
+ @@unique([id,warehouseId,userId],map:"points_grants_source_unique")
  id String @id @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
  userId String @map("user_id") @db.Uuid
@@ -1303,4 +1307,27 @@ model PointsGrant {
  reviewer Staff? @relation("grantReviewer",fields:[reviewerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@index([warehouseId,id],map:"points_grants_scope_idx")
  @@map("points_grants")
+}
+
+model PointsCorrection {
+ id String @id @db.Uuid
+ grantId String @map("grant_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ amount BigInt
+ reason String @db.VarChar(300)
+ reference String @db.VarChar(120)
+ creatorId String @map("creator_id") @db.Uuid
+ reviewerId String? @map("reviewer_id") @db.Uuid
+ status String @default("SUBMITTED") @db.VarChar(16)
+ decisionReason String? @map("decision_reason") @db.VarChar(300)
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ decidedAt DateTime? @map("decided_at") @db.Timestamptz(3)
+ grant PointsGrant @relation(fields:[grantId,warehouseId,userId],references:[id,warehouseId,userId],onDelete:Restrict,onUpdate:NoAction)
+ creator Staff @relation("correctionCreator",fields:[creatorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ reviewer Staff? @relation("correctionReviewer",fields:[reviewerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@index([grantId,status],map:"points_corrections_source_idx")
+ @@index([warehouseId,id])
+ @@map("points_corrections")
 }

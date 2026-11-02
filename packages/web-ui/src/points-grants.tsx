@@ -5,6 +5,9 @@ import { Modal } from './modal.js';
 type Grant = {
   id: string;
   userId: string;
+  grantId?: string;
+  sourceAmount?: string;
+  sourceReference?: string;
   displayName: string;
   amount: string;
   reason: string;
@@ -23,7 +26,16 @@ const labels: Record<string, string> = {
   REJECTED: '已驳回',
   CANCELED: '已撤销',
 };
-export function PointsGrants({ profile }: { profile: StaffProfile }) {
+export function PointsGrants({
+  profile,
+  correction = false,
+}: {
+  profile: StaffProfile;
+  correction?: boolean;
+}) {
+  const base = correction ? '/admin/points/corrections' : '/admin/points/grants';
+  const statusLabel = (status: string) =>
+    correction && status === 'APPROVED' ? '已扣减' : labels[status];
   const [data, setData] = useState<Data>({ policy: null, items: [], nextCursor: null }),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true);
@@ -31,7 +43,15 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
     [selected, setSelected] = useState<Grant | null>(null),
     [busy, setBusy] = useState(false),
     [unknown, setUnknown] = useState(false);
-  const [users, setUsers] = useState<Array<{ id: string; displayName: string }>>([]),
+  const [users, setUsers] = useState<
+      Array<{
+        id: string;
+        displayName: string;
+        amount?: string;
+        remainingAmount?: string;
+        reference?: string;
+      }>
+    >([]),
     [keyword, setKeyword] = useState(''),
     [userId, setUserId] = useState(''),
     [amount, setAmount] = useState(''),
@@ -40,6 +60,10 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
   const [single, setSingle] = useState(''),
     [daily, setDaily] = useState(''),
     [enabled, setEnabled] = useState(false);
+  const [sourceCursor, setSourceCursor] = useState<string | null>(null),
+    [searching, setSearching] = useState(false);
+  const searchSequence = useRef(0),
+    appliedSearch = useRef('');
   const pending = useRef<Intent | null>(null),
     sequence = useRef(0),
     writing = useRef(false);
@@ -49,9 +73,7 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
     setLoading(true);
     setError('');
     try {
-      const d = await staffRequest<Data>(
-        '/admin/points/grants' + (cursor ? '?cursor=' + cursor : ''),
-      );
+      const d = await staffRequest<Data>(base + (cursor ? '?cursor=' + cursor : ''));
       if (n === sequence.current)
         setData((old) => ({ ...d, items: cursor ? [...old.items, ...d.items] : d.items }));
     } catch (e) {
@@ -64,6 +86,7 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
     void load();
     return () => {
       sequence.current++;
+      searchSequence.current++;
     };
   }, []);
   async function write(action: string) {
@@ -72,11 +95,13 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
     setBusy(true);
     setError('');
     const attempt = pending.current ?? {
-      path: '/admin/points/grants/' + (selected ? selected.id : 'store') + '/' + action,
+      path: base + '/' + (selected ? selected.id : 'store') + '/' + action,
       key: crypto.randomUUID(),
       body:
         action === 'create'
-          ? { userId, amount, reference, reason }
+          ? correction
+            ? { grantId: userId, amount, reference, reason }
+            : { userId, amount, reference, reason }
           : action === 'policy'
             ? {
                 version: data.policy?.version ?? 0,
@@ -115,20 +140,36 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
       setBusy(false);
     }
   }
-  async function search() {
+  async function search(cursor?: string) {
+    const n = ++searchSequence.current;
+    setSearching(true);
+    if (!cursor) appliedSearch.current = keyword.trim();
     setError('');
     try {
-      const r = await staffRequest<{ items: Array<{ id: string; displayName: string }> }>(
-        '/admin/points/accounts?keyword=' + encodeURIComponent(keyword),
+      const r = await staffRequest<{
+        items: Array<{ id: string; displayName: string }>;
+        nextCursor: string | null;
+      }>(
+        (correction
+          ? '/admin/points/corrections/sources?keyword='
+          : '/admin/points/accounts?keyword=') +
+          encodeURIComponent(appliedSearch.current) +
+          (cursor ? '&cursor=' + cursor : ''),
       );
-      setUsers(r.items);
-      setUserId('');
+      if (n !== searchSequence.current) return;
+      setUsers((old) => (cursor ? [...old, ...r.items] : r.items));
+      setSourceCursor(r.nextCursor);
+      if (!cursor) setUserId('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : '用户查询失败');
+      if (n === searchSequence.current) setError(e instanceof Error ? e.message : '用户查询失败');
+    } finally {
+      if (n === searchSequence.current) setSearching(false);
     }
   }
   function close() {
     if (busy || unknown) return;
+    searchSequence.current++;
+    setSearching(false);
     setEditor(null);
     setSelected(null);
     setError('');
@@ -137,10 +178,12 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
   return (
     <section className="points-workbench" aria-label="积分发放审批">
       <div className="notice">
-        {data.policy?.enabled
-          ? `发放已启用 · 单笔上限 ${data.policy.singleLimit} 积分 · 每日预算 ${data.policy.dailyLimit} 积分`
-          : '发放暂停或尚未配置预算。可提交申请，审批入账前须配置规则。'}{' '}
-        · 按北京时间核算每日预算。
+        {correction
+          ? '误发冲正仅关联已入账发放；待审批占用来源额度，余额不足不扣成负数。'
+          : data.policy?.enabled
+            ? `发放已启用 · 单笔上限 ${data.policy.singleLimit} 积分 · 每日预算 ${data.policy.dailyLimit} 积分`
+            : '发放暂停或尚未配置预算。可提交申请，审批入账前须配置规则。'}{' '}
+        {!correction && '· 按北京时间核算每日预算。'}
       </div>
       <div className="points-toolbar">
         <button
@@ -148,15 +191,16 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
           onClick={() => {
             setEditor('create');
             setUsers([]);
+            setSourceCursor(null);
             setUserId('');
             setAmount('');
             setReference('');
             setReason('');
           }}
         >
-          申请发放积分
+          {correction ? '申请误发冲正' : '申请发放积分'}
         </button>
-        {admin && (
+        {admin && !correction && (
           <button
             className="secondary-button"
             onClick={() => {
@@ -174,21 +218,23 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
           刷新申请
         </button>
       </div>
-      {loading && <p role="status">正在读取发放申请…</p>}
+      {loading && <p role="status">{correction ? '正在读取冲正申请…' : '正在读取发放申请…'}</p>}
       {error && !editor && !selected && (
         <div role="alert" className="notice task-error">
           {error}
           <button onClick={() => void load()}>重试读取</button>
         </div>
       )}
-      {!loading && data.items.length === 0 && <div className="points-empty">暂无发放申请</div>}
+      {!loading && data.items.length === 0 && (
+        <div className="points-empty">{correction ? '暂无冲正申请' : '暂无发放申请'}</div>
+      )}
       <div className="points-ledger">
         {data.items.map((g) => (
           <article className="points-entry" key={g.id}>
             <strong>
               {g.displayName} · {g.amount} 积分
             </strong>
-            <p>{labels[g.status]}</p>
+            <p>{statusLabel(g.status)}</p>
             <p>{g.reason}</p>
             <button
               className="secondary-button"
@@ -216,10 +262,14 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
         <Modal
           title={
             editor === 'create'
-              ? '申请发放积分'
+              ? correction
+                ? '申请误发冲正'
+                : '申请发放积分'
               : editor === 'policy'
                 ? '发放预算规则'
-                : '积分发放申请详情'
+                : correction
+                  ? '积分冲正申请详情'
+                  : '积分发放申请详情'
           }
           busy={busy || unknown}
           onClose={close}
@@ -228,10 +278,15 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
             {selected && (
               <>
                 <strong>
-                  {selected.displayName} · {selected.amount} 积分 · {labels[selected.status]}
+                  {selected.displayName} · {selected.amount} 积分 · {statusLabel(selected.status)}
                 </strong>
                 <p>申请原因：{selected.reason}</p>
                 <p>业务凭据：{selected.reference}</p>
+                {correction && (
+                  <p>
+                    原发放 {selected.sourceAmount} 积分 · 原发放凭据：{selected.sourceReference}
+                  </p>
+                )}
                 {selected.decisionReason && <p>处理说明：{selected.decisionReason}</p>}
               </>
             )}
@@ -247,28 +302,56 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
                 </label>
                 <button
                   className="secondary-button"
-                  disabled={busy || unknown || !keyword.trim()}
+                  disabled={busy || unknown || searching || !keyword.trim()}
                   onClick={() => void search()}
                 >
-                  查询用户
+                  {searching ? '正在查询…' : '查询用户'}
                 </button>
+                {sourceCursor && (
+                  <button
+                    className="secondary-button"
+                    disabled={busy || unknown || searching}
+                    onClick={() => void search(sourceCursor)}
+                  >
+                    {correction ? '更多原发放记录' : '更多用户'}
+                  </button>
+                )}
                 <label>
-                  发放对象
+                  {correction ? '原发放记录' : '发放对象'}
                   <select
                     value={userId}
                     disabled={busy || unknown}
                     onChange={(e) => setUserId(e.target.value)}
                   >
-                    <option value="">请选择用户</option>
+                    <option value="">{correction ? '请选择原发放记录' : '请选择用户'}</option>
                     {users.map((u) => (
-                      <option key={u.id} value={u.id}>
+                      <option
+                        key={u.id}
+                        value={u.id}
+                        disabled={correction && u.remainingAmount === '0'}
+                      >
                         {u.displayName}
+                        {correction
+                          ? ' · 原发放 ' +
+                            u.amount +
+                            ' 积分 · 可冲正 ' +
+                            u.remainingAmount +
+                            ' · ' +
+                            u.reference
+                          : ''}
                       </option>
                     ))}
                   </select>
                 </label>
+                {correction && users.find((u) => u.id === userId) && (
+                  <p className="notice">
+                    已选原发放：{users.find((u) => u.id === userId)?.amount} 积分 · 剩余可冲正{' '}
+                    {users.find((u) => u.id === userId)?.remainingAmount} 积分 · 凭据{' '}
+                    {users.find((u) => u.id === userId)?.reference}
+                  </p>
+                )}
                 <label>
-                  发放积分
+                  {correction ? '冲正积分' : '发放积分'}
                   <input
                     inputMode="numeric"
                     value={amount}
@@ -318,7 +401,7 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
             )}
             {(editor || selected?.status === 'SUBMITTED') && (
               <label>
-                {editor === 'create' ? '发放原因' : '处理说明'}
+                {editor === 'create' ? (correction ? '冲正原因' : '发放原因') : '处理说明'}
                 <textarea
                   maxLength={300}
                   value={reason}
@@ -348,10 +431,16 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
                 {editor && (
                   <button
                     className="primary-button"
-                    disabled={busy || !reason.trim() || (editor === 'create' && !userId)}
+                    disabled={
+                      busy || searching || !reason.trim() || (editor === 'create' && !userId)
+                    }
                     onClick={() => void write(editor!)}
                   >
-                    {editor === 'create' ? '提交发放申请' : '保存预算规则'}
+                    {editor === 'create'
+                      ? correction
+                        ? '提交冲正申请'
+                        : '提交发放申请'
+                      : '保存预算规则'}
                   </button>
                 )}
                 {selected?.status === 'SUBMITTED' &&
@@ -371,7 +460,7 @@ export function PointsGrants({ profile }: { profile: StaffProfile }) {
                           disabled={busy || !reason.trim()}
                           onClick={() => void write('approve')}
                         >
-                          批准并入账
+                          {correction ? '批准并扣减' : '批准并入账'}
                         </button>
                         <button
                           className="secondary-button"

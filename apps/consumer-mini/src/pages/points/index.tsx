@@ -3,7 +3,15 @@ import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import { cartIdentity } from '../../account-cart';
 import { addressRequest } from '../../address-api';
-type Entry = { id: string; delta: string; reason: string; createdAt: string };
+type Entry = {
+  id: string;
+  delta: string;
+  reason: string;
+  createdAt: string;
+  entryKind?: string;
+  sourceAmount?: string | null;
+  sourceCreatedAt?: string | null;
+};
 type Page = { items: Entry[]; nextCursor: string | null };
 export default function Points() {
   const [balance, setBalance] = useState('0'),
@@ -109,6 +117,19 @@ export default function Points() {
                     {e.delta} 积分
                   </Text>
                   <Text className="account-copy">{e.reason}</Text>
+                  {e.entryKind === 'GRANT_REVERSAL' && (
+                    <Text className="account-copy">
+                      误发冲正 · 原发放 {e.sourceAmount} 积分
+                      {e.sourceCreatedAt
+                        ? ' · ' +
+                          new Date(Date.parse(e.sourceCreatedAt) + 8 * 60 * 60 * 1000)
+                            .toISOString()
+                            .slice(0, 16)
+                            .replace('T', ' ') +
+                          '（北京时间）'
+                        : ''}
+                    </Text>
+                  )}
                   <Text className="account-copy">
                     {new Date(Date.parse(e.createdAt) + 8 * 60 * 60 * 1000)
                       .toISOString()

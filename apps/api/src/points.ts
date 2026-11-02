@@ -23,11 +23,23 @@ export class PointsService {
         delta: string;
         reason: string;
         createdAt: Date;
+        entryKind: string;
+        sourceAmount: string | null;
+        sourceCreatedAt: Date | null;
+        relatedEntryId: string | null;
       }>
-    >`SELECT id,delta::text,reason,created_at AS "createdAt" FROM points_ledger
-       WHERE user_id=${userId}::uuid AND (${cursor}::uuid IS NULL OR id>${cursor}::uuid)
-       ORDER BY id LIMIT 21`;
-    const items = rows.slice(0, 20).map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }));
+    >`SELECT l.id,l.delta::text,l.reason,l.created_at AS "createdAt",CASE WHEN c.id IS NOT NULL THEN 'GRANT_REVERSAL' WHEN g.id IS NOT NULL THEN 'GRANT' ELSE 'ADJUSTMENT' END AS "entryKind",source.amount::text AS "sourceAmount",source.decided_at AS "sourceCreatedAt",original.id AS "relatedEntryId" FROM points_ledger l
+       LEFT JOIN points_grants g ON l.action_key='GRANT:'||g.id::text AND g.user_id=l.user_id
+       LEFT JOIN points_corrections c ON l.action_key='CORRECTION:'||c.id::text AND c.user_id=l.user_id
+       LEFT JOIN points_grants source ON source.id=c.grant_id AND source.user_id=l.user_id
+       LEFT JOIN points_ledger original ON original.action_key='GRANT:'||source.id::text AND original.user_id=l.user_id
+       WHERE l.user_id=${userId}::uuid AND (${cursor}::uuid IS NULL OR l.id>${cursor}::uuid)
+       ORDER BY l.id LIMIT 21`;
+    const items = rows.slice(0, 20).map((r) => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      sourceCreatedAt: r.sourceCreatedAt?.toISOString() ?? null,
+    }));
     return {
       items,
       hasMore: rows.length > 20,
@@ -61,7 +73,19 @@ export class PointsService {
 }
 const accountSchema = object({ balance: text, expiryPolicy: text });
 const ledgerSchema = object({
-  items: { type: 'array', items: object({ id: text, delta: text, reason: text, createdAt: text }) },
+  items: {
+    type: 'array',
+    items: object({
+      id: text,
+      delta: text,
+      reason: text,
+      createdAt: text,
+      entryKind: text,
+      sourceAmount: { type: 'string', nullable: true },
+      sourceCreatedAt: { type: 'string', nullable: true },
+      relatedEntryId: { type: 'string', nullable: true },
+    }),
+  },
   hasMore: { type: 'boolean' },
   nextCursor: { type: 'string', nullable: true },
 });

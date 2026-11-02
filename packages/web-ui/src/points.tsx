@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { staffRequest } from './index.js';
 type Account = { id: string; displayName: string; balance: string };
-type Entry = { id: string; delta: string; reason: string; createdAt: string };
+type Entry = {
+  id: string;
+  delta: string;
+  reason: string;
+  createdAt: string;
+  entryKind?: string;
+  sourceAmount?: string | null;
+  sourceCreatedAt?: string | null;
+};
 type Page<T> = { items: T[]; nextCursor: string | null };
 type Intent = { account: Account | null; keyword: string; cursor?: string };
 export function PointsWorkbench() {
@@ -184,6 +192,17 @@ export function PointsWorkbench() {
                 {e.delta} 积分
               </strong>
               <p>{e.reason}</p>
+              {e.entryKind === 'GRANT_REVERSAL' && (
+                <p>
+                  误发冲正 · 原发放 {e.sourceAmount} 积分
+                  {e.sourceCreatedAt
+                    ? ' · ' +
+                      new Date(e.sourceCreatedAt).toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                      })
+                    : ''}
+                </p>
+              )}
               <time>
                 {new Date(e.createdAt).toLocaleString('zh-CN', {
                   timeZone: 'Asia/Shanghai',

@@ -20,6 +20,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'points-corrections'
   | 'points-grants'
   | 'points'
   | 'delivery-lab'
@@ -51,6 +52,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'points-corrections',
+    name: '积分误发冲正',
+    glyph: '◇',
+    hint: '关联原发放的纠错与独立审批',
+    permission: 'points.write',
+  },
   {
     id: 'points-grants',
     name: '积分发放审批',
@@ -446,8 +454,10 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'points-corrections' ? (
+            <PointsGrants key="corrections" profile={profile} correction />
           ) : activeView === 'points-grants' ? (
-            <PointsGrants profile={profile} />
+            <PointsGrants key="grants" profile={profile} />
           ) : activeView === 'points' ? (
             <PointsWorkbench />
           ) : activeView === 'service-area' ? (
