@@ -54,7 +54,7 @@ export function RedemptionsWorkbench() {
   return (
     <section aria-label="积分兑换订单">
       <div className="notice">
-        本机开发兑换订单：积分扣账、预占与取消可追溯。履约待办已保存，真实拣货配送尚未接入；积分兑换不计现金销售额。
+        本机开发兑换订单：积分扣账、预占与取消可追溯。履约待办与仓库领取可追溯，出库配送尚未开放；积分兑换不计现金销售额。
       </div>
       {detail ? (
         <div className="reward-detail">
@@ -66,7 +66,17 @@ export function RedemptionsWorkbench() {
             {detail.spec} · {detail.quantity} 件
           </p>
           <p className="reward-price">{detail.totalPoints} 积分</p>
-          <p>{detail.status === 'CANCELED' ? '已取消 · 已退积分' : '已扣积分 · 待履约接入'}</p>
+          <p>
+            {detail.status === 'CANCELED'
+              ? '已取消 · 已退积分'
+              : detail.fulfillmentState === 'PICKING'
+                ? '仓库已领取'
+                : detail.fulfillmentState === 'READY_TO_PICK'
+                  ? '待仓库领取'
+                  : detail.fulfillmentState === 'REVIEW_REQUIRED'
+                    ? '待核查'
+                    : '待创建拣货任务'}
+          </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
           <h3>实物预占凭据</h3>
           {detail.allocations?.map((a, i) => (
@@ -138,7 +148,15 @@ export function RedemptionsWorkbench() {
                       <td>
                         {o.quantity} 件 / {o.totalPoints} 积分
                       </td>
-                      <td>{o.status === 'CANCELED' ? '已取消' : '待履约接入'}</td>
+                      <td>
+                        {o.status === 'CANCELED'
+                          ? '已取消'
+                          : o.fulfillmentState === 'PICKING'
+                            ? '仓库已领取'
+                            : o.fulfillmentState === 'READY_TO_PICK'
+                              ? '待仓库领取'
+                              : '待建任务/核查'}
+                      </td>
                       <td>
                         <button
                           className="secondary-button"

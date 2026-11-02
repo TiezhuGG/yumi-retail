@@ -1,3 +1,4 @@
+import { RedemptionPickingWorkbench } from './redemption-picking.js';
 import { RedemptionsWorkbench } from './redemptions.js';
 import { RewardsWorkbench } from './rewards.js';
 import { PointsGrants } from './points-grants.js';
@@ -22,6 +23,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'redemption-picking'
   | 'redemptions'
   | 'rewards'
   | 'points-corrections'
@@ -56,6 +58,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'redemption-picking',
+    name: '兑换拣货',
+    glyph: '◇',
+    hint: '按兑换预占领取真实拣货任务',
+    permission: 'redemption-picking.read',
+  },
   {
     id: 'redemptions',
     name: '积分兑换订单',
@@ -271,8 +280,16 @@ function WorkspaceSession({
     mobile && profile.roles.includes('PICKER') && !profile.permissions.includes('stock.transfer');
   const mobileViews = new Set<WorkspaceView>(
     pickerOnly
-      ? ['picking-readiness', 'picking-lab', 'delivery-lab', 'stock', 'locations']
+      ? [
+          'redemption-picking',
+          'picking-readiness',
+          'picking-lab',
+          'delivery-lab',
+          'stock',
+          'locations',
+        ]
       : [
+          'redemption-picking',
           'picking-readiness',
           'picking-lab',
           'delivery-lab',
@@ -321,6 +338,7 @@ function WorkspaceSession({
     }
   };
   const retainedViews: WorkspaceView[] = [
+    'redemption-picking',
     'delivery-lab',
     'picking-lab',
     'notification-records',
@@ -430,7 +448,9 @@ function WorkspaceSession({
               className="retained-payment-view"
               data-payment-view={v}
             >
-              {v === 'delivery-lab' ? (
+              {v === 'redemption-picking' ? (
+                <RedemptionPickingWorkbench profile={profile} />
+              ) : v === 'delivery-lab' ? (
                 <DeliveryLabWorkbench profile={profile} />
               ) : v === 'picking-lab' ? (
                 <PickingLabWorkbench profile={profile} />

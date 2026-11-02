@@ -40,3 +40,6 @@ export {
 export * from './payment-query-adapter.js';
 export * from './payment-adapter-fixtures.js';
 export { settleQueryLabFromNotification } from './payment-query-lab.js';
+
+export { inventoryLocks, metadataLocks } from './reservation-locks.js';
+export * from './redemption-picking.js';

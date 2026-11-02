@@ -839,7 +839,13 @@ export interface RedemptionOrderView {
   createdAt: string;
   canceledAt: string | null;
   version: number;
-  fulfillmentState: 'PENDING' | 'CANCELED' | 'MISSING';
+  fulfillmentState:
+    | 'PENDING'
+    | 'CANCELED'
+    | 'MISSING'
+    | 'READY_TO_PICK'
+    | 'PICKING'
+    | 'REVIEW_REQUIRED';
   address?: ConsumerOrderAddress;
   allocations?: Array<{
     quantity: number;
@@ -853,5 +859,44 @@ export interface RedemptionOrderView {
 }
 export interface RedemptionOrderPage {
   items: RedemptionOrderView[];
+  nextCursor: string | null;
+}
+
+export interface RedemptionPickingView {
+  id: string;
+  orderNo: string;
+  title: string;
+  spec: string;
+  quantity: number;
+  state: string;
+  task: null | {
+    id: string;
+    state: string;
+    ownerId: string | null;
+    ownerName: string | null;
+    version: number;
+    claimedAt: string | null;
+  };
+  job: {
+    state: string;
+    attempts: number;
+    version: number;
+    lastErrorCode: string | null;
+    nextAttemptAt: string;
+    leaseUntil: string | null;
+  };
+  readiness: { ready: boolean; blockers: string[] };
+  lines: Array<{
+    id: string;
+    quantity: number;
+    batchNo: string;
+    locationName: string;
+    locationCode: string;
+    expiresAt: string | null;
+  }>;
+}
+export interface RedemptionPickingPage {
+  enabled: boolean;
+  items: RedemptionPickingView[];
   nextCursor: string | null;
 }

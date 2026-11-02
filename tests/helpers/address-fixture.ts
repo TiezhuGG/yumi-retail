@@ -8,6 +8,7 @@ export async function addressFixture(
   options: {
     orders?: boolean;
     redemptions?: boolean;
+    redemptionPicking?: boolean;
     holdSeconds?: number;
     pickingLab?: boolean;
     notificationLab?: boolean;
@@ -48,6 +49,7 @@ export async function addressFixture(
         NODE_ENV: 'test',
         PICKING_LAB_ENABLED: options.pickingLab ? '1' : '0',
         PAYMENT_NOTIFICATION_LAB_ENABLED: options.notificationLab ? '1' : '0',
+        REDEMPTION_PICKING_DEV_ENABLED: options.redemptionPicking ? '1' : '0',
         REDEMPTION_DEV_SUBMIT_ENABLED: options.redemptions ? '1' : '0',
         ORDER_DEV_SUBMIT_ENABLED: options.orders ? '1' : '0',
         ORDER_DEV_HOLD_SECONDS: String(options.holdSeconds ?? 900),

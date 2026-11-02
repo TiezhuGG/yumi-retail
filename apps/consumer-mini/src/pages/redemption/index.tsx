@@ -107,10 +107,23 @@ export default function RedemptionDetail() {
               <Text className="account-copy">
                 {order.status === 'CANCELED'
                   ? '积分已退还，库存和限兑配额已释放。'
-                  : '已扣积分并预占库存；履约待办已保存，真实仓配尚未接入。'}
+                  : order.fulfillmentState === 'PICKING'
+                    ? '仓库已领取，正在准备拣货；尚未出库或配送。'
+                    : order.fulfillmentState === 'READY_TO_PICK'
+                      ? '已创建拣货任务，等待仓库领取。'
+                      : order.fulfillmentState === 'REVIEW_REQUIRED'
+                        ? '履约待办需要门店核查，积分和预占仍保留。'
+                        : '已扣积分并预占库存，正在等待创建拣货任务。'}
               </Text>
               <Text className="account-copy redemption-order-no">兑换单号：{order.orderNo}</Text>
             </View>
+            {order.fulfillmentState === 'PICKING' && (
+              <View className="account-card">
+                <Text className="account-copy">
+                  仓库已开始作业，暂不支持直接取消。如需停止履约，请联系门店核实。
+                </Text>
+              </View>
+            )}
             {order.address && (
               <View className="account-card">
                 <Text className="account-card-title">收货地址快照</Text>
@@ -123,10 +136,10 @@ export default function RedemptionDetail() {
                 </Text>
               </View>
             )}
-            {order.status === 'ACTIVE' && (
+            {order.status === 'ACTIVE' && order.fulfillmentState !== 'PICKING' && (
               <View className="account-card">
                 <Text className="account-copy">
-                  履约开始前可取消。本轮尚未开放拣货，取消会退还全部积分。
+                  仓库领取前可直接取消，退还全部积分并释放预占；领取和取消以服务端先完成的结果为准。
                 </Text>
                 <Button
                   className="points-action"

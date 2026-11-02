@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Prisma, orderReservationDelta } from '@yumi/database';
+import { Prisma, orderReservationDelta, redemptionJobChange } from '@yumi/database';
 import type { ConsumerOrderAddress } from '@yumi/contracts';
 import { CatalogService } from './catalog-service.js';
 import { CheckoutService } from './checkout.js';
@@ -418,7 +418,9 @@ export class RedemptionService {
       if (order.version !== version) throw failure(409, 'VERSION_CONFLICT', '兑换单已变化，请刷新');
       await tx.$queryRaw`SELECT order_id FROM redemption_outbox WHERE order_id=${id}::uuid FOR UPDATE`;
       const job = await tx.redemptionOutbox.findUnique({ where: { orderId: id } });
-      if (job?.state !== 'PENDING')
+      await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${id}::uuid FOR UPDATE`;
+      const task = await tx.redemptionPickingTask.findUnique({ where: { orderId: id } });
+      if (!job || job.state === 'CANCELED' || task?.state === 'CLAIMED')
         throw failure(409, 'CANCELLATION_REVIEW_REQUIRED', '履约已开始或待办异常，需人工核实');
       for (const a of await tx.redemptionAllocation.findMany({
         where: { orderId: id },
@@ -452,7 +454,31 @@ export class RedemptionService {
           redemptionAction: 'CANCEL',
         },
       });
-      await tx.redemptionOutbox.update({ where: { orderId: id }, data: { state: 'CANCELED' } });
+      if (task) {
+        if (task.state !== 'READY')
+          throw failure(409, 'CANCELLATION_REVIEW_REQUIRED', '拣货状态需人工核实');
+        await tx.redemptionPickingTask.update({
+          where: { id: task.id },
+          data: { state: 'CANCELED', version: { increment: 1 } },
+        });
+        await tx.redemptionPickingEvent.create({
+          data: {
+            id: randomUUID(),
+            taskId: task.id,
+            orderId: id,
+            action: 'CANCELED',
+            consumerActorId: userId,
+            requestId: r.requestId,
+          },
+        });
+      }
+      await redemptionJobChange(
+        tx,
+        job,
+        { state: 'CANCELED', leaseToken: null, leaseUntil: null, lastErrorCode: null },
+        'CANCELED',
+        r.requestId,
+      );
       await tx.redemptionOrder.update({
         where: { id },
         data: { status: 'CANCELED', canceledAt: await this.clock(tx), version: { increment: 1 } },
@@ -470,7 +496,7 @@ export class RedemptionService {
     });
   }
   private dto(
-    row: Prisma.RedemptionOrderGetPayload<{ include: { outbox: true } }>,
+    row: Prisma.RedemptionOrderGetPayload<{ include: { outbox: true; pickingTask: true } }>,
     consumer: boolean,
   ) {
     return {
@@ -487,7 +513,18 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
-      fulfillmentState: row.outbox?.state ?? 'MISSING',
+      fulfillmentState:
+        row.status === 'CANCELED'
+          ? 'CANCELED'
+          : row.pickingTask?.state === 'CLAIMED'
+            ? 'PICKING'
+            : row.pickingTask?.state === 'READY'
+              ? 'READY_TO_PICK'
+              : row.outbox?.state === 'FAILED'
+                ? 'REVIEW_REQUIRED'
+                : row.outbox
+                  ? 'PENDING'
+                  : 'MISSING',
       ...(consumer
         ? {
             address: this.privateData.decrypt<ConsumerOrderAddress>(
@@ -525,7 +562,7 @@ export class RedemptionService {
         where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
         orderBy: { id: 'asc' },
         take: 21,
-        include: { outbox: true },
+        include: { outbox: true, pickingTask: true },
       });
       if (id && !rows.length) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');
       const items = rows.slice(0, 20).map((row) => this.dto(row, !admin));
@@ -538,7 +575,7 @@ export class RedemptionService {
       const warehouseId = await this.staff.authorize(r, tx);
       const row = await tx.redemptionOrder.findFirst({
         where: { id, warehouseId },
-        include: { outbox: true },
+        include: { outbox: true, pickingTask: true },
       });
       if (!row) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');
       const allocations = await tx.redemptionAllocation.findMany({

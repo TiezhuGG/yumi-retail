@@ -13,6 +13,7 @@ export interface ApplicationConfig {
   addressEncryptionKey?: string;
   orderDevSubmit?: boolean;
   redemptionDevSubmit?: boolean;
+  redemptionPickingDev?: boolean;
   orderDevHoldSeconds?: number;
   consumerDevLogin?: boolean;
   consumerSessionSeconds?: number;
@@ -92,6 +93,18 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
       (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
   )
     throw new Error('Notification lab requires non-production loopback binding.');
+  if (
+    env.REDEMPTION_PICKING_DEV_ENABLED &&
+    !['0', '1'].includes(env.REDEMPTION_PICKING_DEV_ENABLED)
+  )
+    throw Error('Invalid REDEMPTION_PICKING_DEV_ENABLED.');
+  const redemptionPickingDev = env.REDEMPTION_PICKING_DEV_ENABLED === '1';
+  if (
+    redemptionPickingDev &&
+    (environment === 'production' ||
+      (env.API_HOST && !['localhost', '127.0.0.1', '::1'].includes(env.API_HOST)))
+  )
+    throw Error('Redemption picking requires local development isolation.');
   if (env.REDEMPTION_DEV_SUBMIT_ENABLED && !['0', '1'].includes(env.REDEMPTION_DEV_SUBMIT_ENABLED))
     throw new Error('Invalid REDEMPTION_DEV_SUBMIT_ENABLED.');
   const redemptionDevSubmit = env.REDEMPTION_DEV_SUBMIT_ENABLED === '1';
@@ -123,6 +136,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     orderDevHoldSeconds: Number(env.ORDER_DEV_HOLD_SECONDS ?? 900),
     orderDevSubmit,
     redemptionDevSubmit,
+    redemptionPickingDev,
     addressEncryptionKey: env.ADDRESS_ENCRYPTION_KEY || undefined,
     environment: environment as ApplicationConfig['environment'],
     staffOrigins: origins,

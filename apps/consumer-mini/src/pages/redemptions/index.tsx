@@ -68,7 +68,7 @@ export default function Redemptions() {
         <Text className="account-name">兑换订单</Text>
       </View>
       <View className="account-content">
-        <Text className="account-copy">本机开发兑换，真实仓配尚未接入。</Text>
+        <Text className="account-copy">本机开发兑换，按真实预占进入拣货；出库与配送尚未开放。</Text>
         {loading && <Text>正在读取兑换单…</Text>}
         {guest && (
           <Button
@@ -103,7 +103,15 @@ export default function Redemptions() {
             </Text>
             <Text className="reward-price">{o.totalPoints} 积分</Text>
             <Text className="account-copy">
-              {o.status === 'CANCELED' ? '已取消 · 积分已退还' : '已扣积分 · 待履约接入'}
+              {o.status === 'CANCELED'
+                ? '已取消 · 积分已退还'
+                : o.fulfillmentState === 'PICKING'
+                  ? '仓库已领取'
+                  : o.fulfillmentState === 'READY_TO_PICK'
+                    ? '待仓库领取'
+                    : o.fulfillmentState === 'REVIEW_REQUIRED'
+                      ? '待门店核查'
+                      : '待创建拣货任务'}
             </Text>
             <Button
               className="points-action"

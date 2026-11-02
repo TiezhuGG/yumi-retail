@@ -286,3 +286,8 @@ S2的基础盘点/报损可在浏览开发间隙完善，但S5正式交易前库
 ## 2026-11-02 P3积分兑换交易增量
 
 本机隔离报价（120秒）、单SKU扣分/实物预占/累计限兑、双方订单与本人取消已实现；默认REDEMPTION_DEV_SUBMIT_ENABLED=0，生产/远程拒启。独立redemption_quotes/orders/allocations/outbox/events、消费者身份积分流水及来源复合外键/SQL配平/不可变约束；现金单复用原锁与预占算法，不冒用支付单或合成拣货。总/个人用量在兑换商品锁内按有效单聚合，取消同事务退分、释放库存与配额并撤销待办；价格/地址/资格变化需重新报价。小程序独立确认、列表和详情，持久化原账号/报价/键恢复，后台只读预占及动作证据。OpenAPI0.42.0；新增迁移202611020012仅临时schema重放，旧SDK的积分actor非空模型须做兼容，不可在新流水存在后盲退旧版。正式经营规则仍未确认，不开生产兑换；Outbox无真实执行器，下一项P4真实拣货接入及领取/取消竞争。完整边界、接口与实际检查见P3-REDEMPTIONS-2026-11-02记录。
+
+
+## 2026-11-02 P4a兑换真实拣货任务与领取
+
+新增redemption_picking_tasks/events及redemption_outbox_events，扩展Outbox租约/最多3次退避重试/耗尽与人工恢复。唯一任务绑定兑换单、仓库和SKU复合来源，不连接合成演练。Worker幂等建READY，不再扣分或动实物；本仓有效负责人/仓管/拣货员按真实批次/库位资格竞争领取，只有管理角色重试失败待办。领取与消费者取消按库存→订单→Outbox→任务锁内互斥；READY可取消，CLAIMED拒绝直接退分/释放。默认REDEMPTION_PICKING_DEV_ENABLED和REDEMPTION_FULFILLMENT_WORKER_ENABLED均0，生产/远程拒启，不改业务主库。API基路径/warehouse/warehouses/:warehouseId/redemption-picking，GET列表/:id和POST/:id/claim、/:id/retry，员工Cookie/CSRF/原键/版本及事务内权限；OpenAPI0.43.0。后台、仓库手机和消费者状态同步，未提供出库配送或假完成。新增迁移202611020013仅临时schema验证，须迁移后部署匹配API/Worker，旧P3取消不能处理新待办状态与版本，不可盲退旧版。完整规则、约束、接口和实际检查见P4A-REDEMPTION-PICKING-2026-11-02记录。下一项领取人按真实预占核对与缺货阻断，P4/P5未整体验收。

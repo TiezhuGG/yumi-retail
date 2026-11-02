@@ -2981,3 +2981,52 @@ small {
 .redemption-order-no {
   overflow-wrap: anywhere;
 }
+
+.redemption-picking-panel {
+  margin-top: 20px;
+}
+.picking-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+}
+.picking-allocation {
+  padding: 18px;
+  border: 1px solid #dce6de;
+  border-radius: 14px;
+  background: white;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.picking-state {
+  color: #008a42;
+  font-weight: 700;
+}
+.redemption-picking-panel select,
+.readiness-warehouse select {
+  min-height: 44px;
+  max-width: 100%;
+}
+
+.readiness-warehouse select {
+  width: min(100%, 360px);
+  display: block;
+  border: 1px solid #dce6de;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: white;
+  color: #345544;
+}
+.redemption-picking-panel .picking-mine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+.redemption-picking-panel .picking-mine input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+  flex: none;
+}

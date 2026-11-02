@@ -6,9 +6,19 @@ import type {
 } from '../../packages/contracts/src/index.ts';
 import { rewardsFixture } from './rewards-fixture.ts';
 export async function redemptionFixture(
-  options: { enabled?: boolean; balance?: number; limit?: number; quota?: number } = {},
+  options: {
+    enabled?: boolean;
+    balance?: number;
+    limit?: number;
+    quota?: number;
+    picking?: boolean;
+  } = {},
 ) {
-  const f = await rewardsFixture({ redemptions: options.enabled !== false, orders: true });
+  const f = await rewardsFixture({
+    redemptions: options.enabled !== false,
+    orders: true,
+    redemptionPicking: options.picking,
+  });
   try {
     const created = await f.api('/admin/rewards/store/create', {
       ...f.input,

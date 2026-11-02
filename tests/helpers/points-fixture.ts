@@ -2,7 +2,9 @@
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { hashPassword } from '../../packages/database/dist/index.js';
 import { addressFixture } from './address-fixture.ts';
-export async function pointsFixture(options: { redemptions?: boolean; orders?: boolean } = {}) {
+export async function pointsFixture(
+  options: { redemptions?: boolean; orders?: boolean; redemptionPicking?: boolean } = {},
+) {
   const f = await addressFixture(options);
   try {
     const db = f.runtime.db,

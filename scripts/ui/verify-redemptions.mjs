@@ -151,9 +151,7 @@ try {
     1,
   );
   await mini.goto('http://127.0.0.1:5188/?mini&view=order&id=' + id);
-  await mini
-    .getByText('已扣积分并预占库存；履约待办已保存，真实仓配尚未接入。', { exact: true })
-    .waitFor();
+  await mini.getByText('已扣积分并预占库存，正在等待创建拣货任务。', { exact: true }).waitFor();
   await shot('MINI-ORDER-ACTIVE', mini);
   let dropCancel = true;
   await mini.route('**/api/v1/consumer/redemptions/*/cancel', async (route) => {

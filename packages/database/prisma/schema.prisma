@@ -69,6 +69,9 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionPickingOwned RedemptionPickingTask[]
+ redemptionPickingEvents RedemptionPickingEvent[]
+ redemptionOutboxEvents RedemptionOutboxEvent[]
  pointsCorrectionsCreated PointsCorrection[] @relation("correctionCreator")
  pointsCorrectionsReviewed PointsCorrection[] @relation("correctionReviewer")
  pointsGrantsCreated PointsGrant[] @relation("grantCreator")
@@ -625,6 +628,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ redemptionPickingEvents RedemptionPickingEvent[]
  redemptionQuotes RedemptionQuote[]
  redemptions RedemptionOrder[]
  redemptionEvents RedemptionEvent[]
@@ -1386,6 +1390,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ pickingTask RedemptionPickingTask?
  id String @id @db.Uuid
  userId String @map("user_id") @db.Uuid
  quoteId String @unique @map("quote_id") @db.Uuid
@@ -1438,6 +1443,14 @@ model RedemptionAllocation {
  @@map("redemption_allocations")
 }
 model RedemptionOutbox {
+ attempts Int @default(0)
+ version Int @default(0)
+ leaseToken String? @map("lease_token") @db.Uuid
+ leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+ nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+ lastErrorCode String? @map("last_error_code") @db.VarChar(40)
+ events RedemptionOutboxEvent[]
+ @@index([state,nextAttemptAt,orderId],map:"redemption_outbox_due_idx")
  orderId String @id @map("order_id") @db.Uuid
  state String @default("PENDING") @db.VarChar(16)
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -1455,4 +1468,55 @@ model RedemptionEvent {
  consumerActor ConsumerUser @relation(fields:[consumerActorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([orderId,type])
  @@map("redemption_events")
+}
+
+model RedemptionPickingTask {
+ id String @id @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ skuId String @map("sku_id") @db.Uuid
+ state String @default("READY") @db.VarChar(16)
+ ownerId String? @map("owner_id") @db.Uuid
+ claimedAt DateTime? @map("claimed_at") @db.Timestamptz(3)
+ version Int @default(0)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId,warehouseId,skuId],references:[id,warehouseId,skuId],onDelete:Restrict,onUpdate:NoAction)
+ owner Staff? @relation(fields:[ownerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events RedemptionPickingEvent[]
+ @@unique([id,orderId])
+ @@unique([orderId,warehouseId,skuId])
+ @@index([warehouseId,state,id],map:"redemption_picking_scope_idx")
+ @@map("redemption_picking_tasks")
+}
+model RedemptionPickingEvent {
+ id String @id @db.Uuid
+ taskId String @map("task_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ action String @db.VarChar(16)
+ actorId String? @map("actor_id") @db.Uuid
+ consumerActorId String? @map("consumer_actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ task RedemptionPickingTask @relation(fields:[taskId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ consumerActor ConsumerUser? @relation(fields:[consumerActorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([taskId,action])
+ @@map("redemption_picking_events")
+}
+model RedemptionOutboxEvent {
+ id String @id @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ version Int
+ state String @db.VarChar(16)
+ attempts Int
+ reason String @db.VarChar(24)
+ lastErrorCode String? @map("last_error_code") @db.VarChar(40)
+ leaseToken String? @map("lease_token") @db.Uuid
+ actorId String? @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ job RedemptionOutbox @relation(fields:[orderId],references:[orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([orderId,version])
+ @@map("redemption_outbox_events")
 }
