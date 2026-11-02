@@ -69,13 +69,15 @@ export function RedemptionsWorkbench() {
           <p>
             {detail.status === 'CANCELED'
               ? '已取消 · 已退积分'
-              : detail.fulfillmentState === 'PICKING'
-                ? '仓库已领取'
-                : detail.fulfillmentState === 'READY_TO_PICK'
-                  ? '待仓库领取'
-                  : detail.fulfillmentState === 'REVIEW_REQUIRED'
-                    ? '待核查'
-                    : '待创建拣货任务'}
+              : detail.fulfillmentState === 'PICKED_WAIT_PACK'
+                ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                : detail.fulfillmentState === 'PICKING'
+                  ? '仓库已领取'
+                  : detail.fulfillmentState === 'READY_TO_PICK'
+                    ? '待仓库领取'
+                    : detail.fulfillmentState === 'REVIEW_REQUIRED'
+                      ? '待核查'
+                      : '待创建拣货任务'}
           </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
           <h3>实物预占凭据</h3>
@@ -151,11 +153,13 @@ export function RedemptionsWorkbench() {
                       <td>
                         {o.status === 'CANCELED'
                           ? '已取消'
-                          : o.fulfillmentState === 'PICKING'
-                            ? '仓库已领取'
-                            : o.fulfillmentState === 'READY_TO_PICK'
-                              ? '待仓库领取'
-                              : '待建任务/核查'}
+                          : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                            ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                            : o.fulfillmentState === 'PICKING'
+                              ? '仓库已领取'
+                              : o.fulfillmentState === 'READY_TO_PICK'
+                                ? '待仓库领取'
+                                : '待建任务/核查'}
                       </td>
                       <td>
                         <button

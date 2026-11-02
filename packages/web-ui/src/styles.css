@@ -3030,3 +3030,49 @@ small {
   margin: 0;
   flex: none;
 }
+
+.picking-line-work form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: end;
+  margin-top: 12px;
+}
+.picking-line-work label {
+  display: grid;
+  gap: 6px;
+  flex: 1 1 180px;
+}
+.picking-line-work input,
+.picking-line-work select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #dce6de;
+  border-radius: 8px;
+  background: white;
+}
+.picking-line-work form p {
+  flex-basis: 100%;
+}
+@media (max-width: 640px) {
+  .picking-line-work form > button {
+    width: 100%;
+  }
+}
+
+.redemption-picking-panel .picking-allocation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+.redemption-picking-panel .picking-allocation > p:last-of-type,
+.redemption-picking-panel .picking-line-work {
+  grid-column: 1 / -1;
+}
+@media (max-width: 680px) {
+  .redemption-picking-panel .picking-allocation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

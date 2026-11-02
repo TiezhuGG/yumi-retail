@@ -9,10 +9,12 @@ export const STAFF_COOKIE = 'yumi_staff_session';
 export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
     'redemption-picking.retry',
+    'redemption-picking.resolve',
     'points.read',
     'points.write',
     'redemption-picking.read',
     'redemption-picking.claim',
+    'redemption-picking.work',
     'picking.read',
     'picking-lab.read',
     'picking-lab.create',
@@ -65,8 +67,10 @@ export const rolePermissions: Record<string, readonly string[]> = {
   ],
   WAREHOUSE_MANAGER: [
     'redemption-picking.retry',
+    'redemption-picking.resolve',
     'redemption-picking.read',
     'redemption-picking.claim',
+    'redemption-picking.work',
     'picking.read',
     'picking-lab.read',
     'picking-lab.create',
@@ -102,6 +106,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'picking-lab.work',
     'redemption-picking.read',
     'redemption-picking.claim',
+    'redemption-picking.work',
     'picking.read',
     'warehouse.read',
     'catalog.read',

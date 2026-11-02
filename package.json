@@ -139,6 +139,8 @@
     "test:redemptions": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemptions.integration.test.ts",
     "preverify:redemptions:ui": "npm run build:server",
     "verify:redemptions:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemptions.mjs",
+    "pretest:redemption-picking-work": "npm run build:server",
+    "test:redemption-picking-work": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-picking-work.integration.test.ts",
     "pretest:redemption-picking": "npm run build:server",
     "test:redemption-picking": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-picking.integration.test.ts",
     "preverify:redemption-picking:ui": "npm run build:server",

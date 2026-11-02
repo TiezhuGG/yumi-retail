@@ -14,6 +14,7 @@ const states: Record<string, string> = {
   READY: '待领取',
   CLAIMED: '已领取 · 待逐项核对',
   CANCELED: '已取消',
+  CHECKED: '拣货完成 · 待打包',
 };
 const reasons: Record<string, string> = {
   WAREHOUSE_PAUSED: '仓库暂停',
@@ -29,7 +30,14 @@ const reasons: Record<string, string> = {
   ALLOCATION_INCOMPLETE: '预占件数不完整',
   POINTS_EVIDENCE_MISSING: '积分扣除证据异常',
 };
-type Intent = { id: string; action: 'claim' | 'retry'; key: string; version: number };
+type Action = 'claim' | 'retry' | 'check' | 'report' | 'resolve' | 'complete';
+type Intent = {
+  id: string;
+  action: Action;
+  key: string;
+  version: number;
+  body?: Record<string, unknown>;
+};
 export function RedemptionPickingWorkbench({ profile }: { profile: StaffProfile }) {
   const [warehouses, setWarehouses] = useState<WarehouseSummary[]>([]),
     [w, setW] = useState(''),
@@ -61,7 +69,7 @@ export function RedemptionPickingWorkbench({ profile }: { profile: StaffProfile 
   return (
     <section aria-label="兑换拣货作业">
       <div className="notice">
-        来自已扣积分、已预占实物的兑换单。领取后由本人继续作业；本轮只开放领取，逐项核对、出库和配送后续交付。
+        来自已扣积分、已预占实物的兑换单。领取后按原预占批次和库位核对。缺货或破损须上报，仓管确认原需求备齐后重新核对；完成拣货后等待打包。
       </div>
       {error && (
         <p role="alert">
@@ -116,7 +124,7 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['claim', 'retry'].includes(v.action) ||
+      !['claim', 'retry', 'check', 'report', 'resolve', 'complete'].includes(v.action) ||
       !Number.isInteger(v.version)
     )
       throw Error('原作业操作记录无法读取，请保留并核实');
@@ -170,7 +178,7 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
       seq.current++;
     };
   }, []);
-  async function write(action: 'claim' | 'retry') {
+  async function write(action: Action, body?: Record<string, unknown>) {
     if (writing.current || corrupt || !detail) return;
     writing.current = true;
     setBusy(true);
@@ -182,7 +190,8 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           id: detail.id,
           action,
           key: crypto.randomUUID(),
-          version: action === 'claim' ? detail.task!.version : detail.job.version,
+          version: action === 'retry' ? detail.job.version : detail.task!.version,
+          body,
         };
       sessionStorage.setItem(storage, JSON.stringify(v));
       setIntent(v);
@@ -193,7 +202,7 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           'X-CSRF-Token': profile.csrfToken,
           'Idempotency-Key': v.key,
         },
-        body: JSON.stringify({ version: v.version }),
+        body: JSON.stringify({ ...v.body, version: v.version }),
       });
       sessionStorage.removeItem(storage);
       if (n !== seq.current) return;
@@ -231,6 +240,7 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             <option value="QUEUED">待创建/重试中</option>
             <option value="READY">待领取</option>
             <option value="CLAIMED">已领取</option>
+            <option value="CHECKED">拣货完成 · 待打包</option>
             <option value="FAILED">创建失败</option>
             <option value="CANCELED">已取消</option>
           </select>
@@ -315,6 +325,27 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     '（北京时间）'
                   : '此批次未设效期'}
               </p>
+              <p>
+                {l.issue
+                  ? (l.issue.kind === 'SHORTAGE' ? '缺货' : '破损') +
+                    ' ' +
+                    l.issue.quantity +
+                    ' 件 · 待仓管处置，整项阻断'
+                  : l.checked
+                    ? '已核对原预占完整件数'
+                    : '待领取人核对'}
+              </p>
+              {detail.state === 'CLAIMED' && (
+                <AllocationWork
+                  key={l.id + ':' + detail.task!.version}
+                  line={l}
+                  owner={detail.task?.ownerId === profile.id}
+                  manager={profile.permissions.includes('redemption-picking.resolve')}
+                  disabled={busy || loading || !!intent || !enabled || corrupt}
+                  blocked={detail.readiness.blockers.length > 0}
+                  write={write}
+                />
+              )}
             </article>
           ))}
           {detail.readiness.blockers.length > 0 && (
@@ -339,7 +370,15 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             >
               {busy
                 ? '正在核实…'
-                : '使用原请求核实' + (intent.action === 'claim' ? '领取' : '重试')}
+                : '使用原请求核实' +
+                  {
+                    claim: '领取',
+                    retry: '重试',
+                    check: '核对',
+                    report: '上报',
+                    resolve: '处置',
+                    complete: '完成拣货',
+                  }[intent.action]}
             </button>
           ) : (
             <>
@@ -364,9 +403,54 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                 )}
             </>
           )}
+          {detail.state === 'CLAIMED' && detail.task?.ownerId === profile.id && !intent && (
+            <button
+              className="primary-button"
+              disabled={busy || loading || !enabled || !detail.work.canComplete || corrupt}
+              onClick={() => void write('complete')}
+            >
+              全部核对后完成拣货
+            </button>
+          )}
+          {detail.state === 'CHECKED' && (
+            <div className="notice">
+              原预占逐项核对已完成，等待打包。尚未出库或配送，实物预占和积分保持不变。
+            </div>
+          )}
+          {!!detail.history.length && (
+            <details>
+              <summary>查看核对与异常记录（{detail.history.length}）</summary>
+              {detail.history.map((e) => (
+                <p key={e.id}>
+                  {
+                    (
+                      {
+                        CHECK: '完整件数核对',
+                        SHORTAGE: '缺货上报',
+                        DAMAGE: '破损上报',
+                        RESOLVE: '原需求备齐确认',
+                        COMPLETE: '完成拣货',
+                      } as Record<string, string>
+                    )[e.action]
+                  }
+                  {e.quantity === null ? '' : ' · ' + e.quantity + ' 件'} ·{' '}
+                  {e.allocationId && (
+                    <>
+                      {' '}
+                      · {detail.lines.find((l) => l.id === e.allocationId)?.batchNo} /{' '}
+                      {detail.lines.find((l) => l.id === e.allocationId)?.locationName}
+                    </>
+                  )}{' '}
+                  · {e.actorId === detail.task?.ownerId ? '领取人' : '仓管/负责人'} ·{' '}
+                  {new Date(e.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                  （北京时间）
+                </p>
+              ))}
+            </details>
+          )}
           {detail.task?.state === 'CLAIMED' && (
             <div className="notice">
-              任务已领取，本轮尚未开放逐项核对和出库。消费者直接取消已停止；需要停止履约时须待协调取消能力交付。
+              消费者直接取消已停止。异常处置只确认原预占需求已备齐，须由领取人重新核对；不得用处置代替调账、换批或退分。
             </div>
           )}
         </div>
@@ -407,6 +491,113 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function AllocationWork({
+  line,
+  owner,
+  manager,
+  disabled,
+  blocked,
+  write,
+}: {
+  line: RedemptionPickingView['lines'][number];
+  owner: boolean;
+  manager: boolean;
+  disabled: boolean;
+  blocked: boolean;
+  write: (action: Action, body?: Record<string, unknown>) => Promise<void>;
+}) {
+  const [quantity, setQuantity] = useState(''),
+    [kind, setKind] = useState('SHORTAGE');
+  const valid = /^[1-9]\d*$/.test(quantity) && Number(quantity) <= line.quantity;
+  return (
+    <div className="picking-line-work">
+      {line.issue
+        ? manager && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void write('resolve', {
+                  allocationId: line.id,
+                  issueId: line.issue!.id,
+                  quantity: Number(quantity),
+                });
+              }}
+            >
+              <label>
+                确认原预占已备齐件数
+                <input
+                  aria-label="确认原预占已备齐件数"
+                  type="number"
+                  min="1"
+                  max={line.quantity}
+                  step="1"
+                  value={quantity}
+                  disabled={disabled}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </label>
+              <button
+                className="secondary-button"
+                disabled={disabled || blocked || Number(quantity) !== line.quantity}
+              >
+                确认原需求已备齐
+              </button>
+              <p>仅确认原批次、原库位完整需求已恢复；领取人仍须重新核对。</p>
+            </form>
+          )
+        : owner && (
+            <form onSubmit={(e) => e.preventDefault()}>
+              <label>
+                实际核对或异常件数
+                <input
+                  aria-label="实际核对或异常件数"
+                  type="number"
+                  min="1"
+                  max={line.quantity}
+                  step="1"
+                  disabled={disabled}
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                />
+              </label>
+              {!line.checked && (
+                <button
+                  className="primary-button"
+                  disabled={disabled || blocked || Number(quantity) !== line.quantity}
+                  onClick={() =>
+                    void write('check', { allocationId: line.id, quantity: Number(quantity) })
+                  }
+                >
+                  确认此项完整件数
+                </button>
+              )}
+              <label>
+                异常原因
+                <select
+                  aria-label="异常原因"
+                  value={kind}
+                  disabled={disabled}
+                  onChange={(e) => setKind(e.target.value)}
+                >
+                  <option value="SHORTAGE">缺货</option>
+                  <option value="DAMAGE">破损</option>
+                </select>
+              </label>
+              <button
+                className="secondary-button"
+                disabled={disabled || !valid}
+                onClick={() =>
+                  void write('report', { allocationId: line.id, quantity: Number(quantity), kind })
+                }
+              >
+                上报此项异常
+              </button>
+            </form>
+          )}
     </div>
   );
 }

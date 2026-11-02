@@ -53,7 +53,15 @@ const orderProperties = {
   version: integer,
   fulfillmentState: {
     type: 'string' as const,
-    enum: ['PENDING', 'CANCELED', 'MISSING', 'READY_TO_PICK', 'PICKING', 'REVIEW_REQUIRED'],
+    enum: [
+      'PENDING',
+      'CANCELED',
+      'MISSING',
+      'READY_TO_PICK',
+      'PICKING',
+      'PICKED_WAIT_PACK',
+      'REVIEW_REQUIRED',
+    ],
   },
 };
 const address = object({

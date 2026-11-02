@@ -571,3 +571,8 @@ PICKING_LAB_ENABLED默认0，仅本机开发/隔离测试可显式启用，生�
 ## 2026-11-02 P4a兑换真实拣货任务与领取
 
 新增redemption_picking_tasks/events及redemption_outbox_events，扩展Outbox租约/最多3次退避重试/耗尽与人工恢复。唯一任务绑定兑换单、仓库和SKU复合来源，不连接合成演练。Worker幂等建READY，不再扣分或动实物；本仓有效负责人/仓管/拣货员按真实批次/库位资格竞争领取，只有管理角色重试失败待办。领取与消费者取消按库存→订单→Outbox→任务锁内互斥；READY可取消，CLAIMED拒绝直接退分/释放。默认REDEMPTION_PICKING_DEV_ENABLED和REDEMPTION_FULFILLMENT_WORKER_ENABLED均0，生产/远程拒启，不改业务主库。API基路径/warehouse/warehouses/:warehouseId/redemption-picking，GET列表/:id和POST/:id/claim、/:id/retry，员工Cookie/CSRF/原键/版本及事务内权限；OpenAPI0.43.0。后台、仓库手机和消费者状态同步，未提供出库配送或假完成。新增迁移202611020013仅临时schema验证，须迁移后部署匹配API/Worker，旧P3取消不能处理新待办状态与版本，不可盲退旧版。完整规则、约束、接口和实际检查见P4A-REDEMPTION-PICKING-2026-11-02记录。下一项领取人按真实预占核对与缺货阻断，P4/P5未整体验收。
+
+
+## 2026-11-02 P4b兑换逐项核对与异常阻断
+
+真实预占分配逐项完整件数核对、领取人缺货/破损上报、仓管确认原需求备齐及重新核对、全项完成拣货已实现，本地验证见[P4b记录](../verification/P4B-REDEMPTION-PICKING-WORK-2026-11-02.md)。异常不改库存或积分，不换批次；某项上报会使此前核对失效，处置后仍须领取人重新核对。未决异常、漏项、数量不符及当前冻结/效期/来源资格变化阻断完成；CHECKED仅表示拣货核对完成、待打包，仍未出库或配送。CLAIMED/CHECKED均禁止消费者直接取消，未交付协调取消/重派/出库/配送/售后。沿用本机作业开关默认关闭、生产拒启，经营规则与真机/生产未验，P4/P5未整体验收。下一项P4c打包前完整性与真实幂等出库，需继续校验原预占与库存账实约束；已领取消/员工停用后接续仍是后续必需能力。

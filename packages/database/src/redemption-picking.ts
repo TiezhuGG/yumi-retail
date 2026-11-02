@@ -57,7 +57,12 @@ export async function redemptionJobChange(
 }
 const sourceInclude = {
   outbox: true,
-  pickingTask: { include: { owner: { select: { displayName: true } } } },
+  pickingTask: {
+    include: {
+      owner: { select: { displayName: true } },
+      work: { orderBy: { version: 'asc' as const } },
+    },
+  },
   reward: {
     include: {
       sku: { include: { product: { include: { category: { include: { parent: true } } } } } },

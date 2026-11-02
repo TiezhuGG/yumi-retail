@@ -757,3 +757,21 @@ SUPER_ADMIN/WAREHOUSE_MANAGER新增delivery-lab.read及assign；RIDER仅read。�
 ## 2026-11-02 P4a兑换真实拣货任务与领取
 
 新增redemption_picking_tasks/events及redemption_outbox_events，扩展Outbox租约/最多3次退避重试/耗尽与人工恢复。唯一任务绑定兑换单、仓库和SKU复合来源，不连接合成演练。Worker幂等建READY，不再扣分或动实物；本仓有效负责人/仓管/拣货员按真实批次/库位资格竞争领取，只有管理角色重试失败待办。领取与消费者取消按库存→订单→Outbox→任务锁内互斥；READY可取消，CLAIMED拒绝直接退分/释放。默认REDEMPTION_PICKING_DEV_ENABLED和REDEMPTION_FULFILLMENT_WORKER_ENABLED均0，生产/远程拒启，不改业务主库。API基路径/warehouse/warehouses/:warehouseId/redemption-picking，GET列表/:id和POST/:id/claim、/:id/retry，员工Cookie/CSRF/原键/版本及事务内权限；OpenAPI0.43.0。后台、仓库手机和消费者状态同步，未提供出库配送或假完成。新增迁移202611020013仅临时schema验证，须迁移后部署匹配API/Worker，旧P3取消不能处理新待办状态与版本，不可盲退旧版。完整规则、约束、接口和实际检查见P4A-REDEMPTION-PICKING-2026-11-02记录。下一项领取人按真实预占核对与缺货阻断，P4/P5未整体验收。
+
+
+## 2026-11-02 P4b兑换逐项核对与异常阻断
+
+真实预占分配逐项完整件数核对、领取人缺货/破损上报、仓管确认原需求备齐及重新核对、全项完成拣货已实现，本地验证见[P4b记录](../verification/P4B-REDEMPTION-PICKING-WORK-2026-11-02.md)。异常不改库存或积分，不换批次；某项上报会使此前核对失效，处置后仍须领取人重新核对。未决异常、漏项、数量不符及当前冻结/效期/来源资格变化阻断完成；CHECKED仅表示拣货核对完成、待打包，仍未出库或配送。CLAIMED/CHECKED均禁止消费者直接取消，未交付协调取消/重派/出库/配送/售后。沿用本机作业开关默认关闭、生产拒启，经营规则与真机/生产未验，P4/P5未整体验收。下一项P4c打包前完整性与真实幂等出库，需继续校验原预占与库存账实约束；已领取消/员工停用后接续仍是后续必需能力。
+
+OpenAPI 0.44.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-picking`，新增 POST `/:id/check`、`/:id/report`、`/:id/resolve`、`/:id/complete`。统一员工Cookie、Origin/CSRF、Idempotency-Key，仓库和会话/角色在事务内重查；不允许额外字段。check/report/complete由任务当前领取人执行（redemption-picking.work），resolve仅本仓负责人/仓管（redemption-picking.resolve）。
+
+|动作|请求体|行为|
+|---|---|---|
+|check|version、allocationId、quantity|原预占完整件数，未决异常拒绝|
+|report|version、allocationId、quantity、kind|kind=SHORTAGE/DAMAGE；1..该分配件数；冻结/过期仍可记录；同项未决拒绝重复报|
+|resolve|version、allocationId、quantity、issueId|匹配当前未决原异常；quantity必须原分配完整件数，确认原批次/库位已备齐；不是换货/调账|
+|complete|version|当前领取人、全部原分配最新事实CHECK且现时资格通过，转CHECKED|
+
+version为当前任务版本，每个动作递增一次。相同员工/动作/订单/键及完全相同输入返回历史结果；改体同键409；失权后拒绝重放。GET列表新增status=CHECKED，详情/列表项增work.complete/canComplete、lines[].checked/issue及history[]（事实id、action、allocationId、quantity、actorId、createdAt）。history保留已处置异常，quantity在COMPLETE为空。消费者及后台订单fulfillmentState增PICKED_WAIT_PACK；既有客户端须升级后部署，不能把新状态误当可直接取消。
+
+错误包括400 VALIDATION_ERROR；403 PICKING_OWNER_REQUIRED/FORBIDDEN；409 VERSION_CONFLICT、ALLOCATION_INVALID、QUANTITY_MISMATCH、PICKING_ISSUE_OPEN、ISSUE_CHANGED、ALREADY_CHECKED、PICKING_INCOMPLETE、PICKING_BLOCKED；503 REDEMPTION_PICKING_DISABLED/RETRYABLE_CONFLICT。未知网络/5xx保留原键及完整原始输入，刷新或重载后同键核实，不能自动另建请求。

@@ -105,13 +105,15 @@ export default function Redemptions() {
             <Text className="account-copy">
               {o.status === 'CANCELED'
                 ? '已取消 · 积分已退还'
-                : o.fulfillmentState === 'PICKING'
-                  ? '仓库已领取'
-                  : o.fulfillmentState === 'READY_TO_PICK'
-                    ? '待仓库领取'
-                    : o.fulfillmentState === 'REVIEW_REQUIRED'
-                      ? '待门店核查'
-                      : '待创建拣货任务'}
+                : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                  ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                  : o.fulfillmentState === 'PICKING'
+                    ? '仓库已领取'
+                    : o.fulfillmentState === 'READY_TO_PICK'
+                      ? '待仓库领取'
+                      : o.fulfillmentState === 'REVIEW_REQUIRED'
+                        ? '待门店核查'
+                        : '待创建拣货任务'}
             </Text>
             <Button
               className="points-action"

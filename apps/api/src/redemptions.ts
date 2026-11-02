@@ -420,7 +420,12 @@ export class RedemptionService {
       const job = await tx.redemptionOutbox.findUnique({ where: { orderId: id } });
       await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${id}::uuid FOR UPDATE`;
       const task = await tx.redemptionPickingTask.findUnique({ where: { orderId: id } });
-      if (!job || job.state === 'CANCELED' || task?.state === 'CLAIMED')
+      if (
+        !job ||
+        job.state === 'CANCELED' ||
+        task?.state === 'CLAIMED' ||
+        task?.state === 'CHECKED'
+      )
         throw failure(409, 'CANCELLATION_REVIEW_REQUIRED', '履约已开始或待办异常，需人工核实');
       for (const a of await tx.redemptionAllocation.findMany({
         where: { orderId: id },
@@ -516,15 +521,17 @@ export class RedemptionService {
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
-          : row.pickingTask?.state === 'CLAIMED'
-            ? 'PICKING'
-            : row.pickingTask?.state === 'READY'
-              ? 'READY_TO_PICK'
-              : row.outbox?.state === 'FAILED'
-                ? 'REVIEW_REQUIRED'
-                : row.outbox
-                  ? 'PENDING'
-                  : 'MISSING',
+          : row.pickingTask?.state === 'CHECKED'
+            ? 'PICKED_WAIT_PACK'
+            : row.pickingTask?.state === 'CLAIMED'
+              ? 'PICKING'
+              : row.pickingTask?.state === 'READY'
+                ? 'READY_TO_PICK'
+                : row.outbox?.state === 'FAILED'
+                  ? 'REVIEW_REQUIRED'
+                  : row.outbox
+                    ? 'PENDING'
+                    : 'MISSING',
       ...(consumer
         ? {
             address: this.privateData.decrypt<ConsumerOrderAddress>(

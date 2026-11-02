@@ -204,6 +204,88 @@ try {
     (await f.call('/consumer/redemptions/' + id + '/cancel', { version: 0 })).error.code,
     'CANCELLATION_REVIEW_REQUIRED',
   );
+  // P4b actual owner check/report; manager resolves original demand; owner must recheck.
+  await ops.getByLabel('实际核对或异常件数', { exact: true }).fill('1');
+  await ops.getByRole('button', { name: '确认此项完整件数', exact: true }).click();
+  await ops.getByText('已核对原预占完整件数', { exact: true }).waitFor();
+  await shot('OPS-LINE-CHECKED', ops);
+  await ops.getByLabel('实际核对或异常件数', { exact: true }).fill('1');
+  await ops.getByLabel('异常原因', { exact: true }).selectOption('DAMAGE');
+  let dropReport = true;
+  await ops.route('**/api/v1/warehouse/warehouses/*/redemption-picking/*/report', async (route) => {
+    if (dropReport) {
+      dropReport = false;
+      await route.fetch();
+      await route.abort();
+    } else await route.continue();
+  });
+  await ops.getByRole('button', { name: '上报此项异常', exact: true }).click();
+  await ops.getByRole('alert').waitFor();
+  await shot('OPS-REPORT-UNKNOWN', ops);
+  await ops.reload();
+  await ops.getByRole('button', { name: '使用原请求核实上报', exact: true }).click();
+  await ops.getByText('破损 1 件 · 待仓管处置，整项阻断', { exact: true }).waitFor();
+  assert.equal(await ops.getByRole('button', { name: '确认原需求已备齐', exact: true }).count(), 0);
+  assert.equal(
+    await ops.getByRole('button', { name: '全部核对后完成拣货', exact: true }).isEnabled(),
+    false,
+  );
+  await shot('OPS-ISSUE-BLOCKED', ops);
+  await page.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await page.getByText('破损 1 件 · 待仓管处置，整项阻断', { exact: true }).waitFor();
+  await shot('ADMIN-ISSUE');
+  await page.getByLabel('确认原预占已备齐件数', { exact: true }).fill('1');
+  await page.getByRole('button', { name: '确认原需求已备齐', exact: true }).click();
+  await page.getByText('待领取人核对', { exact: true }).waitFor();
+  await shot('ADMIN-RESOLVED');
+  await ops.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await ops.getByText('待领取人核对', { exact: true }).waitFor();
+  assert.equal(
+    await ops.getByRole('button', { name: '全部核对后完成拣货', exact: true }).isEnabled(),
+    false,
+  );
+  await shot('OPS-RECHECK-REQUIRED', ops);
+  await ops.getByLabel('实际核对或异常件数', { exact: true }).fill('1');
+  await ops.getByRole('button', { name: '确认此项完整件数', exact: true }).click();
+  await ops.getByText('已核对原预占完整件数', { exact: true }).waitFor();
+  let dropComplete = true;
+  await ops.route(
+    '**/api/v1/warehouse/warehouses/*/redemption-picking/*/complete',
+    async (route) => {
+      if (dropComplete) {
+        dropComplete = false;
+        await route.fetch();
+        await route.abort();
+      } else await route.continue();
+    },
+  );
+  await ops.getByRole('button', { name: '全部核对后完成拣货', exact: true }).click();
+  await ops.getByRole('alert').waitFor();
+  await shot('OPS-COMPLETE-UNKNOWN', ops);
+  await ops.reload();
+  await ops.getByRole('button', { name: '使用原请求核实完成拣货', exact: true }).click();
+  await ops.locator('.picking-state').filter({ hasText: '拣货完成 · 待打包' }).waitFor();
+  await ops.getByText('查看核对与异常记录（5）', { exact: true }).click();
+  await ops.getByText('破损上报', { exact: false }).waitFor();
+  await shot('OPS-CHECKED', ops);
+  await page.getByRole('button', { name: '刷新作业', exact: true }).click();
+  await page.locator('.picking-state').filter({ hasText: '拣货完成 · 待打包' }).waitFor();
+  await shot('ADMIN-CHECKED');
+  await mini.reload();
+  await mini.getByText('拣货已核对完成，等待打包；尚未出库或配送。', { exact: true }).waitFor();
+  assert.equal(
+    await mini.getByRole('button', { name: '取消兑换并退还 120 积分', exact: true }).count(),
+    0,
+  );
+  await shot('MINI-CHECKED', mini);
+  assert.equal(
+    await f.runtime.db.redemptionPickingWork.count({ where: { orderId: id, action: 'DAMAGE' } }),
+    1,
+  );
+  assert.equal(
+    await f.runtime.db.redemptionPickingWork.count({ where: { orderId: id, action: 'COMPLETE' } }),
+    1,
+  );
   const second = await f.order();
   await runRedemptionPickingOnce(f.runtime.db);
   await mini.goto('http://127.0.0.1:5188/?mini&view=order&id=' + second);

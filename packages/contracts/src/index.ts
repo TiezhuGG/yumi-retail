@@ -845,6 +845,7 @@ export interface RedemptionOrderView {
     | 'MISSING'
     | 'READY_TO_PICK'
     | 'PICKING'
+    | 'PICKED_WAIT_PACK'
     | 'REVIEW_REQUIRED';
   address?: ConsumerOrderAddress;
   allocations?: Array<{
@@ -886,7 +887,18 @@ export interface RedemptionPickingView {
     leaseUntil: string | null;
   };
   readiness: { ready: boolean; blockers: string[] };
+  work: { complete: boolean; canComplete: boolean };
+  history: Array<{
+    id: string;
+    action: string;
+    allocationId: string | null;
+    quantity: number | null;
+    actorId: string;
+    createdAt: string;
+  }>;
   lines: Array<{
+    checked: boolean;
+    issue: null | { id: string; kind: string; quantity: number };
     id: string;
     quantity: number;
     batchNo: string;

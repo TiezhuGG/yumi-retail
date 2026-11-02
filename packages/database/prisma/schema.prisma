@@ -69,6 +69,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionPickingWork RedemptionPickingWork[]
  redemptionPickingOwned RedemptionPickingTask[]
  redemptionPickingEvents RedemptionPickingEvent[]
  redemptionOutboxEvents RedemptionOutboxEvent[]
@@ -1426,6 +1427,8 @@ model RedemptionOrder {
  @@map("redemption_orders")
 }
 model RedemptionAllocation {
+ work RedemptionPickingWork[]
+ @@unique([id,orderId])
  id String @id @db.Uuid
  orderId String @map("order_id") @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
@@ -1471,6 +1474,7 @@ model RedemptionEvent {
 }
 
 model RedemptionPickingTask {
+ work RedemptionPickingWork[]
  id String @id @db.Uuid
  orderId String @unique @map("order_id") @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
@@ -1519,4 +1523,25 @@ model RedemptionOutboxEvent {
  actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([orderId,version])
  @@map("redemption_outbox_events")
+}
+
+model RedemptionPickingWork {
+ id String @id @db.Uuid
+ taskId String @map("task_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ version Int
+ action String @db.VarChar(16)
+ allocationId String? @map("allocation_id") @db.Uuid
+ quantity Int?
+ issueId String? @unique @map("issue_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ task RedemptionPickingTask @relation(fields:[taskId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ allocation RedemptionAllocation? @relation(fields:[allocationId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ issue RedemptionPickingWork? @relation("workIssue",fields:[issueId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ resolution RedemptionPickingWork? @relation("workIssue")
+ @@unique([taskId,version])
+ @@map("redemption_picking_work")
 }

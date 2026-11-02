@@ -63,7 +63,31 @@ export class RedemptionPickingService {
         ready: o.status === 'ACTIVE' && task?.state === 'READY' && !blockers.length,
         blockers,
       },
+      work: {
+        complete: task?.state === 'CHECKED',
+        canComplete:
+          task?.state === 'CLAIMED' &&
+          !blockers.length &&
+          o.allocations.every(
+            (a) => task.work.filter((e) => e.allocationId === a.id).at(-1)?.action === 'CHECK',
+          ),
+      },
+      history: (task?.work ?? []).map((e) => ({
+        id: e.id,
+        action: e.action,
+        allocationId: e.allocationId,
+        quantity: e.quantity,
+        actorId: e.actorId,
+        createdAt: e.createdAt.toISOString(),
+      })),
       lines: o.allocations.map((a) => ({
+        checked: task?.work.filter((e) => e.allocationId === a.id).at(-1)?.action === 'CHECK',
+        issue: (() => {
+          const e = task?.work.filter((e) => e.allocationId === a.id).at(-1);
+          return e && ['SHORTAGE', 'DAMAGE'].includes(e.action)
+            ? { id: e.id, kind: e.action, quantity: e.quantity! }
+            : null;
+        })(),
         id: a.id,
         quantity: a.quantity,
         batchNo: a.position.lot.batchNo,
@@ -77,7 +101,7 @@ export class RedemptionPickingService {
     const b = fields(q, ['cursor', 'status', 'mine']),
       cursor = b.cursor === undefined ? null : uuid(b.cursor),
       status = b.status === undefined ? '' : str(b.status, 16);
-    if (status && !['READY', 'CLAIMED', 'CANCELED', 'FAILED', 'QUEUED'].includes(status))
+    if (status && !['READY', 'CLAIMED', 'CHECKED', 'CANCELED', 'FAILED', 'QUEUED'].includes(status))
       throw failure(400, 'VALIDATION_ERROR', '任务筛选无效');
     if (b.mine !== undefined && b.mine !== '1')
       throw failure(400, 'VALIDATION_ERROR', '本人筛选无效');
@@ -89,7 +113,7 @@ export class RedemptionPickingService {
           ...(id ? { id } : {}),
           ...(b.mine ? { pickingTask: { ownerId: r.staffContext!.staffId } } : {}),
           ...(status === 'CANCELED' ? { status: 'CANCELED' } : status ? { status: 'ACTIVE' } : {}),
-          ...(['READY', 'CLAIMED'].includes(status)
+          ...(['READY', 'CLAIMED', 'CHECKED'].includes(status)
             ? {
                 pickingTask: {
                   state: status,
@@ -215,8 +239,121 @@ export class RedemptionPickingService {
       },
     );
   }
+  async work(
+    r: ApiRequest,
+    w: string,
+    id: string,
+    action: 'check' | 'report' | 'resolve' | 'complete',
+    k: string,
+    input: unknown,
+  ) {
+    const allowed =
+      action === 'complete'
+        ? ['version']
+        : action === 'report'
+          ? ['version', 'allocationId', 'quantity', 'kind']
+          : action === 'resolve'
+            ? ['version', 'allocationId', 'quantity', 'issueId']
+            : ['version', 'allocationId', 'quantity'];
+    const b = fields(input, allowed),
+      version = integer(b.version, 1, 2147483646);
+    const allocationId = action === 'complete' ? null : uuid(b.allocationId);
+    const quantity = action === 'complete' ? null : integer(b.quantity, 1, 2147483647);
+    const issueId = action === 'resolve' ? uuid(b.issueId) : null;
+    const kind = action === 'report' ? str(b.kind, 16) : null;
+    if (kind && !['SHORTAGE', 'DAMAGE'].includes(kind))
+      throw failure(400, 'VALIDATION_ERROR', '异常原因无效');
+    await this.authorize(this.catalog.db, r, w, action === 'resolve');
+    if (!this.enabled) throw failure(503, 'REDEMPTION_PICKING_DISABLED', '兑换拣货作业尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_PICKING_' + action,
+      w + ':' + id,
+      k,
+      { version, allocationId, quantity, issueId, kind },
+      async (tx) => {
+        await this.authorize(tx, r, w, action === 'resolve');
+        const initial = await tx.redemptionOrder.findFirst({ where: { id, warehouseId: w } });
+        if (!initial) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到本仓兑换单');
+        await metadataLocks(tx, [initial.skuId]);
+        await inventoryLocks(tx, w, [initial.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT order_id FROM redemption_outbox WHERE order_id=${id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${id}::uuid FOR UPDATE`;
+        const { order: o, blockers } = await redemptionPickingReadiness(tx, id),
+          t = o?.pickingTask;
+        if (
+          !o ||
+          o.status !== 'ACTIVE' ||
+          o.outbox?.state !== 'COMPLETED' ||
+          !t ||
+          t.state !== 'CLAIMED' ||
+          t.version !== version
+        )
+          throw failure(409, 'VERSION_CONFLICT', '任务已变化，请刷新后核实');
+        if (action !== 'resolve' && t.ownerId !== r.staffContext!.staffId)
+          throw failure(403, 'PICKING_OWNER_REQUIRED', '仅当前领取人可核对、上报或完成');
+        const a = o.allocations.find((a) => a.id === allocationId),
+          latest = t.work.filter((e) => e.allocationId === allocationId).at(-1);
+        const open = latest && ['SHORTAGE', 'DAMAGE'].includes(latest.action);
+        if (action !== 'complete') {
+          if (!a || a.releaseLedgerId)
+            throw failure(409, 'ALLOCATION_INVALID', '必须选择本单原预占批次和库位');
+          if (quantity! > a.quantity || (action !== 'report' && quantity !== a.quantity))
+            throw failure(
+              409,
+              'QUANTITY_MISMATCH',
+              '核对及处置须为原预占完整件数，异常件数不得超过原预占',
+            );
+          if (action === 'resolve') {
+            if (!open || latest.id !== issueId)
+              throw failure(409, 'ISSUE_CHANGED', '原未决异常已变化，请刷新');
+          } else if (open)
+            throw failure(409, 'PICKING_ISSUE_OPEN', '此项异常尚未处置，不能重复上报或核对');
+          else if (action === 'check' && latest?.action === 'CHECK')
+            throw failure(409, 'ALREADY_CHECKED', '此项已核对');
+        } else if (
+          !o.allocations.length ||
+          o.allocations.some(
+            (a) => t.work.filter((e) => e.allocationId === a.id).at(-1)?.action !== 'CHECK',
+          )
+        )
+          throw failure(409, 'PICKING_INCOMPLETE', '仍有未核对项或未决异常，不能完成');
+        // Reporting remains available when stock is held or expired, so actual problems can be recorded.
+        if (action !== 'report' && blockers.length)
+          throw failure(409, 'PICKING_BLOCKED', '预占、效期或商品资格变化，不能核对、处置或完成');
+        await tx.redemptionPickingTask.update({
+          where: { id: t.id },
+          data: {
+            version: { increment: 1 },
+            ...(action === 'complete' ? { state: 'CHECKED' } : {}),
+          },
+        });
+        await tx.redemptionPickingWork.create({
+          data: {
+            id: randomUUID(),
+            taskId: t.id,
+            orderId: id,
+            version: version + 1,
+            action: kind ?? action.toUpperCase(),
+            allocationId,
+            quantity,
+            issueId,
+            actorId: r.staffContext!.staffId,
+            requestId: r.requestId,
+          },
+        });
+        await this.catalog.audit(tx, r, 'REDEMPTION_PICKING_' + action.toUpperCase(), id, w);
+        await this.authorize(tx, r, w, action === 'resolve');
+        if (action !== 'report' && (await redemptionPickingReadiness(tx, id)).blockers.length)
+          throw failure(409, 'PICKING_BLOCKED', '处理期间批次或预占资格失效，本次操作回滚');
+        return { id };
+      },
+    );
+  }
 }
 const n = { type: 'integer' as const, minimum: 0 },
+  positive = { ...n, minimum: 1 },
   nullable = { type: 'string' as const, nullable: true };
 const task = object({
   id: text,
@@ -245,11 +382,25 @@ const task = object({
     leaseUntil: nullable,
   }),
   readiness: object({ ready: { type: 'boolean' }, blockers: { type: 'array', items: text } }),
+  work: object({ complete: { type: 'boolean' }, canComplete: { type: 'boolean' } }),
+  history: {
+    type: 'array',
+    items: object({
+      id: text,
+      action: text,
+      allocationId: nullable,
+      quantity: { ...n, nullable: true },
+      actorId: text,
+      createdAt: text,
+    }),
+  },
   lines: {
     type: 'array',
     items: object({
       id: text,
       quantity: n,
+      checked: { type: 'boolean' },
+      issue: { ...object({ id: text, kind: text, quantity: n }), nullable: true },
       batchNo: text,
       locationName: text,
       locationCode: text,
@@ -268,7 +419,7 @@ export class RedemptionPickingController {
   @ApiQuery({
     name: 'status',
     required: false,
-    enum: ['READY', 'CLAIMED', 'CANCELED', 'FAILED', 'QUEUED'],
+    enum: ['READY', 'CLAIMED', 'CHECKED', 'CANCELED', 'FAILED', 'QUEUED'],
   })
   @ApiQuery({ name: 'mine', required: false, enum: ['1'] })
   @Permissions('redemption-picking.read')
@@ -335,5 +486,85 @@ export class RedemptionPickingController {
   ) {
     fields(q, []);
     return success(r, await this.service.write(r, uuid(w), uuid(id), 'retry', key(r), b));
+  }
+  @Post(':id/check')
+  @HttpCode(200)
+  @Permissions('redemption-picking.work')
+  @ApiBody({ schema: object({ version: positive, allocationId: text, quantity: positive }) })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async check(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.work(r, uuid(w), uuid(id), 'check', key(r), b));
+  }
+
+  @Post(':id/report')
+  @HttpCode(200)
+  @Permissions('redemption-picking.work')
+  @ApiBody({
+    schema: object({
+      version: positive,
+      allocationId: text,
+      quantity: positive,
+      kind: { type: 'string', enum: ['SHORTAGE', 'DAMAGE'] },
+    }),
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async report(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.work(r, uuid(w), uuid(id), 'report', key(r), b));
+  }
+
+  @Post(':id/resolve')
+  @HttpCode(200)
+  @Permissions('redemption-picking.resolve')
+  @ApiBody({
+    schema: object({ version: positive, allocationId: text, quantity: positive, issueId: text }),
+  })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async resolve(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.work(r, uuid(w), uuid(id), 'resolve', key(r), b));
+  }
+
+  @Post(':id/complete')
+  @HttpCode(200)
+  @Permissions('redemption-picking.work')
+  @ApiBody({ schema: object({ version: positive }) })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async complete(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.work(r, uuid(w), uuid(id), 'complete', key(r), b));
   }
 }
