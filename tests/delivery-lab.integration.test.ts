@@ -333,15 +333,24 @@ test('stable pagination is scoped and default-off reads remain available while a
 });
 
 async function accept(id: string, body: unknown, cookie = f.extraCookies[1]!) {
-  const r = await fetch(f.base + '/api/v1/delivery-lab/' + id + '/accept?warehouseId=' + f.warehouseId, {
-    method: 'POST',
-    headers: { Cookie: cookie, Origin: 'http://127.0.0.1:5188', 'X-CSRF-Token': await csrf(cookie), 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const r = await fetch(
+    f.base + '/api/v1/delivery-lab/' + id + '/accept?warehouseId=' + f.warehouseId,
+    {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: 'http://127.0.0.1:5188',
+        'X-CSRF-Token': await csrf(cookie),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    },
+  );
   return { status: r.status, ...(await r.json()) };
 }
 test('handoff checks owner and exact count; concurrent original retries create one immutable receipt', async () => {
-  const id = await ready(), rid = await rider();
+  const id = await ready(),
+    rid = await rider();
   assert.equal((await assign(id, { key: randomUUID(), riderId: rid })).status, 200);
   const body = { key: randomUUID(), packageCount: 1 };
   assert.equal((await accept(id, body, f.cookies[1]!)).status, 403);
@@ -352,33 +361,91 @@ test('handoff checks owner and exact count; concurrent original retries create o
     assert.equal((await accept(id, { ...body, packageCount })).status, 400);
   assert.equal((await accept(id, { ...body, state: 'DELIVERED' })).status, 400);
   const results = await Promise.all([accept(id, body), accept(id, body)]);
-  assert.deepEqual(results.map((r) => r.status), [200, 200]);
+  assert.deepEqual(
+    results.map((r) => r.status),
+    [200, 200],
+  );
   assert.equal(results.filter((r) => r.data.duplicate).length, 1);
   assert.equal(await f.runtime.db.deliveryLabHandoff.count(), 1);
   assert.equal(results[0].data.task.handoff.packageCount, 1);
   assert.equal((await accept(id, { ...body, packageCount: 2 })).status, 409);
   assert.equal((await accept(id, { ...body, key: randomUUID() })).status, 409);
   const receipt = await f.runtime.db.deliveryLabHandoff.findFirstOrThrow();
-  await assert.rejects(f.runtime.db.deliveryLabHandoff.update({ where: { id: receipt.id }, data: { packageCount: 2 } }));
+  await assert.rejects(
+    f.runtime.db.deliveryLabHandoff.update({
+      where: { id: receipt.id },
+      data: { packageCount: 2 },
+    }),
+  );
   await assert.rejects(f.runtime.db.deliveryLabHandoff.delete({ where: { id: receipt.id } }));
   assert.equal((await read('/' + id, f.extraCookies[1]!)).data.task.handoff.id, receipt.id);
 });
 test('different handoff requests compete without duplicate evidence', async () => {
   const id = await ready();
   await assign(id, { key: randomUUID(), riderId: await rider() });
-  const results = await Promise.all([accept(id, { key: randomUUID(), packageCount: 1 }), accept(id, { key: randomUUID(), packageCount: 1 })]);
+  const results = await Promise.all([
+    accept(id, { key: randomUUID(), packageCount: 1 }),
+    accept(id, { key: randomUUID(), packageCount: 1 }),
+  ]);
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
   assert.equal(await f.runtime.db.deliveryLabHandoff.count(), 1);
-  assert.equal(await f.runtime.db.businessAudit.count({ where: { action: 'DELIVERY_LAB_ACCEPT' } }), 1);
+  assert.equal(
+    await f.runtime.db.businessAudit.count({ where: { action: 'DELIVERY_LAB_ACCEPT' } }),
+    1,
+  );
 });
 test('database handoff gate rejects mismatched count and revoked rider qualification', async () => {
-  const id = await ready(), rid = await rider();
+  const id = await ready(),
+    rid = await rider();
   await assign(id, { key: randomUUID(), riderId: rid });
   const assignment = await f.runtime.db.deliveryLabAssignment.findFirstOrThrow();
-  const data = { id: randomUUID(), assignmentId: assignment.id, key: randomUUID(), packageCount: 2 };
+  const data = {
+    id: randomUUID(),
+    assignmentId: assignment.id,
+    key: randomUUID(),
+    packageCount: 2,
+  };
   await assert.rejects(f.runtime.db.deliveryLabHandoff.create({ data }));
   await f.runtime.db.staffRole.deleteMany({ where: { staffId: rid, roleCode: 'RIDER' } });
-  await assert.rejects(f.runtime.db.deliveryLabHandoff.create({ data: { ...data, packageCount: 1 } }));
+  await assert.rejects(
+    f.runtime.db.deliveryLabHandoff.create({ data: { ...data, packageCount: 1 } }),
+  );
   assert.equal((await accept(id, { key: randomUUID(), packageCount: 1 })).status, 403);
+  assert.equal(await f.runtime.db.deliveryLabHandoff.count(), 0);
+});
+
+test('handoff audit failure rolls back, original retry recovers, and formal business snapshots remain unchanged', async () => {
+  await f.create();
+  const db = f.runtime.db;
+  const snapshot = async () => ({
+    orders: await db.consumerOrder.findMany(),
+    positions: await db.stockPosition.findMany(),
+    balances: await db.stockBalance.findMany(),
+    lots: await db.stockLot.findMany(),
+    allocations: await db.orderAllocation.findMany(),
+    ledger: await db.stockLedger.findMany(),
+    payment: await db.paymentPreparation.findMany(),
+  });
+  const before = await snapshot(),
+    id = await ready();
+  await assign(id, { key: randomUUID(), riderId: await rider() });
+  const body = { key: randomUUID(), packageCount: 1 };
+  await db.$executeRawUnsafe(
+    "CREATE FUNCTION fail_handoff_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='DELIVERY_LAB_ACCEPT' THEN RAISE EXCEPTION 'Synthetic handoff audit fail'; END IF; RETURN NEW; END $$",
+  );
+  await db.$executeRawUnsafe(
+    'CREATE TRIGGER fail_handoff_audit BEFORE INSERT ON business_audits FOR EACH ROW EXECUTE FUNCTION fail_handoff_audit()',
+  );
+  assert.equal((await accept(id, body)).status, 500);
+  assert.equal(await db.deliveryLabHandoff.count(), 0);
+  await db.$executeRawUnsafe('DROP TRIGGER fail_handoff_audit ON business_audits');
+  assert.equal((await accept(id, body)).status, 200);
+  assert.equal((await accept(id, body)).data.duplicate, true);
+  assert.deepEqual(await snapshot(), before);
+});
+test('default-off handoff refuses writes without creating a receipt', async () => {
+  await f.cleanup();
+  f = await pickingFixture();
+  assert.equal((await accept(randomUUID(), { key: randomUUID(), packageCount: 1 })).status, 503);
   assert.equal(await f.runtime.db.deliveryLabHandoff.count(), 0);
 });

@@ -46,11 +46,13 @@ const dto = (d: Row, enabled: boolean): DeliveryLabTask => {
           createdAt: a.createdAt.toISOString(),
         }
       : null,
-    handoff: a?.handoff ? {
-      id: a.handoff.id,
-      packageCount: a.handoff.packageCount,
-      createdAt: a.handoff.createdAt.toISOString(),
-    } : null,
+    handoff: a?.handoff
+      ? {
+          id: a.handoff.id,
+          packageCount: a.handoff.packageCount,
+          createdAt: a.handoff.createdAt.toISOString(),
+        }
+      : null,
     handoffReadiness: { ready: blockers.length === 0, blockers },
   };
 };
@@ -69,7 +71,14 @@ const taskSchema = object({
     }),
     nullable: true,
   },
-  handoff: { ...object({ id: text, packageCount: { type: 'integer' }, createdAt: { type: 'string', format: 'date-time' } }), nullable: true },
+  handoff: {
+    ...object({
+      id: text,
+      packageCount: { type: 'integer' },
+      createdAt: { type: 'string', format: 'date-time' },
+    }),
+    nullable: true,
+  },
   handoffReadiness: object({ ready: { type: 'boolean' }, blockers: strings }),
 });
 const listSchema = object({
@@ -164,24 +173,57 @@ export class DeliveryLabService {
     return this.catalog.db.$transaction(async (tx) => {
       await this.catalog.warehouse(tx, r, w);
       await tx.$queryRaw`SELECT t.id FROM picking_lab_tasks t JOIN picking_lab_packs p ON p.task_id=t.id JOIN picking_lab_dispatches d ON d.pack_id=p.id WHERE d.id=${id}::uuid AND t.warehouse_id=${w}::uuid FOR UPDATE OF t`;
-      const d = await tx.pickingLabDispatch.findFirst({ where: { id, pack: { task: { warehouseId: w } }, assignment: { riderId: r.staffContext!.staffId } }, include });
-      if (!d || !d.assignment) throw failure(404, 'DELIVERY_LAB_NOT_FOUND', '本人合成配送任务不存在');
+      const d = await tx.pickingLabDispatch.findFirst({
+        where: {
+          id,
+          pack: { task: { warehouseId: w } },
+          assignment: { riderId: r.staffContext!.staffId },
+        },
+        include,
+      });
+      if (!d || !d.assignment)
+        throw failure(404, 'DELIVERY_LAB_NOT_FOUND', '本人合成配送任务不存在');
       const h = d.assignment.handoff;
       if (h) {
-        if (h.key !== key) throw failure(409, 'DELIVERY_ALREADY_ACCEPTED', '已经接货，不能重复交接');
-        if (h.packageCount !== packageCount) throw failure(409, 'IDEMPOTENCY_CONFLICT', '原接货数量已改变');
+        if (h.key !== key)
+          throw failure(409, 'DELIVERY_ALREADY_ACCEPTED', '已经接货，不能重复交接');
+        if (h.packageCount !== packageCount)
+          throw failure(409, 'IDEMPOTENCY_CONFLICT', '原接货数量已改变');
         return { task: dto(d, this.enabled), duplicate: true };
       }
       // Lock current qualifications before re-reading them; revocation serializes with this receipt.
-      const people = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM staff WHERE id=${d.assignment.riderId}::uuid AND enabled FOR SHARE`;
-      const roles = await tx.$queryRaw<{ staff_id: string }[]>`SELECT staff_id FROM staff_roles WHERE staff_id=${d.assignment.riderId}::uuid AND role_code='RIDER' FOR SHARE`;
-      const scopes = await tx.$queryRaw<{ staff_id: string }[]>`SELECT staff_id FROM staff_warehouses WHERE staff_id=${d.assignment.riderId}::uuid AND warehouse_id=${w}::uuid FOR SHARE`;
-      if (!people.length || !roles.length || !scopes.length || !dto(d, this.enabled).handoffReadiness.ready)
+      const people = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM staff WHERE id=${d.assignment.riderId}::uuid AND enabled FOR SHARE`;
+      const roles = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_roles WHERE staff_id=${d.assignment.riderId}::uuid AND role_code='RIDER' FOR SHARE`;
+      const scopes = await tx.$queryRaw<
+        { staff_id: string }[]
+      >`SELECT staff_id FROM staff_warehouses WHERE staff_id=${d.assignment.riderId}::uuid AND warehouse_id=${w}::uuid FOR SHARE`;
+      if (
+        !people.length ||
+        !roles.length ||
+        !scopes.length ||
+        !dto(d, this.enabled).handoffReadiness.ready
+      )
         throw failure(409, 'DELIVERY_NOT_READY', '当前骑手或任务不满足接货资格');
-      if (packageCount !== d.pack.packageCount) throw failure(409, 'PACKAGE_COUNT_MISMATCH', '核对包裹数必须与合成出库凭据一致');
-      await tx.deliveryLabHandoff.create({ data: { id: randomUUID(), assignmentId: d.assignment.id, key, packageCount } });
-      await this.catalog.audit(tx, r, 'DELIVERY_LAB_ACCEPT', id, w, null, { syntheticOnly: true, packageCount });
-      return { task: dto(await tx.pickingLabDispatch.findUniqueOrThrow({ where: { id }, include }), this.enabled), duplicate: false };
+      if (packageCount !== d.pack.packageCount)
+        throw failure(409, 'PACKAGE_COUNT_MISMATCH', '核对包裹数必须与合成出库凭据一致');
+      await tx.deliveryLabHandoff.create({
+        data: { id: randomUUID(), assignmentId: d.assignment.id, key, packageCount },
+      });
+      await this.catalog.audit(tx, r, 'DELIVERY_LAB_ACCEPT', id, w, null, {
+        syntheticOnly: true,
+        packageCount,
+      });
+      return {
+        task: dto(
+          await tx.pickingLabDispatch.findUniqueOrThrow({ where: { id }, include }),
+          this.enabled,
+        ),
+        duplicate: false,
+      };
     });
   }
   async assign(r: ApiRequest, w: string, id: string, key: string, riderId: string) {
@@ -289,11 +331,33 @@ export class DeliveryLabController {
   @ApiParam({ name: 'id', type: String })
   @ApiQuery({ name: 'warehouseId', required: true, type: String })
   @ApiHeader({ name: 'X-CSRF-Token', required: true })
-  @ApiBody({ schema: object({ key: { type: 'string', format: 'uuid' }, packageCount: { type: 'integer', minimum: 1, maximum: 100 } }) })
-  @ApiResult(object({ task: taskSchema, duplicate: { type: 'boolean' } }), [400, 401, 403, 404, 409, 503, 500])
-  async accept(@Req() r: ApiRequest, @Query() q: unknown, @Param('id') id: string, @Body() body: unknown) {
+  @ApiBody({
+    schema: object({
+      key: { type: 'string', format: 'uuid' },
+      packageCount: { type: 'integer', minimum: 1, maximum: 100 },
+    }),
+  })
+  @ApiResult(
+    object({ task: taskSchema, duplicate: { type: 'boolean' } }),
+    [400, 401, 403, 404, 409, 503, 500],
+  )
+  async accept(
+    @Req() r: ApiRequest,
+    @Query() q: unknown,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     const b = fields(body, ['key', 'packageCount']);
-    return success(r, await this.service.accept(r, query(q).w, uuid(id), uuid(b.key), integer(b.packageCount, 1, 100)));
+    return success(
+      r,
+      await this.service.accept(
+        r,
+        query(q).w,
+        uuid(id),
+        uuid(b.key),
+        integer(b.packageCount, 1, 100),
+      ),
+    );
   }
   @Post(':id/assign')
   @HttpCode(200)
@@ -311,31 +375,6 @@ export class DeliveryLabController {
     object({ task: taskSchema, duplicate: { type: 'boolean' } }),
     [400, 401, 403, 404, 409, 503, 500],
   )
-  async accept(r: ApiRequest, w: string, id: string, key: string, packageCount: number) {
-    if (!this.enabled) throw failure(503, 'PICKING_LAB_DISABLED', '本机配送演练写入尚未开启');
-    return this.catalog.db.$transaction(async (tx) => {
-      await this.catalog.warehouse(tx, r, w);
-      await tx.$queryRaw`SELECT t.id FROM picking_lab_tasks t JOIN picking_lab_packs p ON p.task_id=t.id JOIN picking_lab_dispatches d ON d.pack_id=p.id WHERE d.id=${id}::uuid AND t.warehouse_id=${w}::uuid FOR UPDATE OF t`;
-      const d = await tx.pickingLabDispatch.findFirst({ where: { id, pack: { task: { warehouseId: w } }, assignment: { riderId: r.staffContext!.staffId } }, include });
-      if (!d || !d.assignment) throw failure(404, 'DELIVERY_LAB_NOT_FOUND', '本人合成配送任务不存在');
-      const h = d.assignment.handoff;
-      if (h) {
-        if (h.key !== key) throw failure(409, 'DELIVERY_ALREADY_ACCEPTED', '已经接货，不能重复交接');
-        if (h.packageCount !== packageCount) throw failure(409, 'IDEMPOTENCY_CONFLICT', '原接货数量已改变');
-        return { task: dto(d, this.enabled), duplicate: true };
-      }
-      // Lock current qualifications before re-reading them; revocation serializes with this receipt.
-      const people = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM staff WHERE id=${d.assignment.riderId}::uuid AND enabled FOR SHARE`;
-      const roles = await tx.$queryRaw<{ staff_id: string }[]>`SELECT staff_id FROM staff_roles WHERE staff_id=${d.assignment.riderId}::uuid AND role_code='RIDER' FOR SHARE`;
-      const scopes = await tx.$queryRaw<{ staff_id: string }[]>`SELECT staff_id FROM staff_warehouses WHERE staff_id=${d.assignment.riderId}::uuid AND warehouse_id=${w}::uuid FOR SHARE`;
-      if (!people.length || !roles.length || !scopes.length || !dto(d, this.enabled).handoffReadiness.ready)
-        throw failure(409, 'DELIVERY_NOT_READY', '当前骑手或任务不满足接货资格');
-      if (packageCount !== d.pack.packageCount) throw failure(409, 'PACKAGE_COUNT_MISMATCH', '核对包裹数必须与合成出库凭据一致');
-      await tx.deliveryLabHandoff.create({ data: { id: randomUUID(), assignmentId: d.assignment.id, key, packageCount } });
-      await this.catalog.audit(tx, r, 'DELIVERY_LAB_ACCEPT', id, w, null, { syntheticOnly: true, packageCount });
-      return { task: dto(await tx.pickingLabDispatch.findUniqueOrThrow({ where: { id }, include }), this.enabled), duplicate: false };
-    });
-  }
   async assign(
     @Req() r: ApiRequest,
     @Query() q: unknown,

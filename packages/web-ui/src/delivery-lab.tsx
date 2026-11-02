@@ -254,7 +254,11 @@ function DeliveryPanel({
                 <article className="readiness-check picking-order-card" key={t.id}>
                   <h3>{t.label}</h3>
                   <span className={'badge ' + (t.assignment ? 'green' : 'amber')}>
-                    {t.handoff ? '合成接货已记录' : t.assignment ? '已分配 · 尚未交接' : '待分配骑手'}
+                    {t.handoff
+                      ? '合成接货已记录'
+                      : t.assignment
+                        ? '已分配 · 尚未交接'
+                        : '待分配骑手'}
                   </span>
                   <p>
                     {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
@@ -313,7 +317,11 @@ function DeliveryPanel({
                 <div className="readiness-check">
                   <h3>交接资格核验</h3>
                   <span className={'badge ' + (task.handoffReadiness.ready ? 'green' : 'amber')}>
-                    {task.handoff ? '合成接货已记录' : task.handoffReadiness.ready ? '资格满足 · 尚未接货' : '交接资格未满足'}
+                    {task.handoff
+                      ? '合成接货已记录'
+                      : task.handoffReadiness.ready
+                        ? '资格满足 · 尚未接货'
+                        : '交接资格未满足'}
                   </span>
                   <ul>
                     {task.handoffReadiness.blockers.map((b) => (
@@ -327,12 +335,23 @@ function DeliveryPanel({
                 {task.handoff ? (
                   <div className="picking-line" role="status">
                     <h3>不可变合成接货凭据</h3>
-                    <p>已核对 {task.handoff.packageCount} 个合成包裹 · {date(task.handoff.createdAt)}</p>
+                    <p>
+                      已核对 {task.handoff.packageCount} 个合成包裹 · {date(task.handoff.createdAt)}
+                    </p>
                     <p>不代表实物交接或送达。</p>
                   </div>
                 ) : null}
                 {profile.permissions.includes('delivery-lab.accept') && (
-                  <AcceptForm key={task.id} task={task} w={w} profile={profile} enabled={enabled} onResult={(result) => setTask((current) => current?.id === result.id ? result : current)} />
+                  <AcceptForm
+                    key={task.id}
+                    task={task}
+                    w={w}
+                    profile={profile}
+                    enabled={enabled}
+                    onResult={(result) =>
+                      setTask((current) => (current?.id === result.id ? result : current))
+                    }
+                  />
                 )}
                 {task.assignment ? (
                   <div className="picking-line">
@@ -394,8 +413,17 @@ function DeliveryPanel({
 
 // Kept above the detail lifecycle so a read refresh cannot silently replace an unknown request.
 const acceptPending = new Map<string, { key: string; packageCount: number }>();
-function AcceptForm({ task, w, profile, enabled, onResult }: {
-  task: DeliveryLabTask; w: string; profile: StaffProfile; enabled: boolean;
+function AcceptForm({
+  task,
+  w,
+  profile,
+  enabled,
+  onResult,
+}: {
+  task: DeliveryLabTask;
+  w: string;
+  profile: StaffProfile;
+  enabled: boolean;
   onResult: (task: DeliveryLabTask) => void;
 }) {
   const scope = profile.id + ':' + profile.csrfToken + ':' + w + ':' + task.id;
@@ -416,7 +444,11 @@ function AcceptForm({ task, w, profile, enabled, onResult }: {
     try {
       const r = await staffRequest<{ task: DeliveryLabTask; duplicate: boolean }>(
         '/delivery-lab/' + task.id + '/accept?warehouseId=' + w,
-        { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken }, body: JSON.stringify(op) },
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
+          body: JSON.stringify(op),
+        },
       );
       acceptPending.delete(scope);
       setPending(undefined);
@@ -433,15 +465,44 @@ function AcceptForm({ task, w, profile, enabled, onResult }: {
       setBusy(false);
     }
   }
-  return <form className="picking-line picking-check-form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-    <h3>本人合成接货核对</h3>
-    {message && <p role="status">{message}</p>}
-    {pending ? <p>接货结果未确认，请按原请求恢复。原核对数量：{pending.packageCount}。</p> : !task.handoff && <label>
-      实际核对合成包裹数
-      <input aria-label="实际核对合成包裹数" type="number" min="1" max="100" step="1" required value={quantity} disabled={busy || !enabled} onChange={(e) => setQuantity(e.target.value)} />
-    </label>}
-    {(!task.handoff || pending) && <button className="primary-button" disabled={busy || !enabled || (!pending && !task.handoffReadiness.ready)}>
-      {busy ? '正在确认…' : pending ? '按原接货请求重试' : '确认本人合成接货'}
-    </button>}
-  </form>;
+  return (
+    <form
+      className="picking-line picking-check-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+    >
+      <h3>本人合成接货核对</h3>
+      {message && <p role="status">{message}</p>}
+      {pending ? (
+        <p>接货结果未确认，请按原请求恢复。原核对数量：{pending.packageCount}。</p>
+      ) : (
+        !task.handoff && (
+          <label>
+            实际核对合成包裹数
+            <input
+              aria-label="实际核对合成包裹数"
+              type="number"
+              min="1"
+              max="100"
+              step="1"
+              required
+              value={quantity}
+              disabled={busy || !enabled}
+              onChange={(e) => setQuantity(e.target.value)}
+            />
+          </label>
+        )
+      )}
+      {(!task.handoff || pending) && (
+        <button
+          className="primary-button"
+          disabled={busy || !enabled || (!pending && !task.handoffReadiness.ready)}
+        >
+          {busy ? '正在确认…' : pending ? '按原接货请求重试' : '确认本人合成接货'}
+        </button>
+      )}
+    </form>
+  );
 }
