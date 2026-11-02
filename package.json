@@ -134,7 +134,11 @@
     "pretest:rewards": "npm run build:server",
     "test:rewards": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/rewards.integration.test.ts",
     "preverify:rewards:ui": "npm run build:server",
-    "verify:rewards:ui": "node --env-file=.env --import tsx scripts/ui/verify-rewards.mjs"
+    "verify:rewards:ui": "node --env-file=.env --import tsx scripts/ui/verify-rewards.mjs",
+    "pretest:redemptions": "npm run build:server",
+    "test:redemptions": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemptions.integration.test.ts",
+    "preverify:redemptions:ui": "npm run build:server",
+    "verify:redemptions:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemptions.mjs"
   },
   "pnpm": {
     "overrides": {

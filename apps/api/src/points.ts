@@ -27,12 +27,16 @@ export class PointsService {
         sourceAmount: string | null;
         sourceCreatedAt: Date | null;
         relatedEntryId: string | null;
+        redemptionId: string | null;
+        redemptionOrderNo: string | null;
       }>
-    >`SELECT l.id,l.delta::text,l.reason,l.created_at AS "createdAt",CASE WHEN c.id IS NOT NULL THEN 'GRANT_REVERSAL' WHEN g.id IS NOT NULL THEN 'GRANT' ELSE 'ADJUSTMENT' END AS "entryKind",source.amount::text AS "sourceAmount",source.decided_at AS "sourceCreatedAt",original.id AS "relatedEntryId" FROM points_ledger l
+    >`SELECT l.id,l.delta::text,l.reason,l.created_at AS "createdAt",CASE WHEN l.redemption_action='REDEEM' THEN 'REDEMPTION' WHEN l.redemption_action='CANCEL' THEN 'REDEMPTION_RETURN' WHEN c.id IS NOT NULL THEN 'GRANT_REVERSAL' WHEN g.id IS NOT NULL THEN 'GRANT' ELSE 'ADJUSTMENT' END AS "entryKind",source.amount::text AS "sourceAmount",source.decided_at AS "sourceCreatedAt",COALESCE(original.id,redemption_debit.id) AS "relatedEntryId",ro.id AS "redemptionId",ro.order_no AS "redemptionOrderNo" FROM points_ledger l
        LEFT JOIN points_grants g ON l.action_key='GRANT:'||g.id::text AND g.user_id=l.user_id
        LEFT JOIN points_corrections c ON l.action_key='CORRECTION:'||c.id::text AND c.user_id=l.user_id
        LEFT JOIN points_grants source ON source.id=c.grant_id AND source.user_id=l.user_id
        LEFT JOIN points_ledger original ON original.action_key='GRANT:'||source.id::text AND original.user_id=l.user_id
+       LEFT JOIN redemption_orders ro ON ro.id=l.redemption_id AND ro.user_id=l.user_id
+       LEFT JOIN points_ledger redemption_debit ON redemption_debit.redemption_id=ro.id AND redemption_debit.redemption_action='REDEEM' AND redemption_debit.user_id=l.user_id AND l.redemption_action='CANCEL'
        WHERE l.user_id=${userId}::uuid AND (${cursor}::uuid IS NULL OR l.id>${cursor}::uuid)
        ORDER BY l.id LIMIT 21`;
     const items = rows.slice(0, 20).map((r) => ({
@@ -83,6 +87,8 @@ const ledgerSchema = object({
       entryKind: text,
       sourceAmount: { type: 'string', nullable: true },
       sourceCreatedAt: { type: 'string', nullable: true },
+      redemptionId: { type: 'string', nullable: true },
+      redemptionOrderNo: { type: 'string', nullable: true },
       relatedEntryId: { type: 'string', nullable: true },
     }),
   },

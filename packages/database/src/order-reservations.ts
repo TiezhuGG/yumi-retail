@@ -8,7 +8,6 @@ export async function orderReservationDelta(
   tx: Tx,
   allocation: {
     id: string;
-    orderId: string;
     positionId: string;
     warehouseId: string;
     skuId: string;
@@ -18,6 +17,7 @@ export async function orderReservationDelta(
   release: boolean,
   requestId: string,
   consumerId?: string,
+  source: 'ORDER' | 'REDEMPTION' = 'ORDER',
 ) {
   const quantity = release ? -allocation.quantity : allocation.quantity;
   await tx.stockBalance.update({
@@ -39,7 +39,7 @@ export async function orderReservationDelta(
       lotId: allocation.lotId,
       warehouseId: allocation.warehouseId,
       skuId: allocation.skuId,
-      actionKey: `ORDER_${release ? 'RELEASE' : 'RESERVE'}:${allocation.id}`,
+      actionKey: `${source}_${release ? 'RELEASE' : 'RESERVE'}:${allocation.id}`,
       deltaOnHand: 0,
       deltaReserved: quantity,
       deltaBlocked: 0,

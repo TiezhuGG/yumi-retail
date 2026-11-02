@@ -1,3 +1,4 @@
+import { RedemptionsWorkbench } from './redemptions.js';
 import { RewardsWorkbench } from './rewards.js';
 import { PointsGrants } from './points-grants.js';
 import { PointsWorkbench } from './points.js';
@@ -21,6 +22,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'redemptions'
   | 'rewards'
   | 'points-corrections'
   | 'points-grants'
@@ -54,6 +56,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'redemptions',
+    name: '积分兑换订单',
+    glyph: '◇',
+    hint: '查询兑换扣分、预占与取消凭据',
+    permission: 'points.read',
+  },
   {
     id: 'rewards',
     name: '兑换商品',
@@ -463,6 +472,8 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'redemptions' ? (
+            <RedemptionsWorkbench />
           ) : activeView === 'rewards' ? (
             <RewardsWorkbench profile={profile} />
           ) : activeView === 'points-corrections' ? (

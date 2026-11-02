@@ -9,6 +9,8 @@ type Entry = {
   reason: string;
   createdAt: string;
   entryKind?: string;
+  redemptionId?: string | null;
+  redemptionOrderNo?: string | null;
   sourceAmount?: string | null;
   sourceCreatedAt?: string | null;
 };
@@ -106,7 +108,7 @@ export default function Points() {
               <View className="account-card">
                 <Text className="account-card-title">积分明细</Text>
                 <Text className="account-copy">
-                  积分不兑换现金。发放记录以到账明细为准，商品兑换正在准备中。
+                  积分不兑换现金。发放记录以到账明细为准，兑换扣除及取消退还可查看关联兑换单。
                 </Text>
                 {items.length === 0 && <Text>暂无积分记录</Text>}
               </View>
@@ -117,6 +119,19 @@ export default function Points() {
                     {e.delta} 积分
                   </Text>
                   <Text className="account-copy">{e.reason}</Text>
+                  {e.redemptionId && (
+                    <Button
+                      className="account-link redemption-order-no"
+                      onClick={() =>
+                        void Taro.navigateTo({
+                          url: '/pages/redemption/index?id=' + e.redemptionId,
+                        })
+                      }
+                    >
+                      {e.entryKind === 'REDEMPTION_RETURN' ? '取消退积分' : '兑换扣积分'} ·
+                      查看兑换单
+                    </Button>
+                  )}
                   {e.entryKind === 'GRANT_REVERSAL' && (
                     <Text className="account-copy">
                       误发冲正 · 原发放 {e.sourceAmount} 积分

@@ -23,6 +23,7 @@ test('production, public binding, real payment and every nonzero or malformed to
     ...[
       'CONSUMER_DEV_LOGIN_ENABLED',
       'ORDER_DEV_SUBMIT_ENABLED',
+      'REDEMPTION_DEV_SUBMIT_ENABLED',
       'PAYMENT_NOTIFICATION_LAB_ENABLED',
       'PAYMENT_QUERY_LAB_WORKER_ENABLED',
       'PICKING_LAB_ENABLED',

@@ -12,6 +12,7 @@ export interface ApplicationConfig {
   productImageRoot?: string;
   addressEncryptionKey?: string;
   orderDevSubmit?: boolean;
+  redemptionDevSubmit?: boolean;
   orderDevHoldSeconds?: number;
   consumerDevLogin?: boolean;
   consumerSessionSeconds?: number;
@@ -91,6 +92,15 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
       (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
   )
     throw new Error('Notification lab requires non-production loopback binding.');
+  if (env.REDEMPTION_DEV_SUBMIT_ENABLED && !['0', '1'].includes(env.REDEMPTION_DEV_SUBMIT_ENABLED))
+    throw new Error('Invalid REDEMPTION_DEV_SUBMIT_ENABLED.');
+  const redemptionDevSubmit = env.REDEMPTION_DEV_SUBMIT_ENABLED === '1';
+  if (
+    redemptionDevSubmit &&
+    (environment === 'production' ||
+      (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
+  )
+    throw new Error('Redemption submission is local development only.');
   const orderDevSubmit = env.ORDER_DEV_SUBMIT_ENABLED === '1';
   if (
     orderDevSubmit &&
@@ -112,6 +122,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     paymentConfiguration: paymentConfiguration(env),
     orderDevHoldSeconds: Number(env.ORDER_DEV_HOLD_SECONDS ?? 900),
     orderDevSubmit,
+    redemptionDevSubmit,
     addressEncryptionKey: env.ADDRESS_ENCRYPTION_KEY || undefined,
     environment: environment as ApplicationConfig['environment'],
     staffOrigins: origins,

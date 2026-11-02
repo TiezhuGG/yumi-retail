@@ -2,8 +2,8 @@
 import { randomUUID } from 'node:crypto';
 import { pointsFixture } from './points-fixture.ts';
 import { seedCartCatalog } from './cart-catalog.ts';
-export async function rewardsFixture() {
-  const f = await pointsFixture();
+export async function rewardsFixture(options: { redemptions?: boolean; orders?: boolean } = {}) {
+  const f = await pointsFixture(options);
   try {
     const catalog = await seedCartCatalog(f.runtime, f.warehouseId, true);
     const me = await fetch(f.base + '/api/v1/staff/me', { headers: { Cookie: f.cookie } });

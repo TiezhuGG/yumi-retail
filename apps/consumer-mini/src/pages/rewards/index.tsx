@@ -120,7 +120,7 @@ export default function Rewards() {
       </View>
       <View className="account-content">
         <View className="reward-notice">
-          <Text>商城商品浏览已开放，兑换下单正在准备中。</Text>
+          <Text>商城商品可浏览，正式兑换尚未开放；本机开发兑换仅用于隔离验证。</Text>
           <Text>积分不兑换现金；具体兑换、配送与售后规则正式开放前公布。</Text>
         </View>
         <View className="reward-search">

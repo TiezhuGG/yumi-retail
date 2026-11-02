@@ -118,7 +118,7 @@ export default function RewardDetail() {
                 {item.endsAt ? '；结束：' + time(item.endsAt) + '（北京时间）' : '；结束时间不限'}
               </Text>
               <Text className="account-copy">
-                当前仅展示商品与积分合计，不扣积分、不占用库存。配送、取消与售后规则待正式开放前公布。
+                此处积分合计仅供预览。启用本机开发兑换后，需在确认页核验报价并明确确认，才会扣分预占；正式配送与售后规则待公布。
               </Text>
               <Button
                 className="account-link"
@@ -126,8 +126,16 @@ export default function RewardDetail() {
               >
                 查看配送范围 →
               </Button>
-              <Button className="points-action" disabled>
-                兑换下单待开放
+              <Button
+                className="points-action"
+                disabled={!item.redemptionEnabled || !valid}
+                onClick={() =>
+                  void Taro.navigateTo({
+                    url: '/pages/redemption-checkout/index?id=' + item.id + '&quantity=' + count,
+                  })
+                }
+              >
+                {item.redemptionEnabled ? '核验开发兑换' : '兑换下单待开放'}
               </Button>
             </View>
           </>

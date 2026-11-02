@@ -329,6 +329,8 @@ model StockLot {
 }
 
 model StockLedger {
+ redemptionReserves RedemptionAllocation[] @relation("redemptionReserve")
+ redemptionReleases RedemptionAllocation[] @relation("redemptionRelease")
   id              String            @id @db.Uuid
   lotId           String            @map("lot_id") @db.Uuid
   warehouseId     String            @map("warehouse_id") @db.Uuid
@@ -401,6 +403,7 @@ model WarehouseLocation {
 }
 
 model StockPosition {
+ redemptionAllocations RedemptionAllocation[]
   id          String            @id @db.Uuid
   warehouseId String            @map("warehouse_id") @db.Uuid
   skuId       String            @map("sku_id") @db.Uuid
@@ -622,6 +625,10 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ redemptionQuotes RedemptionQuote[]
+ redemptions RedemptionOrder[]
+ redemptionEvents RedemptionEvent[]
+ consumerPointActions PointsEntry[]
  pointsGrants PointsGrant[]
   pointsAccount PointsAccount?
   id          String   @id @db.Uuid
@@ -1270,11 +1277,17 @@ model PointsEntry {
  delta BigInt
  actionKey String @unique @map("action_key") @db.VarChar(160)
  reason String @db.VarChar(300)
- actorId String @map("actor_id") @db.Uuid
+ actorId String? @map("actor_id") @db.Uuid
+ consumerActorId String? @map("consumer_actor_id") @db.Uuid
+ redemptionId String? @map("redemption_id") @db.Uuid
+ redemptionAction String? @map("redemption_action") @db.VarChar(16)
+ consumerActor ConsumerUser? @relation(fields:[consumerActorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ redemption RedemptionOrder? @relation(fields:[redemptionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
  account PointsAccount @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
- actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@index([userId,id],map:"points_ledger_owner_idx")
+ @@unique([redemptionId,redemptionAction],map:"points_ledger_redemption_action_key")
  @@map("points_ledger")
 }
 
@@ -1335,6 +1348,8 @@ model PointsCorrection {
 }
 
 model RewardProduct {
+ redemptionQuotes RedemptionQuote[]
+ redemptions RedemptionOrder[]
  id String @id @db.Uuid
  warehouseId String @map("warehouse_id") @db.Uuid
  skuId String @map("sku_id") @db.Uuid
@@ -1354,4 +1369,90 @@ model RewardProduct {
  @@unique([id,warehouseId,skuId],map:"reward_products_source_unique")
  @@index([warehouseId,status,sortOrder,id],map:"reward_products_scope_idx")
  @@map("reward_products")
+}
+
+model RedemptionQuote {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ rewardId String @map("reward_id") @db.Uuid
+ snapshot Json
+ createdAt DateTime @map("created_at") @db.Timestamptz(3)
+ expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ reward RewardProduct @relation(fields:[rewardId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ order RedemptionOrder?
+ @@unique([id,userId])
+ @@index([userId,expiresAt],map:"redemption_quotes_owner_idx")
+ @@map("redemption_quotes")
+}
+model RedemptionOrder {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ quoteId String @unique @map("quote_id") @db.Uuid
+ rewardId String @map("reward_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ skuId String @map("sku_id") @db.Uuid
+ orderNo String @unique @map("order_no") @db.VarChar(40)
+ status String @default("ACTIVE") @db.VarChar(16)
+ title String @db.VarChar(120)
+ name String @db.VarChar(120)
+ spec String @db.VarChar(100)
+ unit String @db.VarChar(16)
+ quantity Int
+ pointsPrice BigInt @map("points_price")
+ totalPoints BigInt @map("total_points")
+ rewardVersion Int @map("reward_version")
+ addressPayload String @map("address_payload")
+ createdAt DateTime @map("created_at") @db.Timestamptz(3)
+ canceledAt DateTime? @map("canceled_at") @db.Timestamptz(3)
+ version Int @default(0)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ quote RedemptionQuote @relation(fields:[quoteId,userId],references:[id,userId],onDelete:Restrict,onUpdate:NoAction)
+ reward RewardProduct @relation(fields:[rewardId,warehouseId,skuId],references:[id,warehouseId,skuId],onDelete:Restrict,onUpdate:NoAction)
+ allocations RedemptionAllocation[]
+ entries PointsEntry[]
+ events RedemptionEvent[]
+ outbox RedemptionOutbox?
+ @@unique([id,warehouseId,skuId])
+ @@unique([quoteId,userId])
+ @@index([userId,id],map:"redemption_orders_owner_idx")
+ @@index([warehouseId,status,id],map:"redemption_orders_scope_idx")
+ @@index([rewardId,userId,status],map:"redemption_orders_quota_idx")
+ @@map("redemption_orders")
+}
+model RedemptionAllocation {
+ id String @id @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ skuId String @map("sku_id") @db.Uuid
+ lotId String @map("lot_id") @db.Uuid
+ positionId String @map("position_id") @db.Uuid
+ quantity Int
+ reserveLedgerId String @unique @map("reserve_ledger_id") @db.Uuid
+ releaseLedgerId String? @unique @map("release_ledger_id") @db.Uuid
+ order RedemptionOrder @relation(fields:[orderId,warehouseId,skuId],references:[id,warehouseId,skuId],onDelete:Restrict,onUpdate:NoAction)
+ position StockPosition @relation(fields:[positionId,warehouseId,skuId,lotId],references:[id,warehouseId,skuId,lotId],onDelete:Restrict,onUpdate:NoAction)
+ reserve StockLedger @relation("redemptionReserve",fields:[reserveLedgerId,warehouseId,skuId,lotId],references:[id,warehouseId,skuId,lotId],onDelete:Restrict,onUpdate:NoAction)
+ release StockLedger? @relation("redemptionRelease",fields:[releaseLedgerId,warehouseId,skuId,lotId],references:[id,warehouseId,skuId,lotId],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([orderId,positionId])
+ @@map("redemption_allocations")
+}
+model RedemptionOutbox {
+ orderId String @id @map("order_id") @db.Uuid
+ state String @default("PENDING") @db.VarChar(16)
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_outbox")
+}
+model RedemptionEvent {
+ id String @id @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ type String @db.VarChar(32)
+ consumerActorId String @map("consumer_actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ consumerActor ConsumerUser @relation(fields:[consumerActorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([orderId,type])
+ @@map("redemption_events")
 }

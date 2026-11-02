@@ -15,6 +15,6 @@ export type Reward = {
   version: number;
   startsAt: string | null;
   endsAt: string | null;
-  redemptionEnabled: false;
+  redemptionEnabled: boolean;
 };
 export type RewardPage = { items: Reward[]; nextCursor: string | null };

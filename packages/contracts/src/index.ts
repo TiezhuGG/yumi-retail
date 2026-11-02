@@ -802,3 +802,56 @@ export type DeliveryLabList = {
   items: DeliveryLabTask[];
   nextCursor: string | null;
 };
+
+export interface RedemptionQuoteView {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  expired: boolean;
+  snapshot: {
+    rewardId: string;
+    rewardVersion: number;
+    quantity: number;
+    addressId: string;
+    addressVersion: number;
+    title: string;
+    name: string;
+    spec: string;
+    unit: string;
+    pointsPrice: string;
+    totalPoints: string;
+    balance: string;
+    remainingBalance: string;
+    deliveryMode: 'LOCAL_NO_CASH';
+  };
+}
+export interface RedemptionOrderView {
+  id: string;
+  orderNo: string;
+  status: 'ACTIVE' | 'CANCELED';
+  title: string;
+  name: string;
+  spec: string;
+  unit: string;
+  quantity: number;
+  pointsPrice: string;
+  totalPoints: string;
+  createdAt: string;
+  canceledAt: string | null;
+  version: number;
+  fulfillmentState: 'PENDING' | 'CANCELED' | 'MISSING';
+  address?: ConsumerOrderAddress;
+  allocations?: Array<{
+    quantity: number;
+    batchNo: string;
+    locationName: string;
+    locationCode: string;
+    reserved: boolean;
+    released: boolean;
+  }>;
+  events?: Array<{ type: string; createdAt: string }>;
+}
+export interface RedemptionOrderPage {
+  items: RedemptionOrderView[];
+  nextCursor: string | null;
+}

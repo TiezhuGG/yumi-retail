@@ -130,6 +130,12 @@ export default function Account() {
           <Text className="account-card-title">个人服务</Text>
           <Button
             className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/redemptions/index' })}
+          >
+            我的兑换订单 →
+          </Button>
+          <Button
+            className="account-link"
             onClick={() => void Taro.navigateTo({ url: '/pages/rewards/index' })}
           >
             积分商城 →

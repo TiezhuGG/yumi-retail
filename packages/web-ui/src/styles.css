@@ -2978,3 +2978,6 @@ small {
   background: #e4f4e9;
   color: #006b36;
 }
+.redemption-order-no {
+  overflow-wrap: anywhere;
+}
