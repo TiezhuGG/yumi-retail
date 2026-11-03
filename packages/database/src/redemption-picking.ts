@@ -67,7 +67,10 @@ const sourceInclude = {
           shipment: {
             include: {
               assignments: {
-                where: { withdrawal: null },
+                where: {
+                  withdrawal: null,
+                  OR: [{ handoff: null }, { handoff: { returned: null } }],
+                },
                 include: { handoff: { include: { journey: true } } },
               },
             },
@@ -86,7 +89,7 @@ const sourceInclude = {
     include: { position: { include: { lot: true, location: true } } },
     orderBy: { id: 'asc' as const },
   },
-} as const;
+} satisfies Prisma.RedemptionOrderInclude;
 export async function redemptionPickingReadiness(tx: Tx, id: string) {
   const order = await tx.redemptionOrder.findUnique({ where: { id }, include: sourceInclude });
   const blockers: string[] = [];

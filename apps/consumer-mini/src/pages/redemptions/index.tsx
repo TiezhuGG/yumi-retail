@@ -102,6 +102,11 @@ export default function Redemptions() {
               {o.spec} · {o.quantity} 件
             </Text>
             <Text className="reward-price">{o.totalPoints} 积分</Text>
+            {o.deliveryReturnRecorded && (
+              <Text className="account-copy">
+                曾回交仓库，以下为重新安排的配送进度；积分未重复扣减。
+              </Text>
+            )}
             <Text className="account-copy">
               {o.status === 'CANCELED'
                 ? '已取消 · 积分已退还'
@@ -114,9 +119,13 @@ export default function Redemptions() {
                       : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
                         ? '骑手已核对接货，等待开始配送。'
                         : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                          ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                          ? o.deliveryReturnRecorded
+                            ? '已重新分配，等待骑手核对接货。'
+                            : '已分配骑手，等待骑手核对接货；尚未开始配送。'
                           : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                            ? '已出库，等待骑手接货；尚未开始配送。'
+                            ? o.deliveryReturnRecorded
+                              ? '包裹已回交，等待门店重新安排配送。'
+                              : '已出库，等待骑手接货；尚未开始配送。'
                             : o.fulfillmentState === 'PACKED_WAIT_SHIP'
                               ? '已打包，等待仓库出库；尚未配送。'
                               : o.fulfillmentState === 'PICKED_WAIT_PACK'

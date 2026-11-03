@@ -826,6 +826,7 @@ export interface RedemptionQuoteView {
   };
 }
 export interface RedemptionOrderView {
+  deliveryReturnRecorded?: boolean;
   deliveryExceptionReported?: boolean;
   id: string;
   orderNo: string;
@@ -939,7 +940,18 @@ export interface RedemptionPickingPage {
 }
 
 export interface RedemptionDeliveryView {
+  returnHistory: Array<{
+    id: string;
+    handoffId: string;
+    riderName: string;
+    actorName: string;
+    reason: string;
+    createdAt: string;
+    hadStarted: boolean;
+    exceptions: Array<{ kind: string; reason: string; resolved: boolean }>;
+  }>;
   assignmentHistory: Array<{
+    returned: boolean;
     id: string;
     riderName: string;
     actorName: string;

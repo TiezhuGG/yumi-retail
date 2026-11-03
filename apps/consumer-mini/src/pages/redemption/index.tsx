@@ -116,9 +116,13 @@ export default function RedemptionDetail() {
                         : order.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
                           ? '骑手已核对接货，等待开始配送。'
                           : order.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                            ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                            ? order.deliveryReturnRecorded
+                              ? '已重新分配，等待骑手核对接货。'
+                              : '已分配骑手，等待骑手核对接货；尚未开始配送。'
                             : order.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                              ? '已出库，等待骑手接货；尚未开始配送。'
+                              ? order.deliveryReturnRecorded
+                                ? '包裹已回交，等待门店重新安排配送。'
+                                : '已出库，等待骑手接货；尚未开始配送。'
                               : order.fulfillmentState === 'PACKED_WAIT_SHIP'
                                 ? '已打包，等待仓库出库；尚未配送。'
                                 : order.fulfillmentState === 'PICKED_WAIT_PACK'
@@ -132,6 +136,11 @@ export default function RedemptionDetail() {
                                         : '已扣积分并预占库存，正在等待创建拣货任务。'}
               </Text>
               <Text className="account-copy redemption-order-no">兑换单号：{order.orderNo}</Text>
+              {order.deliveryReturnRecorded && (
+                <Text className="account-copy">
+                  曾回交仓库，以下为重新安排的配送进度；积分未重复扣减。
+                </Text>
+              )}
             </View>
             {[
               'PICKING',

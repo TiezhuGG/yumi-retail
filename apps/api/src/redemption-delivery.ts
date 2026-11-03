@@ -30,7 +30,12 @@ const include = {
     include: {
       withdrawal: true,
       handoff: {
-        include: { lines: true, journey: true, exceptions: { include: { resolution: true } } },
+        include: {
+          returned: true,
+          lines: true,
+          journey: true,
+          exceptions: { include: { resolution: true } },
+        },
       },
     },
   },
@@ -65,7 +70,17 @@ export class RedemptionDeliveryService {
       where: {
         id,
         pack: { task: { warehouseId: w } },
-        ...(self ? { assignments: { some: { riderId: self, withdrawal: null } } } : {}),
+        ...(self
+          ? {
+              assignments: {
+                some: {
+                  riderId: self,
+                  withdrawal: null,
+                  OR: [{ handoff: null }, { handoff: { returned: null } }],
+                },
+              },
+            }
+          : {}),
       },
       include,
     });
@@ -74,7 +89,10 @@ export class RedemptionDeliveryService {
       o = readiness.order;
     if (!o) throw failure(404, 'REDEMPTION_DELIVERY_NOT_FOUND', '原兑换单不存在');
     return {
-      sh: { ...sh, assignment: sh.assignments.find((a) => !a.withdrawal) ?? null },
+      sh: {
+        ...sh,
+        assignment: sh.assignments.find((a) => !a.withdrawal && !a.handoff?.returned) ?? null,
+      },
       o,
       blockers: readiness.blockers,
     };
@@ -123,6 +141,24 @@ export class RedemptionDeliveryService {
     }
     if (incidents.some((e) => !e.resolution)) blockers.push('DELIVERY_EXCEPTION_OPEN');
     return {
+      returnHistory: self
+        ? []
+        : sh.assignments
+            .filter((x) => x.handoff?.returned)
+            .map((x) => ({
+              id: x.handoff!.returned!.id,
+              handoffId: x.handoff!.id,
+              riderName: x.riderName,
+              actorName: x.handoff!.returned!.actorName,
+              reason: x.handoff!.returned!.reason,
+              createdAt: x.handoff!.returned!.createdAt.toISOString(),
+              hadStarted: x.handoff!.journey.some((f) => f.kind === 'START'),
+              exceptions: x.handoff!.exceptions.map((e) => ({
+                kind: e.kind,
+                reason: e.reason,
+                resolved: !!e.resolution,
+              })),
+            })),
       assignmentHistory: self
         ? []
         : [...sh.assignments]
@@ -134,6 +170,7 @@ export class RedemptionDeliveryService {
               riderName: x.riderName,
               actorName: x.actorName,
               createdAt: x.createdAt.toISOString(),
+              returned: !!x.handoff?.returned,
               withdrawal: x.withdrawal
                 ? {
                     actorName: x.withdrawal.actorName,
@@ -222,14 +259,32 @@ export class RedemptionDeliveryService {
           self = manager ? undefined : r.staffContext!.staffId;
         const where: Prisma.RedemptionShipmentWhereInput = {
           pack: { task: { warehouseId: w } },
-          ...(self ? { assignments: { some: { riderId: self, withdrawal: null } } } : {}),
+          ...(self
+            ? {
+                assignments: {
+                  some: {
+                    riderId: self,
+                    withdrawal: null,
+                    OR: [{ handoff: null }, { handoff: { returned: null } }],
+                  },
+                },
+              }
+            : {}),
           ...(status === 'UNASSIGNED'
-            ? { assignments: { none: { withdrawal: null } } }
+            ? {
+                assignments: {
+                  none: {
+                    withdrawal: null,
+                    OR: [{ handoff: null }, { handoff: { returned: null } }],
+                  },
+                },
+              }
             : status
               ? {
                   assignments: {
                     some: {
                       withdrawal: null,
+                      OR: [{ handoff: null }, { handoff: { returned: null } }],
                       ...(self ? { riderId: self } : {}),
                       handoff:
                         status === 'ASSIGNED'
@@ -253,7 +308,19 @@ export class RedemptionDeliveryService {
         const scoped: Prisma.RedemptionShipmentWhereInput = {
           AND: [
             where,
-            ...(self ? [{ assignments: { some: { riderId: self, withdrawal: null } } }] : []),
+            ...(self
+              ? [
+                  {
+                    assignments: {
+                      some: {
+                        riderId: self,
+                        withdrawal: null,
+                        OR: [{ handoff: null }, { handoff: { returned: null } }],
+                      },
+                    },
+                  },
+                ]
+              : []),
           ],
         };
         if (
@@ -299,6 +366,102 @@ export class RedemptionDeliveryService {
     });
   }
 
+  async returnCustody(r: ApiRequest, w: string, id: string, k: string, input: unknown) {
+    const b = fields(input, [
+      'handoffId',
+      'reason',
+      'packageCount',
+      'lines',
+      'intactCustodyConfirmed',
+      'redispatchConfirmed',
+    ]);
+    const handoffId = uuid(b.handoffId),
+      reason = str(b.reason, 300),
+      packageCount = integer(b.packageCount, 1, 100);
+    if (b.intactCustodyConfirmed !== true || b.redispatchConfirmed !== true)
+      throw failure(
+        400,
+        'PHYSICAL_CONFIRMATION_REQUIRED',
+        '须核验完整完好回交，且原地址及异常情况允许重新安排配送',
+      );
+    if (!Array.isArray(b.lines) || !b.lines.length || b.lines.length > 1000)
+      throw failure(400, 'VALIDATION_ERROR', '须逐项核对原单实物');
+    const lines = b.lines
+      .map((v) => {
+        const x = fields(v, ['allocationId', 'quantity']);
+        return { allocationId: uuid(x.allocationId), quantity: integer(x.quantity, 1, 100000) };
+      })
+      .sort((a, b) => a.allocationId.localeCompare(b.allocationId));
+    if (new Set(lines.map((x) => x.allocationId)).size !== lines.length)
+      throw failure(400, 'VALIDATION_ERROR', '核对项不能重复');
+    await this.authorize(this.catalog.db, r, w, true);
+    await this.source(this.catalog.db, w, id);
+    if (!this.enabled) throw failure(503, 'REDEMPTION_DELIVERY_DISABLED', '兑换配送写入尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_CUSTODY_RETURN',
+      w + ':' + id,
+      k,
+      {
+        handoffId,
+        reason,
+        packageCount,
+        lines,
+        intactCustodyConfirmed: true,
+        redispatchConfirmed: true,
+      },
+      async (tx) => {
+        await this.authorize(tx, r, w, true);
+        const initial = await this.source(tx, w, id);
+        await metadataLocks(tx, [initial.o.skuId]);
+        await inventoryLocks(tx, w, [initial.o.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_shipments WHERE id=${id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_handoffs WHERE id=${handoffId}::uuid FOR UPDATE`;
+        const { sh, o } = await this.source(tx, w, id),
+          h = sh.assignment?.handoff;
+        if (!h || h.id !== handoffId || h.returned || h.journey.some((f) => f.kind === 'COMPLETE'))
+          throw failure(409, 'CUSTODY_CHANGED', '须使用当前尚未送达的接货凭据');
+        if (o.status !== 'ACTIVE' || o.pickingTask?.state !== 'CHECKED')
+          throw failure(409, 'DELIVERY_BLOCKED', '原订单或出库来源已变化');
+        if (
+          packageCount !== sh.pack.packageCount ||
+          lines.length !== sh.pack.lines.length ||
+          sh.pack.lines.some(
+            (l) =>
+              !lines.some((x) => x.allocationId === l.allocationId && x.quantity === l.quantity),
+          )
+        )
+          throw failure(
+            409,
+            'RETURN_QUANTITY_MISMATCH',
+            '必须完整核对原包裹及每项件数，不支持部分或破损回交',
+          );
+        const actorName = await this.person(tx, r.staffContext!.staffId, w, true);
+        if (!actorName) throw failure(403, 'FORBIDDEN', '当前人员无本仓回交资格');
+        const fact = await tx.redemptionCustodyReturn.create({
+          data: {
+            id: randomUUID(),
+            handoffId,
+            shipmentId: id,
+            orderId: o.id,
+            actorId: r.staffContext!.staffId,
+            actorName,
+            reason,
+            packageCount,
+            requestId: r.requestId,
+          },
+        });
+        await tx.redemptionCustodyReturnLine.createMany({
+          data: lines.map((x) => ({ ...x, returnId: fact.id, orderId: o.id })),
+        });
+        await this.catalog.audit(tx, r, 'REDEMPTION_CUSTODY_RETURN', o.id, w);
+        await this.authorize(tx, r, w, true);
+        return { id };
+      },
+    );
+  }
   async withdraw(r: ApiRequest, w: string, id: string, k: string, input: unknown) {
     const b = fields(input, ['assignmentId', 'reason', 'warehouseCustodyConfirmed']);
     const assignmentId = uuid(b.assignmentId),
@@ -681,6 +844,22 @@ const task = object(
       type: 'string',
       enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'],
     },
+    returnHistory: {
+      type: 'array',
+      items: object({
+        id: text,
+        handoffId: text,
+        riderName: text,
+        actorName: text,
+        reason: text,
+        createdAt: text,
+        hadStarted: { type: 'boolean' },
+        exceptions: {
+          type: 'array',
+          items: object({ kind: text, reason: text, resolved: { type: 'boolean' } }),
+        },
+      }),
+    },
     assignmentHistory: {
       type: 'array',
       items: object({
@@ -688,6 +867,7 @@ const task = object(
         riderName: text,
         actorName: text,
         createdAt: text,
+        returned: { type: 'boolean' },
         withdrawal: {
           ...object({ actorName: text, reason: text, createdAt: text }),
           nullable: true,
@@ -744,6 +924,7 @@ const task = object(
     'state',
     'assignment',
     'assignmentHistory',
+    'returnHistory',
     'handoff',
     'journey',
     'canStart',
@@ -796,6 +977,35 @@ export class RedemptionDeliveryController {
   ) {
     fields(q, []);
     return success(r, await this.service.read(r, uuid(w), {}, uuid(id)));
+  }
+  @Post(':id/return-custody')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.assign')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      handoffId: text,
+      reason: { type: 'string', maxLength: 300 },
+      packageCount: { type: 'integer', minimum: 1, maximum: 100 },
+      lines: {
+        type: 'array',
+        items: object({ allocationId: text, quantity: { type: 'integer', minimum: 1 } }),
+      },
+      intactCustodyConfirmed: { type: 'boolean', enum: [true] },
+      redispatchConfirmed: { type: 'boolean', enum: [true] },
+    }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async returnCustody(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.returnCustody(r, uuid(w), uuid(id), key(r), b));
   }
   @Post(':id/withdraw')
   @HttpCode(200)

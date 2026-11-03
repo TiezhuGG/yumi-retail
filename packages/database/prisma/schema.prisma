@@ -69,6 +69,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionCustodyReturns RedemptionCustodyReturn[]
  redemptionAssignmentWithdrawals RedemptionAssignmentWithdrawal[]
  redemptionDeliveryResolutions RedemptionDeliveryResolution[]
  redemptionDeliveryExceptions RedemptionDeliveryException[]
@@ -1437,7 +1438,7 @@ model RedemptionOrder {
  @@map("redemption_orders")
 }
 model RedemptionAllocation {
- handoffLine RedemptionHandoffLine?
+ handoffLines RedemptionHandoffLine[]
  packLine RedemptionPackLine?
  consumeLedgerId String? @unique @map("consume_ledger_id") @db.Uuid
  consume StockLedger? @relation("redemptionConsume",fields:[consumeLedgerId,warehouseId,skuId,lotId],references:[id,warehouseId,skuId,lotId],onDelete:Restrict,onUpdate:NoAction)
@@ -1591,6 +1592,7 @@ model RedemptionPackLine {
  @@map("redemption_pack_lines")
 }
 model RedemptionShipment {
+ returns RedemptionCustodyReturn[]
  assignments RedemptionAssignment[]
  @@unique([id,orderId])
  id String @id @db.Uuid
@@ -1640,12 +1642,13 @@ model RedemptionAssignmentWithdrawal {
  @@map("redemption_assignment_withdrawals")
 }
 model RedemptionHandoff {
+ returned RedemptionCustodyReturn?
  exceptions RedemptionDeliveryException[]
  journey RedemptionJourneyFact[]
  id String @id @db.Uuid
  assignmentId String @unique @map("assignment_id") @db.Uuid
- shipmentId String @unique @map("shipment_id") @db.Uuid
- orderId String @unique @map("order_id") @db.Uuid
+ shipmentId String @map("shipment_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
  actorId String @map("actor_id") @db.Uuid
  packageCount Int @map("package_count")
  requestId String @map("request_id") @db.Uuid
@@ -1653,6 +1656,7 @@ model RedemptionHandoff {
  assignment RedemptionAssignment @relation(fields:[assignmentId,shipmentId,orderId],references:[id,shipmentId,orderId],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  lines RedemptionHandoffLine[]
+ @@unique([id,shipmentId,orderId])
  @@unique([id,orderId])
  @@unique([assignmentId,shipmentId,orderId])
  @@map("redemption_handoffs")
@@ -1660,12 +1664,12 @@ model RedemptionHandoff {
 model RedemptionHandoffLine {
  handoffId String @map("handoff_id") @db.Uuid
  orderId String @map("order_id") @db.Uuid
- allocationId String @unique @map("allocation_id") @db.Uuid
+ allocationId String @map("allocation_id") @db.Uuid
  quantity Int
  handoff RedemptionHandoff @relation(fields:[handoffId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
  allocation RedemptionAllocation @relation(fields:[allocationId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
  @@id([handoffId,allocationId])
- @@unique([allocationId,orderId])
+ @@index([allocationId,orderId])
  @@map("redemption_handoff_lines")
 }
 
@@ -1715,4 +1719,34 @@ model RedemptionDeliveryResolution {
  exception RedemptionDeliveryException @relation(fields:[exceptionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("redemption_delivery_resolutions")
+}
+
+model RedemptionCustodyReturn {
+ @@unique([handoffId,shipmentId,orderId])
+ id String @id @db.Uuid
+ handoffId String @unique @map("handoff_id") @db.Uuid
+ shipmentId String @map("shipment_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ reason String @db.VarChar(300)
+ packageCount Int @map("package_count")
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ handoff RedemptionHandoff @relation(fields:[handoffId,shipmentId,orderId],references:[id,shipmentId,orderId],onDelete:Restrict,onUpdate:NoAction)
+ shipment RedemptionShipment @relation(fields:[shipmentId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ lines RedemptionCustodyReturnLine[]
+ @@unique([id,orderId])
+ @@index([shipmentId])
+ @@map("redemption_custody_returns")
+}
+model RedemptionCustodyReturnLine {
+ returnId String @map("return_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ allocationId String @map("allocation_id") @db.Uuid
+ quantity Int
+ returned RedemptionCustodyReturn @relation(fields:[returnId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ @@id([returnId,allocationId])
+ @@map("redemption_custody_return_lines")
 }

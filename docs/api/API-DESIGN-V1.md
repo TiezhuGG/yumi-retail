@@ -863,3 +863,16 @@ POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/withdraw�
 新增迁移202611030005_redemption_assignment_withdrawals：RedemptionAssignmentWithdrawal链接唯一原assignment、当前管理人员及姓名快照、原因、请求号、数据库时间，禁止修改删除。解除assignment的shipment/order唯一约束，保留复合来源外键并增加索引；按原shipment行锁保护同单至多一条有效分配，撤回与接货互斥，SQL禁止撤回已接货及用撤回凭据接货。Prisma shipment.assignment改为assignments集合，各查询只按未撤回记录计算当前状态。旧凭据保留，不改原接货。迁移后须部署匹配API/Worker及页面；旧代码将多条分配错误视为单条，不可盲退或重建旧唯一约束。
 
 OpenAPI 0.50.0已导出。4项新PG专项及32项相关PG回归（初跑34/36，修正两处测试模型/账号引用后定向复验通过）共36个不同用例通过；18张实际API浏览器截图、类型检查、lint、全工作区构建、Prisma生成通过。仅临时schema、默认开关关闭、生产/远程拒启，未改业务主库/.env/生产，微信工具/真机和真实交接未验。P4h仅交付未接货接续；下一项P4i已接货人员撤权后的实物回交与接续，领取人停用接续、协调取消及售后仍须继续。详见[验证记录](../verification/P4H-REDEMPTION-WITHDRAWALS-2026-11-03.md)。
+
+
+## 2026-11-03 P4i 整单实物回交与重新配送（本地）
+
+本仓有效负责人/仓管可对已接货、未送达的当前交接，填写原因并按原包裹数、全部原批次/库位分配件数完整核对回交，分别声明全部实物完整完好已由仓库接收、原地址及异常情况允许重新安排配送。仅支持整单完整完好回交；部分、破损、已送达及无法确认原地址/异常可重配均不得使用。本轮规则为隔离开发实现，不宣称正式经营应急规则已经确认，两项声明均不是系统独立实物证明。回交终止原配送保管关系，再分配有效本仓骑手并重新逐项接货、重新开始和送达。原骑手或分配人撤权/停用/撤仓不妨碍现任管理人员核验回交；冻结等仍阻断新的分配/接货。
+
+POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/return-custody，body仅handoffId、reason（必填最多300字）、packageCount、lines[{allocationId,quantity}]、intactCustodyConfirmed:true、redispatchConfirmed:true；员工Cookie、Origin/CSRF、本仓redemption-delivery.assign和Idempotency-Key。输入/缺确认400、无权403、错当前接货/已回交/送达/数量不符409、关闭503。回交主/逐项事实、审计及幂等结果同事务，晚失败回滚。保留原分配、接货、START及异常，旧骑手失去查询/推进/旧键重放资格；SQL也拒绝给已回交的旧接货追加阶段、异常或原骑手继续型处置。回交并非库存入库、售后退货或取消，不动库存、积分、订单主状态、配额和地址。
+
+新增迁移202611030006_redemption_custody_returns及RedemptionCustodyReturn/Line，唯一原handoff和完整shipment/order来源、管理人员姓名快照、原因、数量、请求号和数据库时间，事实禁止修改删除，延迟SQL约束验证全部原装包行和包裹数。解除handoff的shipment/order和handoff_line的allocation唯一约束，允许不同配送尝试复用同一已消费出库来源；同一分配仍唯一接货。按shipment及handoff行锁保护唯一当前保管关系、回交与送达竞争。未接货撤回也改为只检查当前assignment，不被已回交历史误阻断。有效分配统一为未withdrawal且无handoff.returned。
+
+员工管理查询增加returnHistory及assignmentHistory.returned，显示原骑手/是否出发/接收人/原因/原异常；消费者只增加deliveryReturnRecorded并按本次配送阶段显示，不返回内部备注或人员。原未决异常随回交终止的是原配送尝试，不删除、不伪造原骑手继续型resolution；重新分配前由管理人员单独声明原地址和异常允许重配，并继续检查当前库存等资格。OpenAPI 0.51.0由代码导出。部署必须先迁移再更新API/Worker及三端，旧代码不识别回交不能盲退；不删除历史或恢复旧唯一约束。
+
+5项新真实PG专项及相关回归、实际API三端浏览器检查见[验证记录](../verification/P4I-REDEMPTION-CUSTODY-RETURNS-2026-11-03.md)。沿用默认关闭及生产/远程拒启，仅随机临时schema，未改主库/.env/生产，微信工具/真机和实际实物未验。下一项P4j仓库领取人停用后的接续与重核；部分/破损回交、协调取消及售后仍待后续切片，P4/P5未整体验收，商城未上线。

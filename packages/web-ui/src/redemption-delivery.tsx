@@ -30,7 +30,15 @@ const blockers: Record<string, string> = {
 };
 type Intent = {
   id: string;
-  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception' | 'resolve' | 'withdraw';
+  action:
+    | 'assign'
+    | 'accept'
+    | 'start'
+    | 'complete'
+    | 'exception'
+    | 'resolve'
+    | 'withdraw'
+    | 'return-custody';
   key: string;
   body: Record<string, unknown>;
 };
@@ -121,9 +129,16 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['assign', 'accept', 'start', 'complete', 'exception', 'resolve', 'withdraw'].includes(
-        v.action,
-      ) ||
+      ![
+        'assign',
+        'accept',
+        'start',
+        'complete',
+        'exception',
+        'resolve',
+        'withdraw',
+        'return-custody',
+      ].includes(v.action) ||
       !v.body ||
       typeof v.body !== 'object' ||
       Array.isArray(v.body)
@@ -352,10 +367,19 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     exception: '上报异常',
                     resolve: '处置异常',
                     withdraw: '撤回分配',
+                    'return-custody': '实物回交',
                   }[intent.action]}
             </button>
           ) : (
             <>
+              {manage && ['HANDED_OVER', 'DELIVERING'].includes(detail.state) && (
+                <CustodyReturnForm
+                  key={detail.handoff!.id}
+                  detail={detail}
+                  disabled={disabled}
+                  write={write}
+                />
+              )}
               {manage && detail.state === 'ASSIGNED' && (
                 <WithdrawForm
                   key={detail.assignment!.id}
@@ -436,7 +460,31 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           {!detail.exception && detail.state === 'DELIVERING' && (
             <p className="notice">骑手配送中，请按原收货地址交付全部包裹后确认送达。</p>
           )}
-          {manage && detail.assignmentHistory.some((x) => x.withdrawal) && (
+          {manage && detail.returnHistory.length > 0 && (
+            <section className="picking-pack-proof">
+              <h3>实物回交与保管记录</h3>
+              {detail.returnHistory.map((x) => (
+                <div key={x.id}>
+                  <p>
+                    原骑手：{x.riderName} · {x.hadStarted ? '曾开始配送' : '接货后未开始配送'} ·
+                    已回交仓库
+                  </p>
+                  <p>
+                    接收人：{x.actorName} · {x.reason} ·{' '}
+                    {new Date(x.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                  </p>
+                  {x.exceptions.map((e, i) => (
+                    <p key={i}>
+                      原异常：{e.reason} ·{' '}
+                      {e.resolved ? '此前已处置' : '随本次回交终止原配送，原异常保留'}
+                    </p>
+                  ))}
+                </div>
+              ))}
+              <p>仅保管回交，未增加可售库存或退积分；重新分配仍须通过当前资格核验。</p>
+            </section>
+          )}
+          {manage && detail.assignmentHistory.some((x) => x.withdrawal || x.returned) && (
             <section className="detail-card">
               <h3>分配与撤回记录</h3>
               {detail.assignmentHistory.map((x) => (
@@ -451,6 +499,8 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                         timeZone: 'Asia/Shanghai',
                       })}
                     </>
+                  ) : x.returned ? (
+                    ' · 实物已回交，本次分配结束'
                   ) : (
                     ' · 当前有效'
                   )}
@@ -918,6 +968,120 @@ function WithdrawForm({
       </label>
       <button className="primary-button" disabled={disabled || !reason.trim() || !confirmed}>
         确认撤回分配
+      </button>
+    </form>
+  );
+}
+
+function CustodyReturnForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionDeliveryView;
+  disabled: boolean;
+  write: (action: Intent['action'], body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [count, setCount] = useState(''),
+    [quantities, setQuantities] = useState<Record<string, string>>({}),
+    [confirmed, setConfirmed] = useState(false),
+    [reason, setReason] = useState(''),
+    [redispatch, setRedispatch] = useState(false);
+  const valid =
+    /^[1-9]\d*$/.test(count) &&
+    Number(count) === detail.packageCount &&
+    detail.lines.every(
+      (l) =>
+        /^[1-9]\d*$/.test(quantities[l.allocationId] ?? '') &&
+        Number(quantities[l.allocationId]) === l.quantity,
+    ) &&
+    confirmed &&
+    redispatch &&
+    !!reason.trim();
+  return (
+    <form
+      className="picking-pack-form delivery-exception-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid)
+          void write('return-custody', {
+            handoffId: detail.handoff!.id,
+            reason: reason.trim(),
+            packageCount: Number(count),
+            lines: detail.lines.map((l) => ({
+              allocationId: l.allocationId,
+              quantity: Number(quantities[l.allocationId]),
+            })),
+            intactCustodyConfirmed: true,
+            redispatchConfirmed: true,
+          });
+      }}
+    >
+      <h3>核验整单实物回交</h3>
+      <p>
+        须先从原骑手收回原单全部包裹，逐项核对完整完好；回交后原配送结束，旧骑手失去本单操作权限。冻结等仍会阻断重新分配。部分、破损或已送达不能使用此流程。
+      </p>
+      <label>
+        回交原因
+        <textarea
+          aria-label="回交原因"
+          maxLength={300}
+          disabled={disabled}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <label>
+        实际回交包裹数
+        <input
+          aria-label="实际回交包裹数"
+          type="number"
+          min="1"
+          max={detail.packageCount}
+          step="1"
+          value={count}
+          disabled={disabled}
+          onChange={(e) => setCount(e.target.value)}
+        />
+      </label>
+      {detail.lines.map((l) => (
+        <label key={l.allocationId}>
+          {l.batchNo} · 应回交 {l.quantity} 件
+          <input
+            aria-label={'回交件数 ' + l.batchNo + ' ' + l.locationCode}
+            type="number"
+            min="1"
+            max={l.quantity}
+            step="1"
+            value={quantities[l.allocationId] ?? ''}
+            disabled={disabled}
+            onChange={(e) => setQuantities((old) => ({ ...old, [l.allocationId]: e.target.value }))}
+          />
+        </label>
+      ))}
+      <label className="picking-physical">
+        <input
+          type="checkbox"
+          disabled={disabled}
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        已收到原单全部包裹，逐项完整完好，可重新安排配送
+      </label>
+      <p>
+        回交确认由本仓管理人员声明，不会回补库存或退积分。原异常保留，回交终止原配送，不冒充异常恢复凭据。
+      </p>
+      <label className="picking-physical">
+        <input
+          type="checkbox"
+          disabled={disabled}
+          checked={redispatch}
+          onChange={(e) => setRedispatch(e.target.checked)}
+        />
+        已核验原地址及异常情况，可重新安排配送
+      </label>
+      <button className="primary-button" disabled={disabled || !valid}>
+        确认完整回交仓库
       </button>
     </form>
   );

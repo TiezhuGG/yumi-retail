@@ -164,7 +164,11 @@
     "pretest:redemption-withdrawals": "npm run build:server",
     "test:redemption-withdrawals": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-assignment-withdrawals.integration.test.ts",
     "preverify:redemption-withdrawals:ui": "npm run build:server",
-    "verify:redemption-withdrawals:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-withdrawals.mjs"
+    "verify:redemption-withdrawals:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-withdrawals.mjs",
+    "pretest:redemption-returns": "npm run build:server",
+    "test:redemption-returns": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-custody-returns.integration.test.ts",
+    "preverify:redemption-returns:ui": "npm run build:server",
+    "verify:redemption-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-returns.mjs"
   },
   "pnpm": {
     "overrides": {

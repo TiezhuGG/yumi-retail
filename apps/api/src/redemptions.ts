@@ -510,6 +510,7 @@ export class RedemptionService {
               include: {
                 shipment: {
                   include: {
+                    returns: true;
                     assignments: {
                       include: {
                         handoff: {
@@ -541,6 +542,7 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
+      deliveryReturnRecorded: !!row.pickingTask?.pack?.shipment?.returns.length,
       deliveryExceptionReported:
         !!row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.exceptions.some(
           (e) => !e.resolution,
@@ -620,8 +622,12 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
+                      returns: true,
                       assignments: {
-                        where: { withdrawal: null },
+                        where: {
+                          withdrawal: null,
+                          OR: [{ handoff: null }, { handoff: { returned: null } }],
+                        },
                         include: {
                           handoff: {
                             include: {
@@ -658,8 +664,12 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
+                      returns: true,
                       assignments: {
-                        where: { withdrawal: null },
+                        where: {
+                          withdrawal: null,
+                          OR: [{ handoff: null }, { handoff: { returned: null } }],
+                        },
                         include: {
                           handoff: {
                             include: {
