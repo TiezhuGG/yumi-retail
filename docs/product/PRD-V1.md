@@ -673,3 +673,17 @@ GET /api/v1/admin/redemptions/:id/shipping返回本仓原地址、发货开关�
 迁移202611030008_redemption_express_shipping新增RedemptionExpressShipment不可变事实、一单唯一、同仓同承运方运单唯一、来源复合外键、操作者快照和请求编号；数据库延迟约束同时核验整单全部原预占消费、匹配负数库存/库位流水及发货Outbox。扩展EXPRESS_SHIPPED及其事件和合法迁移；保留旧LOCAL_NO_CASH打包/出库校验路径，禁止两种履约混用。没有快递回调、轨迹或签收状态。OpenAPI0.54.0由代码导出，订单/打印增加expressShipment及EXPRESS_SHIPPED，后台列表增加fulfillment过滤，消费者不能使用后台筛选参数。
 
 部署需先迁移再匹配API、Worker及客户端；已消费库存的发货事实不可盲删、盲退旧版本或改回待发货。只在随机临时schema运行迁移和合成验收，未改业务主库/.env/生产。8项专项加31项快递地址/打印/兑换/旧打包回归，共39项真实PG通过；13张真实API浏览器截图通过。未声称全量历史仓配回归或微信开发工具/真机、实物打印机、实际交快递/承运验证、生产验收。下一项E4：纠错留痕、最小售后与受控上线准备。
+
+## 2026-11-03 E4a 运单资料纠错（本地）
+
+E4按可验证边界拆为E4a运单纠错、E4b最小售后反馈与处理、E4c首发发布准备及人工/设备验收。本轮仅完成E4a，不将售后、真实快递交接、微信真机或生产记作完成。未发货取消/全额退分与发货竞争已在E2/E3实现，本轮回归保持；已发货仍不能直接取消，不做退分、退货入库或补寄。
+
+后台已发货快递单新增“更正运单资料”独立表单，显示当前值，填写更正后的快递公司/运单号、1至200字原因，并勾选已核对原包裹真实运单。仅纠正原包裹的录入错误，不修改收件人/地址、原发货时间、订单版本/状态、积分、配额、库存、预占或Outbox，也不代表重新寄出。原因提示勿填写个人信息，拒绝控制字符；资料不变拒绝保存。后台可查看原发货和逐次更正的公司/单号、原因、操作人及北京时间。用户端和配货打印只展示最新有效运单，标明资料已更正；不返回内部原因或员工信息，复制使用新单号。
+
+POST /api/v1/admin/redemptions/:id/shipping-corrections，严格body为version（当前独立更正版本，初始0）、carrierCode、可选carrierName（OTHER必填）、trackingNo、reason、verified:true。沿用本仓SUPER_ADMIN/OPERATIONS、points.read、员工Cookie、Origin/CSRF、Idempotency-Key及事务内前后权限；只接受ACTIVE+EXPRESS+EXPRESS_SHIPPED且有原发货事实的订单。公司和运单校验与E3一致，标准化大写后计算原键摘要。订单锁串行化同单更正，独立版本防止旧页面覆盖；更新失败整笔回滚，更正记录、运单归属、审计及原键结果一起提交。跨账号/本仓失权后，即使原键成功也拒绝访问。
+
+GET /:id/shipping继续no-store，增加canCorrect和仅后台的shipmentHistory；shipment增加correctionVersion及correctedAt。消费者/后台订单列表、详情、打印统一投影最新更正；shippedAt始终为原发货时间。已出库后的冻结、商品下架或批次后来过期，不阻断仅纠正运单的操作；不借纠错重新运行出库逻辑。复用默认关闭的REDEMPTION_PICKING_DEV_ENABLED本地作业开关，关闭时新更正503，既有成功原键可核实，生产/远程拒启保持。
+
+迁移202611030009_express_shipping_corrections新增不可变RedemptionExpressShipmentCorrection：原发货来源FK、独立连续版本唯一、公司/单号、原因、操作人快照、请求编号及时间；SQL锁原发货来源校验连续版本、已发快递单、当前角色/仓库、值必须变化，禁止覆盖/删除历史。新增SQL运单归属表redemption_express_waybills，回填所有原发货身份；原发货及每次更正自动占用同仓+公司代码+名称+单号唯一身份，归属永久保留。另一订单不能使用任何历史身份；同一订单可核实后更正回自己的原值。唯一索引处理跨订单并发，延迟约束拒绝无对应事实的伪归属；表无外部通用写接口。
+
+OpenAPI0.55.0由代码导出。兼容原E3字段、发货凭据不可变和旧LOCAL_NO_CASH流程；不删除旧迁移/骑手扩展。部署先执行新迁移，再匹配API与前端；旧服务只读原发货资料会显示旧单号，不可盲退服务或丢弃更正/归属历史。仅随机临时schema与合成身份，未改业务主库/.env或生产，未接外部快递服务。

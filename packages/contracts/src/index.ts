@@ -1091,6 +1091,8 @@ export interface RedemptionExpressShipmentView {
   carrierName: string;
   trackingNo: string;
   shippedAt: string;
+  correctionVersion: number;
+  correctedAt: string | null;
 }
 export interface RedemptionExpressShippingView {
   id: string;
@@ -1101,6 +1103,16 @@ export interface RedemptionExpressShippingView {
   quantity: number;
   address: RedemptionOrderAddress;
   shipment: RedemptionExpressShipmentView | null;
+  canCorrect: boolean;
+  shipmentHistory: Array<{
+    version: number;
+    carrierCode: string;
+    carrierName: string;
+    trackingNo: string;
+    reason: string | null;
+    actorName: string;
+    recordedAt: string;
+  }>;
   enabled: boolean;
   canShip: boolean;
   blockers: string[];

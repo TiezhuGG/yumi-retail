@@ -44,7 +44,8 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
           '已快递发货：' +
             o.expressShipment.carrierName +
             ' · 运单号：' +
-            o.expressShipment.trackingNo,
+            o.expressShipment.trackingNo +
+            (o.expressShipment.correctedAt ? '（运单资料已更正）' : ''),
         ),
       );
     const recipient = node('section', undefined, 'recipient');

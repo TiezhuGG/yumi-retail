@@ -182,6 +182,11 @@ export default function RedemptionDetail() {
                   （北京时间）
                 </Text>
                 <Text className="account-copy">运输进度请凭运单号联系快递公司查询。</Text>
+                {order.expressShipment.correctedAt && (
+                  <Text className="account-copy">
+                    运单资料已更正，请以当前显示的快递公司和单号为准。
+                  </Text>
+                )}
                 <Button
                   className="account-link"
                   onClick={() =>

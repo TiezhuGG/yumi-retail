@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ExpressShippingCorrection } from './express-shipping-correction.js';
 import {
   EXPRESS_CARRIERS,
   formatRedemptionAddress,
@@ -163,7 +164,22 @@ export function ExpressShippingPanel({
                 （北京时间）
               </p>
               <p>此记录为门店发货确认，运输进度请凭运单号向快递公司查询。</p>
+              {view.shipment.correctedAt && <p>运单资料已更正，原发货时间不变。更正记录见下方。</p>}
             </div>
+          )}
+          {view.shipment && !pending && (
+            <ExpressShippingCorrection
+              view={view}
+              profile={profile}
+              onDone={() => {
+                void load();
+                onShipped();
+              }}
+              onRejected={(message) => {
+                setView(null);
+                setError(message);
+              }}
+            />
           )}
           {pending ? (
             <div className="notice">

@@ -77,7 +77,14 @@ const quote = object({
   snapshot,
 });
 const expressShipment = {
-  ...object({ carrierCode: text, carrierName: text, trackingNo: text, shippedAt: text }),
+  ...object({
+    carrierCode: text,
+    carrierName: text,
+    trackingNo: text,
+    shippedAt: text,
+    correctionVersion: integer,
+    correctedAt: nullable,
+  }),
   nullable: true,
 };
 const orderProperties = {
@@ -226,6 +233,19 @@ export class AdminRedemptionController {
       quantity: integer,
       address,
       shipment: expressShipment,
+      canCorrect: { type: 'boolean' },
+      shipmentHistory: {
+        type: 'array',
+        items: object({
+          version: integer,
+          carrierCode: text,
+          carrierName: text,
+          trackingNo: text,
+          reason: nullable,
+          actorName: text,
+          recordedAt: text,
+        }),
+      },
       enabled: { type: 'boolean' },
       canShip: { type: 'boolean' },
       blockers: { type: 'array', items: text },
@@ -235,6 +255,36 @@ export class AdminRedemptionController {
   async shippingRead(@Req() r: ApiRequest, @Param('id') id: string, @Query() q: unknown) {
     fields(q, []);
     return success(r, await this.shipping.read(r, uuid(id)));
+  }
+  @Post(':id/shipping-corrections')
+  @HttpCode(200)
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object(
+      {
+        version: integer,
+        carrierCode: {
+          type: 'string',
+          enum: ['SF', 'ZTO', 'YTO', 'STO', 'YUNDA', 'JD', 'EMS', 'POST', 'DEPPON', 'OTHER'],
+        },
+        carrierName: { type: 'string', maxLength: 40 },
+        trackingNo: { type: 'string', minLength: 6, maxLength: 40 },
+        reason: { type: 'string', minLength: 1, maxLength: 200 },
+        verified: { type: 'boolean', enum: [true] },
+      },
+      ['version', 'carrierCode', 'trackingNo', 'reason', 'verified'],
+    ),
+  })
+  @ApiResult(object({ id: text, correctionVersion: integer }), errors)
+  async correct(
+    @Req() r: ApiRequest,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.shipping.correct(r, uuid(id), key(r), b));
   }
   @Post(':id/ship')
   @HttpCode(200)

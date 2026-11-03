@@ -10540,7 +10540,9 @@
                                   "carrierCode",
                                   "carrierName",
                                   "trackingNo",
-                                  "shippedAt"
+                                  "shippedAt",
+                                  "correctionVersion",
+                                  "correctedAt"
                                 ],
                                 "properties": {
                                   "carrierCode": {
@@ -10554,6 +10556,14 @@
                                   },
                                   "shippedAt": {
                                     "type": "string"
+                                  },
+                                  "correctionVersion": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "correctedAt": {
+                                    "type": "string",
+                                    "nullable": true
                                   }
                                 },
                                 "additionalProperties": false,
@@ -11105,7 +11115,9 @@
                             "carrierCode",
                             "carrierName",
                             "trackingNo",
-                            "shippedAt"
+                            "shippedAt",
+                            "correctionVersion",
+                            "correctedAt"
                           ],
                           "properties": {
                             "carrierCode": {
@@ -11119,6 +11131,14 @@
                             },
                             "shippedAt": {
                               "type": "string"
+                            },
+                            "correctionVersion": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "correctedAt": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "additionalProperties": false,
@@ -12025,6 +12045,8 @@
                         "quantity",
                         "address",
                         "shipment",
+                        "canCorrect",
+                        "shipmentHistory",
                         "enabled",
                         "canShip",
                         "blockers"
@@ -12140,7 +12162,9 @@
                             "carrierCode",
                             "carrierName",
                             "trackingNo",
-                            "shippedAt"
+                            "shippedAt",
+                            "correctionVersion",
+                            "correctedAt"
                           ],
                           "properties": {
                             "carrierCode": {
@@ -12154,10 +12178,62 @@
                             },
                             "shippedAt": {
                               "type": "string"
+                            },
+                            "correctionVersion": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "correctedAt": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "additionalProperties": false,
                           "nullable": true
+                        },
+                        "canCorrect": {
+                          "type": "boolean"
+                        },
+                        "shipmentHistory": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "version",
+                              "carrierCode",
+                              "carrierName",
+                              "trackingNo",
+                              "reason",
+                              "actorName",
+                              "recordedAt"
+                            ],
+                            "properties": {
+                              "version": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "carrierCode": {
+                                "type": "string"
+                              },
+                              "carrierName": {
+                                "type": "string"
+                              },
+                              "trackingNo": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "actorName": {
+                                "type": "string"
+                              },
+                              "recordedAt": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
                         },
                         "enabled": {
                           "type": "boolean"
@@ -12170,6 +12246,440 @@
                           "items": {
                             "type": "string"
                           }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "积分兑换订单查询与打印"
+        ]
+      }
+    },
+    "/api/v1/admin/redemptions/{id}/shipping-corrections": {
+      "post": {
+        "operationId": "AdminRedemptionController_correct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "version",
+                  "carrierCode",
+                  "trackingNo",
+                  "reason",
+                  "verified"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "carrierCode": {
+                    "type": "string",
+                    "enum": [
+                      "SF",
+                      "ZTO",
+                      "YTO",
+                      "STO",
+                      "YUNDA",
+                      "JD",
+                      "EMS",
+                      "POST",
+                      "DEPPON",
+                      "OTHER"
+                    ]
+                  },
+                  "carrierName": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "trackingNo": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 40
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "verified": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "correctionVersion"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "correctionVersion": {
+                          "type": "integer",
+                          "minimum": 0
                         }
                       },
                       "additionalProperties": false
@@ -13028,7 +13538,9 @@
                                   "carrierCode",
                                   "carrierName",
                                   "trackingNo",
-                                  "shippedAt"
+                                  "shippedAt",
+                                  "correctionVersion",
+                                  "correctedAt"
                                 ],
                                 "properties": {
                                   "carrierCode": {
@@ -13042,6 +13554,14 @@
                                   },
                                   "shippedAt": {
                                     "type": "string"
+                                  },
+                                  "correctionVersion": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "correctedAt": {
+                                    "type": "string",
+                                    "nullable": true
                                   }
                                 },
                                 "additionalProperties": false,
@@ -13517,7 +14037,9 @@
                                   "carrierCode",
                                   "carrierName",
                                   "trackingNo",
-                                  "shippedAt"
+                                  "shippedAt",
+                                  "correctionVersion",
+                                  "correctedAt"
                                 ],
                                 "properties": {
                                   "carrierCode": {
@@ -13531,6 +14053,14 @@
                                   },
                                   "shippedAt": {
                                     "type": "string"
+                                  },
+                                  "correctionVersion": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                  },
+                                  "correctedAt": {
+                                    "type": "string",
+                                    "nullable": true
                                   }
                                 },
                                 "additionalProperties": false,
@@ -13999,7 +14529,9 @@
                             "carrierCode",
                             "carrierName",
                             "trackingNo",
-                            "shippedAt"
+                            "shippedAt",
+                            "correctionVersion",
+                            "correctedAt"
                           ],
                           "properties": {
                             "carrierCode": {
@@ -14013,6 +14545,14 @@
                             },
                             "shippedAt": {
                               "type": "string"
+                            },
+                            "correctionVersion": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "correctedAt": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "additionalProperties": false,
@@ -80252,7 +80792,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.54.0",
+    "version": "0.55.0",
     "contact": {}
   },
   "tags": [],

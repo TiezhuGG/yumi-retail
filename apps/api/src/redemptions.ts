@@ -1,3 +1,4 @@
+import { expressShipmentInclude, expressShipmentView } from './express-shipment-view.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, orderReservationDelta, redemptionJobChange } from '@yumi/database';
 import type { RedemptionOrderAddress, RedemptionPrintPreview } from '@yumi/contracts';
@@ -569,7 +570,7 @@ export class RedemptionService {
         await tx.$queryRaw`SELECT id FROM redemption_orders WHERE warehouse_id=${warehouseId}::uuid AND id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`;
         const rows = await tx.redemptionOrder.findMany({
           where: { id: { in: ids }, warehouseId },
-          include: { quote: true, expressShipment: true },
+          include: { quote: true, expressShipment: expressShipmentInclude },
         });
         if (rows.length !== ids.length)
           throw failure(
@@ -595,14 +596,7 @@ export class RedemptionService {
             pointsPrice: o.pointsPrice.toString(),
             totalPoints: o.totalPoints.toString(),
             deliveryMode: snapshot.deliveryMode,
-            expressShipment: o.expressShipment
-              ? {
-                  carrierCode: o.expressShipment.carrierCode,
-                  carrierName: o.expressShipment.carrierName,
-                  trackingNo: o.expressShipment.trackingNo,
-                  shippedAt: o.expressShipment.createdAt.toISOString(),
-                }
-              : null,
+            expressShipment: expressShipmentView(o.expressShipment),
             address: this.privateData.decrypt<RedemptionOrderAddress>(
               o.userId,
               o.id,
@@ -621,7 +615,7 @@ export class RedemptionService {
     row: Prisma.RedemptionOrderGetPayload<{
       include: {
         outbox: true;
-        expressShipment: true;
+        expressShipment: typeof expressShipmentInclude;
         pickingTask: {
           include: {
             pack: {
@@ -660,14 +654,7 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
-      expressShipment: row.expressShipment
-        ? {
-            carrierCode: row.expressShipment.carrierCode,
-            carrierName: row.expressShipment.carrierName,
-            trackingNo: row.expressShipment.trackingNo,
-            shippedAt: row.expressShipment.createdAt.toISOString(),
-          }
-        : null,
+      expressShipment: expressShipmentView(row.expressShipment),
       deliveryMode: row.deliveryMode as 'LOCAL_NO_CASH' | 'EXPRESS',
       deliveryReturnRecorded: !!row.pickingTask?.pack?.shipment?.returns.length,
       deliveryExceptionReported:
@@ -762,7 +749,7 @@ export class RedemptionService {
         take: 21,
         include: {
           outbox: true,
-          expressShipment: true,
+          expressShipment: expressShipmentInclude,
           pickingTask: {
             include: {
               pack: {
@@ -805,7 +792,7 @@ export class RedemptionService {
         where: { id, warehouseId },
         include: {
           outbox: true,
-          expressShipment: true,
+          expressShipment: expressShipmentInclude,
           pickingTask: {
             include: {
               pack: {
