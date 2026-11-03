@@ -939,6 +939,13 @@ export interface RedemptionPickingPage {
 }
 
 export interface RedemptionDeliveryView {
+  assignmentHistory: Array<{
+    id: string;
+    riderName: string;
+    actorName: string;
+    createdAt: string;
+    withdrawal: { actorName: string; reason: string; createdAt: string } | null;
+  }>;
   exception: null | RedemptionDeliveryIncident;
   exceptionHistory: RedemptionDeliveryIncident[];
   id: string;

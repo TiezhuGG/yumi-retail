@@ -97,15 +97,17 @@ export class RedemptionPickingService {
         shipment: task?.pack?.shipment
           ? {
               id: task.pack.shipment.id,
-              deliveryState: task.pack.shipment.assignment?.handoff?.journey.some(
+              deliveryState: task.pack.shipment.assignments[0]?.handoff?.journey.some(
                 (f) => f.kind === 'COMPLETE',
               )
                 ? 'DELIVERED'
-                : task.pack.shipment.assignment?.handoff?.journey.some((f) => f.kind === 'START')
+                : task.pack.shipment.assignments[0]?.handoff?.journey.some(
+                      (f) => f.kind === 'START',
+                    )
                   ? 'DELIVERING'
-                  : task.pack.shipment.assignment?.handoff
+                  : task.pack.shipment.assignments[0]?.handoff
                     ? 'HANDED_OVER'
-                    : task.pack.shipment.assignment
+                    : task.pack.shipment.assignments[0]
                       ? 'ASSIGNED'
                       : 'UNASSIGNED',
               actorId: task.pack.shipment.actorId,

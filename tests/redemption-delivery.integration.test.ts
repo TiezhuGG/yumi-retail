@@ -301,7 +301,9 @@ test('SQL enforces original shipment and current actors, exact receipt evidence 
       }),
     );
     assert.equal((await f.assign(s.id, rider.id)).status, 200);
-    const a = await db.redemptionAssignment.findUniqueOrThrow({ where: { shipmentId: s.id } });
+    const a = await db.redemptionAssignment.findFirstOrThrow({
+      where: { shipmentId: s.id, withdrawal: null },
+    });
     await assert.rejects(db.redemptionAssignment.updateMany({ data: { riderId: manager.id } }));
     await assert.rejects(
       db.redemptionHandoff.create({

@@ -30,7 +30,7 @@ const blockers: Record<string, string> = {
 };
 type Intent = {
   id: string;
-  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception' | 'resolve';
+  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception' | 'resolve' | 'withdraw';
   key: string;
   body: Record<string, unknown>;
 };
@@ -121,7 +121,9 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['assign', 'accept', 'start', 'complete', 'exception', 'resolve'].includes(v.action) ||
+      !['assign', 'accept', 'start', 'complete', 'exception', 'resolve', 'withdraw'].includes(
+        v.action,
+      ) ||
       !v.body ||
       typeof v.body !== 'object' ||
       Array.isArray(v.body)
@@ -349,10 +351,19 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     complete: '送达',
                     exception: '上报异常',
                     resolve: '处置异常',
+                    withdraw: '撤回分配',
                   }[intent.action]}
             </button>
           ) : (
             <>
+              {manage && detail.state === 'ASSIGNED' && (
+                <WithdrawForm
+                  key={detail.assignment!.id}
+                  detail={detail}
+                  disabled={disabled}
+                  write={write}
+                />
+              )}
               {manage && detail.state === 'UNASSIGNED' && (
                 <>
                   <button
@@ -424,6 +435,28 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           )}
           {!detail.exception && detail.state === 'DELIVERING' && (
             <p className="notice">骑手配送中，请按原收货地址交付全部包裹后确认送达。</p>
+          )}
+          {manage && detail.assignmentHistory.some((x) => x.withdrawal) && (
+            <section className="detail-card">
+              <h3>分配与撤回记录</h3>
+              {detail.assignmentHistory.map((x) => (
+                <p key={x.id}>
+                  分配给{x.riderName} · 分配人：{x.actorName} ·{' '}
+                  {new Date(x.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                  {x.withdrawal ? (
+                    <>
+                      {' '}
+                      · 已撤回：{x.withdrawal.actorName} · {x.withdrawal.reason} ·{' '}
+                      {new Date(x.withdrawal.createdAt).toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                      })}
+                    </>
+                  ) : (
+                    ' · 当前有效'
+                  )}
+                </p>
+              ))}
+            </section>
           )}
           {detail.exception && !detail.exception.resolution && manage && (
             <DeliveryResolutionForm detail={detail} disabled={disabled} write={write} />
@@ -589,7 +622,7 @@ function AssignForm({
           ))}
         </select>
       </label>
-      <p>提交后保留分配凭据；本轮不支持改派。接货须由该骑手本人完成。</p>
+      <p>提交后保留分配凭据。尚未接货可由管理人员先撤回再重新分配；接货须由当前骑手本人完成。</p>
       <button className="primary-button" disabled={disabled || !riders.some((v) => v.id === rider)}>
         确认分配骑手
       </button>
@@ -830,6 +863,61 @@ function DeliveryResolutionForm({
         disabled={disabled || blocked || !reason.trim() || !confirmed}
       >
         确认处置并允许继续
+      </button>
+    </form>
+  );
+}
+
+function WithdrawForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionDeliveryView;
+  disabled: boolean;
+  write: (action: Intent['action'], body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [reason, setReason] = useState(''),
+    [confirmed, setConfirmed] = useState(false);
+  return (
+    <form
+      className="delivery-exception-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (reason.trim() && confirmed)
+          void write('withdraw', {
+            assignmentId: detail.assignment!.id,
+            reason: reason.trim(),
+            warehouseCustodyConfirmed: true,
+          });
+      }}
+    >
+      <h3>撤回未接货分配</h3>
+      <p>
+        当前骑手：{detail.assignment!.riderName}
+        。撤回后旧骑手将失去本单访问和接货权限，原凭据保留；可再选择有效本仓骑手分配。货品异常仍会阻断新分配。
+      </p>
+      <label>
+        撤回原因
+        <textarea
+          aria-label="撤回原因"
+          maxLength={300}
+          value={reason}
+          disabled={disabled}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          disabled={disabled}
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        已核实骑手尚未接货，全部包裹仍由仓库保管
+      </label>
+      <button className="primary-button" disabled={disabled || !reason.trim() || !confirmed}>
+        确认撤回分配
       </button>
     </form>
   );

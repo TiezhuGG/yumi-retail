@@ -26,8 +26,9 @@ const incidentSchema = object({
   },
 });
 const include = {
-  assignment: {
+  assignments: {
     include: {
+      withdrawal: true,
       handoff: {
         include: { lines: true, journey: true, exceptions: { include: { resolution: true } } },
       },
@@ -64,7 +65,7 @@ export class RedemptionDeliveryService {
       where: {
         id,
         pack: { task: { warehouseId: w } },
-        ...(self ? { assignment: { riderId: self } } : {}),
+        ...(self ? { assignments: { some: { riderId: self, withdrawal: null } } } : {}),
       },
       include,
     });
@@ -72,7 +73,11 @@ export class RedemptionDeliveryService {
     const readiness = await redemptionPickingReadiness(tx, sh.orderId),
       o = readiness.order;
     if (!o) throw failure(404, 'REDEMPTION_DELIVERY_NOT_FOUND', '原兑换单不存在');
-    return { sh, o, blockers: readiness.blockers };
+    return {
+      sh: { ...sh, assignment: sh.assignments.find((a) => !a.withdrawal) ?? null },
+      o,
+      blockers: readiness.blockers,
+    };
   }
   async view(
     tx: Tx,
@@ -118,6 +123,25 @@ export class RedemptionDeliveryService {
     }
     if (incidents.some((e) => !e.resolution)) blockers.push('DELIVERY_EXCEPTION_OPEN');
     return {
+      assignmentHistory: self
+        ? []
+        : [...sh.assignments]
+            .sort(
+              (a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id),
+            )
+            .map((x) => ({
+              id: x.id,
+              riderName: x.riderName,
+              actorName: x.actorName,
+              createdAt: x.createdAt.toISOString(),
+              withdrawal: x.withdrawal
+                ? {
+                    actorName: x.withdrawal.actorName,
+                    reason: x.withdrawal.reason,
+                    createdAt: x.withdrawal.createdAt.toISOString(),
+                  }
+                : null,
+            })),
       exception: incidentDto(current),
       exceptionHistory: incidents.map((e) => incidentDto(e)!),
       id: sh.id,
@@ -198,33 +222,39 @@ export class RedemptionDeliveryService {
           self = manager ? undefined : r.staffContext!.staffId;
         const where: Prisma.RedemptionShipmentWhereInput = {
           pack: { task: { warehouseId: w } },
-          ...(self ? { assignment: { riderId: self } } : {}),
+          ...(self ? { assignments: { some: { riderId: self, withdrawal: null } } } : {}),
           ...(status === 'UNASSIGNED'
-            ? { assignment: null }
+            ? { assignments: { none: { withdrawal: null } } }
             : status
               ? {
-                  assignment: {
-                    ...(self ? { riderId: self } : {}),
-                    handoff:
-                      status === 'ASSIGNED'
-                        ? null
-                        : {
-                            is: {
-                              journey:
-                                status === 'HANDED_OVER'
-                                  ? { none: { kind: 'START' } }
-                                  : status === 'DELIVERING'
-                                    ? { some: { kind: 'START' }, none: { kind: 'COMPLETE' } }
-                                    : { some: { kind: 'COMPLETE' } },
+                  assignments: {
+                    some: {
+                      withdrawal: null,
+                      ...(self ? { riderId: self } : {}),
+                      handoff:
+                        status === 'ASSIGNED'
+                          ? null
+                          : {
+                              is: {
+                                journey:
+                                  status === 'HANDED_OVER'
+                                    ? { none: { kind: 'START' } }
+                                    : status === 'DELIVERING'
+                                      ? { some: { kind: 'START' }, none: { kind: 'COMPLETE' } }
+                                      : { some: { kind: 'COMPLETE' } },
+                              },
                             },
-                          },
+                    },
                   },
                 }
               : {}),
         };
         // Keep the self scope even for UNASSIGNED; a rider can never query the unassigned pool.
         const scoped: Prisma.RedemptionShipmentWhereInput = {
-          AND: [where, ...(self ? [{ assignment: { riderId: self } }] : [])],
+          AND: [
+            where,
+            ...(self ? [{ assignments: { some: { riderId: self, withdrawal: null } } }] : []),
+          ],
         };
         if (
           cursor &&
@@ -269,6 +299,56 @@ export class RedemptionDeliveryService {
     });
   }
 
+  async withdraw(r: ApiRequest, w: string, id: string, k: string, input: unknown) {
+    const b = fields(input, ['assignmentId', 'reason', 'warehouseCustodyConfirmed']);
+    const assignmentId = uuid(b.assignmentId),
+      reason = str(b.reason, 300);
+    if (b.warehouseCustodyConfirmed !== true)
+      throw failure(
+        400,
+        'PHYSICAL_CONFIRMATION_REQUIRED',
+        '须核实骑手尚未接货、全部包裹仍由仓库保管',
+      );
+    await this.authorize(this.catalog.db, r, w, true);
+    await this.source(this.catalog.db, w, id);
+    if (!this.enabled) throw failure(503, 'REDEMPTION_DELIVERY_DISABLED', '兑换配送写入尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_DELIVERY_WITHDRAW',
+      w + ':' + id,
+      k,
+      { assignmentId, reason, warehouseCustodyConfirmed: true },
+      async (tx) => {
+        await this.authorize(tx, r, w, true);
+        const initial = await this.source(tx, w, id);
+        await metadataLocks(tx, [initial.o.skuId]);
+        await inventoryLocks(tx, w, [initial.o.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_shipments WHERE id=${id}::uuid FOR UPDATE`;
+        const { sh, o } = await this.source(tx, w, id);
+        if (!sh.assignment || sh.assignment.id !== assignmentId || sh.assignment.handoff)
+          throw failure(409, 'ASSIGNMENT_CHANGED', '分配已变化或已接货，不能撤回');
+        if (o.status !== 'ACTIVE' || o.pickingTask?.state !== 'CHECKED')
+          throw failure(409, 'DELIVERY_BLOCKED', '原订单或出库来源已变化');
+        const actorName = await this.person(tx, r.staffContext!.staffId, w, true);
+        if (!actorName) throw failure(403, 'FORBIDDEN', '当前人员无本仓撤回资格');
+        await tx.redemptionAssignmentWithdrawal.create({
+          data: {
+            id: randomUUID(),
+            assignmentId,
+            actorId: r.staffContext!.staffId,
+            actorName,
+            reason,
+            requestId: r.requestId,
+          },
+        });
+        await this.catalog.audit(tx, r, 'REDEMPTION_DELIVERY_WITHDRAW', o.id, w);
+        await this.authorize(tx, r, w, true);
+        return { id };
+      },
+    );
+  }
   async resolve(r: ApiRequest, w: string, id: string, k: string, input: unknown) {
     const b = fields(input, ['exceptionId', 'reason', 'continuationConfirmed']);
     const exceptionId = uuid(b.exceptionId),
@@ -511,7 +591,11 @@ export class RedemptionDeliveryService {
         const { sh } = await this.source(tx, w, id, action === 'accept' ? riderId : undefined),
           v = await this.view(tx, w, id, action === 'accept' ? riderId : undefined);
         if (action === 'assign' && sh.assignment)
-          throw failure(409, 'DELIVERY_ALREADY_ASSIGNED', '本出库单已有分配，不能重复分配或改派');
+          throw failure(
+            409,
+            'DELIVERY_ALREADY_ASSIGNED',
+            '本出库单已有有效分配，请先撤回未接货分配',
+          );
         if (action === 'accept' && (!sh.assignment || sh.assignment.id !== assignmentId))
           throw failure(409, 'ASSIGNMENT_CHANGED', '请使用当前本人分配凭据');
         if (sh.assignment?.handoff)
@@ -597,6 +681,19 @@ const task = object(
       type: 'string',
       enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'],
     },
+    assignmentHistory: {
+      type: 'array',
+      items: object({
+        id: text,
+        riderName: text,
+        actorName: text,
+        createdAt: text,
+        withdrawal: {
+          ...object({ actorName: text, reason: text, createdAt: text }),
+          nullable: true,
+        },
+      }),
+    },
     assignment: {
       ...object({ id: text, riderId: text, riderName: text, actorName: text, createdAt: text }),
       nullable: true,
@@ -646,6 +743,7 @@ const task = object(
     'shippedAt',
     'state',
     'assignment',
+    'assignmentHistory',
     'handoff',
     'journey',
     'canStart',
@@ -698,6 +796,29 @@ export class RedemptionDeliveryController {
   ) {
     fields(q, []);
     return success(r, await this.service.read(r, uuid(w), {}, uuid(id)));
+  }
+  @Post(':id/withdraw')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.assign')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      assignmentId: text,
+      reason: { type: 'string', maxLength: 300 },
+      warehouseCustodyConfirmed: { type: 'boolean', enum: [true] },
+    }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async withdraw(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.withdraw(r, uuid(w), uuid(id), key(r), b));
   }
   @Post(':id/assign')
   @HttpCode(200)

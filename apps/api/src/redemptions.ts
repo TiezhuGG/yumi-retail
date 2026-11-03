@@ -510,7 +510,7 @@ export class RedemptionService {
               include: {
                 shipment: {
                   include: {
-                    assignment: {
+                    assignments: {
                       include: {
                         handoff: {
                           include: { journey: true; exceptions: { include: { resolution: true } } };
@@ -542,23 +542,23 @@ export class RedemptionService {
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
       deliveryExceptionReported:
-        !!row.pickingTask?.pack?.shipment?.assignment?.handoff?.exceptions.some(
+        !!row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.exceptions.some(
           (e) => !e.resolution,
         ),
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
-          : row.pickingTask?.pack?.shipment?.assignment?.handoff?.journey.some(
+          : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
                 (f) => f.kind === 'COMPLETE',
               )
             ? 'DELIVERED'
-            : row.pickingTask?.pack?.shipment?.assignment?.handoff?.journey.some(
+            : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
                   (f) => f.kind === 'START',
                 )
               ? 'DELIVERING'
-              : row.pickingTask?.pack?.shipment?.assignment?.handoff
+              : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff
                 ? 'RIDER_RECEIVED_WAIT_START'
-                : row.pickingTask?.pack?.shipment?.assignment
+                : row.pickingTask?.pack?.shipment?.assignments[0]
                   ? 'ASSIGNED_WAIT_HANDOFF'
                   : row.pickingTask?.pack?.shipment
                     ? 'SHIPPED_WAIT_HANDOFF'
@@ -620,7 +620,8 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
-                      assignment: {
+                      assignments: {
+                        where: { withdrawal: null },
                         include: {
                           handoff: {
                             include: {
@@ -657,7 +658,8 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
-                      assignment: {
+                      assignments: {
+                        where: { withdrawal: null },
                         include: {
                           handoff: {
                             include: {

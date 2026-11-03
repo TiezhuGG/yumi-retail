@@ -69,6 +69,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionAssignmentWithdrawals RedemptionAssignmentWithdrawal[]
  redemptionDeliveryResolutions RedemptionDeliveryResolution[]
  redemptionDeliveryExceptions RedemptionDeliveryException[]
  redemptionAssignedRider RedemptionAssignment[] @relation("redemptionAssignedRider")
@@ -1590,7 +1591,7 @@ model RedemptionPackLine {
  @@map("redemption_pack_lines")
 }
 model RedemptionShipment {
- assignment RedemptionAssignment?
+ assignments RedemptionAssignment[]
  @@unique([id,orderId])
  id String @id @db.Uuid
  taskId String @unique @map("task_id") @db.Uuid
@@ -1607,9 +1608,10 @@ model RedemptionShipment {
 }
 
 model RedemptionAssignment {
+ withdrawal RedemptionAssignmentWithdrawal?
  id String @id @db.Uuid
- shipmentId String @unique @map("shipment_id") @db.Uuid
- orderId String @unique @map("order_id") @db.Uuid
+ shipmentId String @map("shipment_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
  riderId String @map("rider_id") @db.Uuid
  riderName String @map("rider_name") @db.VarChar(80)
  actorId String @map("actor_id") @db.Uuid
@@ -1620,10 +1622,22 @@ model RedemptionAssignment {
  rider Staff @relation("redemptionAssignedRider",fields:[riderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation("redemptionAssignmentActor",fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  handoff RedemptionHandoff?
- @@unique([shipmentId,orderId])
+ @@index([shipmentId,orderId])
  @@unique([id,shipmentId,orderId])
  @@index([riderId,shipmentId],map:"redemption_assignments_rider_idx")
  @@map("redemption_assignments")
+}
+model RedemptionAssignmentWithdrawal {
+ id String @id @db.Uuid
+ assignmentId String @unique @map("assignment_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ reason String @db.VarChar(300)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ assignment RedemptionAssignment @relation(fields:[assignmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_assignment_withdrawals")
 }
 model RedemptionHandoff {
  exceptions RedemptionDeliveryException[]

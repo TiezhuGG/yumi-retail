@@ -174,3 +174,14 @@ POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/resolve�
 新增迁移202611030004_redemption_delivery_resolutions及Prisma RedemptionDeliveryResolution，exception_id唯一外键、actor_id及姓名快照、reason、request_id和数据库时间；禁止UPDATE/DELETE。异常handoff唯一约束改普通索引，SQL触发器串行锁原handoff、限制一条未决，并仅用未决异常阻断START/COMPLETE。已消费库存、积分、订单主状态、地址、骑手分配及配额不变。处置确认是管理人员声明，并非独立实物证明。迁移先于API部署；旧P4f代码仍将历史异常视为未决，不可盲退或删除事实。
 
 3项新专项、3项P4f及13项P4e合计19项真实PG测试通过；实际API浏览器闭环30张截图，含处置响应丢失原键恢复、原骑手继续和消费者阶段同步。全工作区构建、类型检查、lint、Prisma生成及OpenAPI导出通过。仅随机临时schema，未改业务主库/.env/生产，沿用默认关闭及生产/远程拒启。微信工具、真机、真实实物和生产仍未验，P4/P5未整体验收。下一项P4h未接货分配撤回/改派及人员撤权接续，后续协调取消和售后。详见[本轮验证记录](../verification/P4G-REDEMPTION-RESOLUTIONS-2026-11-03.md)。
+
+
+## 2026-11-03 P4h 未接货分配撤回及重新分配（本地）
+
+本仓有效负责人/仓管填写原因（必填最多300字），声明骑手尚未接货、全部包裹仍在仓库，可撤回当前分配。原分配与撤回均为不可变事实；撤回后回到已出库待分配，由管理人员再选当前有效本仓骑手，新骑手凭新分配核对接货。两步操作之间允许保持待分配，不自动择人，不退库存、积分或配额。即使原骑手/原分配人停用、撤权或撤仓，现任管理人员仍可撤回；货品冻结等不阻碍撤回，但仍阻断新分配。已接货禁止撤回，不能据此冒充实物回交。管理确认仅是人员声明。
+
+POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/withdraw，body仅assignmentId、reason、warehouseCustodyConfirmed:true；员工Cookie、Origin/CSRF、本仓redemption-delivery.assign和Idempotency-Key。输入错误400、无权403、错来源/旧版本分配/已接货409、关闭503；处置、审计及幂等结果同事务。新分配沿用/assign，不能覆盖现存有效分配。旧骑手列表/详情/接货只认当前未撤回分配，不返回旧单地址或新骑手资料；员工管理查询增加assignmentHistory，消费者只同步实际阶段，不返回内部原因。
+
+新增迁移202611030005_redemption_assignment_withdrawals：RedemptionAssignmentWithdrawal链接唯一原assignment、当前管理人员及姓名快照、原因、请求号、数据库时间，禁止修改删除。解除assignment的shipment/order唯一约束，保留复合来源外键并增加索引；按原shipment行锁保护同单至多一条有效分配，撤回与接货互斥，SQL禁止撤回已接货及用撤回凭据接货。Prisma shipment.assignment改为assignments集合，各查询只按未撤回记录计算当前状态。旧凭据保留，不改原接货。迁移后须部署匹配API/Worker及页面；旧代码将多条分配错误视为单条，不可盲退或重建旧唯一约束。
+
+OpenAPI 0.50.0已导出。4项新PG专项及32项相关PG回归（初跑34/36，修正两处测试模型/账号引用后定向复验通过）共36个不同用例通过；18张实际API浏览器截图、类型检查、lint、全工作区构建、Prisma生成通过。仅临时schema、默认开关关闭、生产/远程拒启，未改业务主库/.env/生产，微信工具/真机和真实交接未验。P4h仅交付未接货接续；下一项P4i已接货人员撤权后的实物回交与接续，领取人停用接续、协调取消及售后仍须继续。详见[验证记录](../verification/P4H-REDEMPTION-WITHDRAWALS-2026-11-03.md)。
