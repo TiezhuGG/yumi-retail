@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, orderReservationDelta, redemptionJobChange } from '@yumi/database';
-import type { ConsumerOrderAddress } from '@yumi/contracts';
+import type { RedemptionOrderAddress, RedemptionPrintPreview } from '@yumi/contracts';
 import { CatalogService } from './catalog-service.js';
 import { CheckoutService } from './checkout.js';
+import { ConsumerExpressAddressService } from './express-address.js';
 import { ConsumerAddressService } from './consumer-address.js';
 import { OrderPrivateData } from './order-private.js';
 import { inventoryLocks, metadataLocks } from './reservation-locks.js';
@@ -17,6 +18,7 @@ type QuoteInput = {
   quantity: number;
   addressId: string;
   addressVersion: number;
+  deliveryMode?: 'LOCAL_NO_CASH' | 'EXPRESS';
 };
 export type RedemptionSnapshot = QuoteInput & {
   skuId: string;
@@ -30,13 +32,16 @@ export type RedemptionSnapshot = QuoteInput & {
   productVersion: number;
   balance: string;
   remainingBalance: string;
-  deliveryMode: 'LOCAL_NO_CASH';
+  deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
+  shippingFeeMode?: 'SENDER_PAID';
+  shippingFeeCents?: number;
 };
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 export class RedemptionService {
   readonly checkout: CheckoutService;
   readonly privateData: OrderPrivateData;
   readonly staff: PointsGrantService;
+  readonly expressAddresses: ConsumerExpressAddressService;
   constructor(
     readonly catalog: CatalogService,
     readonly addresses: ConsumerAddressService,
@@ -46,6 +51,7 @@ export class RedemptionService {
     this.checkout = new CheckoutService(catalog);
     this.privateData = new OrderPrivateData(key);
     this.staff = new PointsGrantService(catalog);
+    this.expressAddresses = new ConsumerExpressAddressService(catalog, key);
   }
   private warehouse() {
     if (!this.catalog.publicWarehouseId)
@@ -120,6 +126,36 @@ export class RedemptionService {
     return p;
   }
   private async address(tx: Tx, userId: string, input: QuoteInput) {
+    if (input.deliveryMode === 'EXPRESS') {
+      const wh = await tx.$queryRaw<
+        Array<{ id: string }>
+      >`SELECT id FROM warehouses WHERE id=${this.warehouse()}::uuid AND enabled FOR SHARE`;
+      if (!wh.length) throw failure(409, 'WAREHOUSE_PAUSED', '仓库暂不受理快递兑换');
+      const book = await tx.$queryRaw<
+        Array<{ version: number }>
+      >`SELECT version FROM consumer_express_address_books WHERE user_id=${userId}::uuid FOR SHARE`;
+      if (book[0]?.version !== input.addressVersion)
+        throw failure(409, 'ADDRESS_VERSION_CONFLICT', '快递地址已变化，请重新选择');
+      const address = await tx.consumerExpressAddress.findFirst({
+        where: { id: input.addressId, userId, deleted: false },
+      });
+      if (!address) throw failure(404, 'ADDRESS_NOT_FOUND', '未找到本人快递地址');
+      const data = this.expressAddresses.decryptSnapshot(userId, address.id, address.payload!);
+      await tx.$queryRaw`SELECT warehouse_id FROM redemption_express_policies WHERE warehouse_id=${this.warehouse()}::uuid FOR SHARE`;
+      const policy = await tx.redemptionExpressPolicy.findUnique({
+        where: { warehouseId: this.warehouse() },
+      });
+      if (!policy?.enabled || policy.shippingFeeMode !== 'SENDER_PAID')
+        throw failure(409, 'EXPRESS_UNAVAILABLE', '快递兑换暂未开放或运费规则未配置');
+      if (!policy.provinces.includes(data.province))
+        throw failure(409, 'ADDRESS_OUT_OF_RANGE', '该省份暂不在快递寄送范围');
+      return {
+        address,
+        areaVersion: policy.version,
+        snapshotAddress: { ...data, orderNote: '' } as RedemptionOrderAddress,
+      };
+    }
+
     const books = await tx.$queryRaw<
       Array<{ version: number }>
     >`SELECT version FROM consumer_address_books WHERE user_id=${userId}::uuid FOR SHARE`;
@@ -133,7 +169,18 @@ export class RedemptionService {
       Array<{ version: number }>
     >`SELECT a.version FROM service_areas a JOIN service_buildings b ON b.area_id=a.id JOIN warehouses w ON w.id=a.warehouse_id WHERE a.id=${address.areaId}::uuid AND b.id=${address.buildingId}::uuid AND a.warehouse_id=${this.warehouse()}::uuid AND a.enabled AND b.enabled AND w.enabled FOR SHARE OF a,b,w`;
     if (!area.length) throw failure(409, 'ADDRESS_OUT_OF_RANGE', '地址不在当前有效配送范围');
-    return { address, areaVersion: area[0]!.version };
+    const areaRow = await tx.serviceArea.findUniqueOrThrow({ where: { id: address.areaId } }),
+      building = await tx.serviceBuilding.findUniqueOrThrow({ where: { id: address.buildingId } });
+    return {
+      address,
+      areaVersion: area[0]!.version,
+      snapshotAddress: {
+        areaName: areaRow.name,
+        buildingName: building.name,
+        ...this.addresses.decryptSnapshot(userId, address.id, address.payload!),
+        orderNote: '',
+      } as RedemptionOrderAddress,
+    };
   }
   private async snapshot(
     tx: Tx,
@@ -189,7 +236,10 @@ export class RedemptionService {
       productVersion: product.product.version,
       balance: balance.toString(),
       remainingBalance: (balance - total).toString(),
-      deliveryMode: 'LOCAL_NO_CASH',
+      deliveryMode: input.deliveryMode ?? 'LOCAL_NO_CASH',
+      ...(input.deliveryMode === 'EXPRESS'
+        ? { shippingFeeMode: 'SENDER_PAID' as const, shippingFeeCents: 0 }
+        : {}),
     };
   }
   async quote(r: ApiRequest, key: string, body: unknown) {
@@ -199,13 +249,20 @@ export class RedemptionService {
       'quantity',
       'addressId',
       'addressVersion',
+      'deliveryMode',
     ]);
+    if (
+      b.deliveryMode !== undefined &&
+      !['LOCAL_NO_CASH', 'EXPRESS'].includes(String(b.deliveryMode))
+    )
+      throw failure(400, 'VALIDATION_ERROR', '配送方式无效');
     const input: QuoteInput = {
       rewardId: uuid(b.rewardId),
       rewardVersion: integer(b.rewardVersion, 0, 2147483646),
       quantity: integer(b.quantity, 1, 100000),
       addressId: uuid(b.addressId),
       addressVersion: integer(b.addressVersion, 0, 2147483646),
+      ...(b.deliveryMode ? { deliveryMode: b.deliveryMode as 'EXPRESS' | 'LOCAL_NO_CASH' } : {}),
     };
     const result = await this.run(r, key, 'QUOTE', input, async (tx, userId) => {
       this.gate();
@@ -280,22 +337,16 @@ export class RedemptionService {
           s.addressVersion,
           s.areaVersion,
           s.productVersion,
+          s.deliveryMode,
+          s.shippingFeeMode ?? null,
+          s.shippingFeeCents ?? null,
         ]);
       if (compare(old) !== compare(fresh))
         throw failure(409, 'QUOTE_CHANGED', '商品或地址规则已变化，请重新报价并确认');
-      const { address } = await this.address(tx, userId, old),
-        area = await tx.serviceArea.findUniqueOrThrow({ where: { id: address.areaId } }),
-        building = await tx.serviceBuilding.findUniqueOrThrow({
-          where: { id: address.buildingId },
-        });
+      const { snapshotAddress } = await this.address(tx, userId, old);
       const now = await this.clock(tx),
         id = randomUUID();
-      const addressPayload = this.privateData.encrypt(userId, id, {
-        areaName: area.name,
-        buildingName: building.name,
-        ...this.addresses.decryptSnapshot(userId, address.id, address.payload!),
-        orderNote: '',
-      });
+      const addressPayload = this.privateData.encrypt(userId, id, snapshotAddress);
       await tx.redemptionOrder.create({
         data: {
           id,
@@ -314,6 +365,7 @@ export class RedemptionService {
           totalPoints: BigInt(fresh.totalPoints),
           rewardVersion: p.version,
           addressPayload,
+          deliveryMode: fresh.deliveryMode,
           createdAt: now,
         },
       });
@@ -377,7 +429,9 @@ export class RedemptionService {
         lotFree.set(pos.lotId, free - quantity);
       }
       if (remaining) throw failure(409, 'STOCK_UNAVAILABLE', '批次可售库存变化，未创建兑换单');
-      await tx.redemptionOutbox.create({ data: { orderId: id } });
+      await tx.redemptionOutbox.create({
+        data: { orderId: id, state: fresh.deliveryMode === 'EXPRESS' ? 'EXPRESS_WAIT' : 'PENDING' },
+      });
       await tx.redemptionEvent.create({
         data: {
           id: randomUUID(),
@@ -500,6 +554,60 @@ export class RedemptionService {
       return { id };
     });
   }
+  async printPreview(r: ApiRequest, input: unknown): Promise<RedemptionPrintPreview> {
+    const b = fields(input, ['ids']);
+    if (!Array.isArray(b.ids) || b.ids.length < 1 || b.ids.length > 20)
+      throw failure(400, 'VALIDATION_ERROR', '每批请选择1至20张订单');
+    const ids = b.ids.map((x) => uuid(x).toLowerCase());
+    if (new Set(ids).size !== ids.length)
+      throw failure(400, 'VALIDATION_ERROR', '订单不能重复选择');
+    return this.catalog.db.$transaction(
+      async (tx) => {
+        const warehouseId = await this.staff.authorize(r, tx);
+        // Serialize snapshot validation with cancellation; no stock or account writes.
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE warehouse_id=${warehouseId}::uuid AND id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`;
+        const rows = await tx.redemptionOrder.findMany({
+          where: { id: { in: ids }, warehouseId },
+          include: { quote: true },
+        });
+        if (rows.length !== ids.length)
+          throw failure(
+            404,
+            'REDEMPTION_NOT_FOUND',
+            '部分订单不存在或不在当前授权范围，请重新查询',
+          );
+        if (rows.some((o) => o.status !== 'ACTIVE'))
+          throw failure(409, 'PRINT_ORDER_UNAVAILABLE', '所选订单已取消，请重新查询后选择有效订单');
+        const items = ids.map((id) => {
+          const o = rows.find((x) => x.id === id)!;
+          const snapshot = o.quote.snapshot as unknown as RedemptionSnapshot;
+          if (!['LOCAL_NO_CASH', 'EXPRESS'].includes(snapshot.deliveryMode))
+            throw failure(409, 'PRINT_MODE_UNSUPPORTED', '该订单配送方式尚未支持当前打印模板');
+          return {
+            id: o.id,
+            orderNo: o.orderNo,
+            createdAt: o.createdAt.toISOString(),
+            title: o.title,
+            spec: o.spec,
+            unit: o.unit,
+            quantity: o.quantity,
+            pointsPrice: o.pointsPrice.toString(),
+            totalPoints: o.totalPoints.toString(),
+            deliveryMode: snapshot.deliveryMode,
+            address: this.privateData.decrypt<RedemptionOrderAddress>(
+              o.userId,
+              o.id,
+              o.addressPayload,
+            ),
+          };
+        });
+        const generatedAt = (await this.clock(tx)).toISOString();
+        await this.staff.authorize(r, tx);
+        return { generatedAt, items };
+      },
+      { timeout: 15000 },
+    );
+  }
   private dto(
     row: Prisma.RedemptionOrderGetPayload<{
       include: {
@@ -542,6 +650,7 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
+      deliveryMode: row.deliveryMode as 'LOCAL_NO_CASH' | 'EXPRESS',
       deliveryReturnRecorded: !!row.pickingTask?.pack?.shipment?.returns.length,
       deliveryExceptionReported:
         !!row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.exceptions.some(
@@ -550,36 +659,38 @@ export class RedemptionService {
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
-          : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
-                (f) => f.kind === 'COMPLETE',
-              )
-            ? 'DELIVERED'
+          : row.deliveryMode === 'EXPRESS'
+            ? 'EXPRESS_WAIT_SHIP'
             : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
-                  (f) => f.kind === 'START',
+                  (f) => f.kind === 'COMPLETE',
                 )
-              ? 'DELIVERING'
-              : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff
-                ? 'RIDER_RECEIVED_WAIT_START'
-                : row.pickingTask?.pack?.shipment?.assignments[0]
-                  ? 'ASSIGNED_WAIT_HANDOFF'
-                  : row.pickingTask?.pack?.shipment
-                    ? 'SHIPPED_WAIT_HANDOFF'
-                    : row.pickingTask?.pack
-                      ? 'PACKED_WAIT_SHIP'
-                      : row.pickingTask?.state === 'CHECKED'
-                        ? 'PICKED_WAIT_PACK'
-                        : row.pickingTask?.state === 'CLAIMED'
-                          ? 'PICKING'
-                          : row.pickingTask?.state === 'READY'
-                            ? 'READY_TO_PICK'
-                            : row.outbox?.state === 'FAILED'
-                              ? 'REVIEW_REQUIRED'
-                              : row.outbox
-                                ? 'PENDING'
-                                : 'MISSING',
+              ? 'DELIVERED'
+              : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
+                    (f) => f.kind === 'START',
+                  )
+                ? 'DELIVERING'
+                : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff
+                  ? 'RIDER_RECEIVED_WAIT_START'
+                  : row.pickingTask?.pack?.shipment?.assignments[0]
+                    ? 'ASSIGNED_WAIT_HANDOFF'
+                    : row.pickingTask?.pack?.shipment
+                      ? 'SHIPPED_WAIT_HANDOFF'
+                      : row.pickingTask?.pack
+                        ? 'PACKED_WAIT_SHIP'
+                        : row.pickingTask?.state === 'CHECKED'
+                          ? 'PICKED_WAIT_PACK'
+                          : row.pickingTask?.state === 'CLAIMED'
+                            ? 'PICKING'
+                            : row.pickingTask?.state === 'READY'
+                              ? 'READY_TO_PICK'
+                              : row.outbox?.state === 'FAILED'
+                                ? 'REVIEW_REQUIRED'
+                                : row.outbox
+                                  ? 'PENDING'
+                                  : 'MISSING',
       ...(consumer
         ? {
-            address: this.privateData.decrypt<ConsumerOrderAddress>(
+            address: this.privateData.decrypt<RedemptionOrderAddress>(
               row.userId,
               row.id,
               row.addressPayload,

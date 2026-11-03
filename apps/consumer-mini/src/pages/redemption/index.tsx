@@ -5,6 +5,7 @@ import type { RedemptionOrderView } from '../../../../../packages/contracts/src/
 import { cartIdentity } from '../../account-cart';
 import { addressRequest, addressOperationKey } from '../../address-api';
 import { acknowledgeRedemption, redemptionCancelKey } from '../../redemption-storage';
+import { formatRedemptionAddress } from '../../redemption-address';
 export default function RedemptionDetail() {
   const id = useRouter().params.id;
   const [order, setOrder] = useState<RedemptionOrderView | null>(null),
@@ -107,33 +108,35 @@ export default function RedemptionDetail() {
               <Text className="account-copy">
                 {order.status === 'CANCELED'
                   ? '积分已退还，库存和限兑配额已释放。'
-                  : order.deliveryExceptionReported
-                    ? '配送异常待处理'
-                    : order.fulfillmentState === 'DELIVERED'
-                      ? '骑手已确认送达。'
-                      : order.fulfillmentState === 'DELIVERING'
-                        ? '骑手配送中。'
-                        : order.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                          ? '骑手已核对接货，等待开始配送。'
-                          : order.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                            ? order.deliveryReturnRecorded
-                              ? '已重新分配，等待骑手核对接货。'
-                              : '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                            : order.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                  : order.deliveryMode === 'EXPRESS'
+                    ? '待快递发货 · 商家承担运费'
+                    : order.deliveryExceptionReported
+                      ? '配送异常待处理'
+                      : order.fulfillmentState === 'DELIVERED'
+                        ? '骑手已确认送达。'
+                        : order.fulfillmentState === 'DELIVERING'
+                          ? '骑手配送中。'
+                          : order.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                            ? '骑手已核对接货，等待开始配送。'
+                            : order.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
                               ? order.deliveryReturnRecorded
-                                ? '包裹已回交，等待门店重新安排配送。'
-                                : '已出库，等待骑手接货；尚未开始配送。'
-                              : order.fulfillmentState === 'PACKED_WAIT_SHIP'
-                                ? '已打包，等待仓库出库；尚未配送。'
-                                : order.fulfillmentState === 'PICKED_WAIT_PACK'
-                                  ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                                  : order.fulfillmentState === 'PICKING'
-                                    ? '仓库已领取，正在准备拣货；尚未出库或配送。'
-                                    : order.fulfillmentState === 'READY_TO_PICK'
-                                      ? '已创建拣货任务，等待仓库领取。'
-                                      : order.fulfillmentState === 'REVIEW_REQUIRED'
-                                        ? '履约待办需要门店核查，积分和预占仍保留。'
-                                        : '已扣积分并预占库存，正在等待创建拣货任务。'}
+                                ? '已重新分配，等待骑手核对接货。'
+                                : '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                              : order.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                                ? order.deliveryReturnRecorded
+                                  ? '包裹已回交，等待门店重新安排配送。'
+                                  : '已出库，等待骑手接货；尚未开始配送。'
+                                : order.fulfillmentState === 'PACKED_WAIT_SHIP'
+                                  ? '已打包，等待仓库出库；尚未配送。'
+                                  : order.fulfillmentState === 'PICKED_WAIT_PACK'
+                                    ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                                    : order.fulfillmentState === 'PICKING'
+                                      ? '仓库已领取，正在准备拣货；尚未出库或配送。'
+                                      : order.fulfillmentState === 'READY_TO_PICK'
+                                        ? '已创建拣货任务，等待仓库领取。'
+                                        : order.fulfillmentState === 'REVIEW_REQUIRED'
+                                          ? '履约待办需要门店核查，积分和预占仍保留。'
+                                          : '已扣积分并预占库存，正在等待创建拣货任务。'}
               </Text>
               <Text className="account-copy redemption-order-no">兑换单号：{order.orderNo}</Text>
               {order.deliveryReturnRecorded && (
@@ -167,10 +170,7 @@ export default function RedemptionDetail() {
             {order.address && (
               <View className="account-card">
                 <Text className="account-card-title">收货地址快照</Text>
-                <Text className="account-copy">
-                  {order.address.areaName} {order.address.buildingName} {order.address.unit}{' '}
-                  {order.address.room}
-                </Text>
+                <Text className="account-copy">{formatRedemptionAddress(order.address)}</Text>
                 <Text className="account-copy">
                   {order.address.contactName} · {order.address.phone}
                 </Text>
@@ -189,7 +189,9 @@ export default function RedemptionDetail() {
               ].includes(order.fulfillmentState) && (
                 <View className="account-card">
                   <Text className="account-copy">
-                    仓库领取前可直接取消，退还全部积分并释放预占；领取和取消以服务端先完成的结果为准。
+                    {order.deliveryMode === 'EXPRESS'
+                      ? '当前待快递发货，可申请取消并退还积分、释放预占，以服务端核验为准。'
+                      : '仓库领取前可直接取消，退还全部积分并释放预占；领取和取消以服务端先完成的结果为准。'}
                   </Text>
                   <Button
                     className="points-action"

@@ -507,7 +507,7 @@ function WorkspaceSession({
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
           ) : activeView === 'redemptions' ? (
-            <RedemptionsWorkbench />
+            <RedemptionsWorkbench profile={profile} />
           ) : activeView === 'rewards' ? (
             <RewardsWorkbench profile={profile} />
           ) : activeView === 'points-corrections' ? (

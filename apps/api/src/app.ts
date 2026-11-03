@@ -1,5 +1,12 @@
 import { RedemptionDeliveryController, RedemptionDeliveryService } from './redemption-delivery.js';
 import { RedemptionPickingService, RedemptionPickingController } from './redemption-picking.js';
+import { ConsumerExpressAddressService } from './express-address.js';
+import { ConsumerExpressAddressController } from './express-address-controller.js';
+import {
+  ExpressPolicyService,
+  PublicExpressPolicyController,
+  AdminExpressPolicyController,
+} from './express-policy.js';
 import { RedemptionService } from './redemptions.js';
 import { RedemptionController, AdminRedemptionController } from './redemption-controller.js';
 import { RewardService, AdminRewardController, PublicRewardController } from './rewards.js';
@@ -177,6 +184,9 @@ export async function createApplication(
       PickingPackingController,
       DeliveryLabController,
       ConsumerAddressController,
+      ConsumerExpressAddressController,
+      PublicExpressPolicyController,
+      AdminExpressPolicyController,
       CheckoutController,
       CheckoutPolicyController,
       StoreController,
@@ -228,6 +238,11 @@ export async function createApplication(
         provide: ConsumerAddressService,
         useValue: addresses,
       },
+      {
+        provide: ConsumerExpressAddressService,
+        useValue: new ConsumerExpressAddressService(catalog, config.addressEncryptionKey),
+      },
+      { provide: ExpressPolicyService, useValue: new ExpressPolicyService(catalog) },
       { provide: ConsumerCartService, useValue: new ConsumerCartService(catalog) },
       { provide: CheckoutService, useValue: checkout },
       {
@@ -349,7 +364,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.51.0')
+      .setVersion('0.53.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

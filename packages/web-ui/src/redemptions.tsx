@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { RedemptionOrderView, RedemptionOrderPage } from '@yumi/contracts';
+import type { RedemptionOrderView, RedemptionOrderPage, StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
-export function RedemptionsWorkbench() {
+import { ExpressPolicyWorkbench } from './express-policy.js';
+import { RedemptionPrintDialog } from './redemption-print.js';
+export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
+  const [selected, setSelected] = useState<string[]>([]),
+    [printIds, setPrintIds] = useState<string[] | null>(null);
   const [items, setItems] = useState<RedemptionOrderView[]>([]),
     [detail, setDetail] = useState<RedemptionOrderView | null>(null),
     [keyword, setKeyword] = useState(''),
@@ -17,6 +21,8 @@ export function RedemptionsWorkbench() {
     pending.current = intent;
     setLoading(true);
     setError('');
+    setPrintIds(null);
+    setSelected([]);
     try {
       if (intent.id) {
         const d = await staffRequest<RedemptionOrderView>('/admin/redemptions/' + intent.id);
@@ -35,7 +41,7 @@ export function RedemptionsWorkbench() {
     } catch (e) {
       if (n === seq.current) {
         setError(e instanceof Error ? e.message : '读取失败');
-        if (e instanceof StaffRequestError && [401, 403].includes(e.status)) {
+        if (e instanceof StaffRequestError && [401, 403, 404].includes(e.status)) {
           setItems([]);
           setDetail(null);
           setCursor(null);
@@ -54,8 +60,9 @@ export function RedemptionsWorkbench() {
   return (
     <section aria-label="积分兑换订单">
       <div className="notice">
-        本机开发兑换订单：积分扣账、预占与取消可追溯。核对、打包与出库可追溯，骑手分配及接货可追溯，开始配送及骑手确认送达可追溯；积分兑换不计现金销售额。
+        兑换订单支持单张或批量打印配货单，用于备货核对。打印不改变发货状态，配送方式以订单记录为准；积分兑换不计现金销售额。
       </div>
+      <ExpressPolicyWorkbench profile={profile} />
       {detail ? (
         <div className="reward-detail">
           <button className="secondary-button" disabled={loading} onClick={() => void load()}>
@@ -69,31 +76,40 @@ export function RedemptionsWorkbench() {
           <p>
             {detail.status === 'CANCELED'
               ? '已取消 · 已退积分'
-              : detail.deliveryExceptionReported
-                ? '配送异常待处理'
-                : detail.fulfillmentState === 'DELIVERED'
-                  ? '骑手已确认送达。'
-                  : detail.fulfillmentState === 'DELIVERING'
-                    ? '骑手配送中。'
-                    : detail.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                      ? '骑手已核对接货，等待开始配送。'
-                      : detail.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                        ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                        : detail.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                          ? '已出库，等待骑手接货；尚未开始配送。'
-                          : detail.fulfillmentState === 'PACKED_WAIT_SHIP'
-                            ? '已打包，等待仓库出库；尚未配送。'
-                            : detail.fulfillmentState === 'PICKED_WAIT_PACK'
-                              ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                              : detail.fulfillmentState === 'PICKING'
-                                ? '仓库已领取'
-                                : detail.fulfillmentState === 'READY_TO_PICK'
-                                  ? '待仓库领取'
-                                  : detail.fulfillmentState === 'REVIEW_REQUIRED'
-                                    ? '待核查'
-                                    : '待创建拣货任务'}
+              : detail.deliveryMode === 'EXPRESS'
+                ? '待快递发货 · 商家承担运费'
+                : detail.deliveryExceptionReported
+                  ? '配送异常待处理'
+                  : detail.fulfillmentState === 'DELIVERED'
+                    ? '骑手已确认送达。'
+                    : detail.fulfillmentState === 'DELIVERING'
+                      ? '骑手配送中。'
+                      : detail.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                        ? '骑手已核对接货，等待开始配送。'
+                        : detail.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                          ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                          : detail.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                            ? '已出库，等待骑手接货；尚未开始配送。'
+                            : detail.fulfillmentState === 'PACKED_WAIT_SHIP'
+                              ? '已打包，等待仓库出库；尚未配送。'
+                              : detail.fulfillmentState === 'PICKED_WAIT_PACK'
+                                ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                                : detail.fulfillmentState === 'PICKING'
+                                  ? '仓库已领取'
+                                  : detail.fulfillmentState === 'READY_TO_PICK'
+                                    ? '待仓库领取'
+                                    : detail.fulfillmentState === 'REVIEW_REQUIRED'
+                                      ? '待核查'
+                                      : '待创建拣货任务'}
           </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
+          <button
+            className="primary-button"
+            disabled={loading || detail.status === 'CANCELED'}
+            onClick={() => setPrintIds([detail.id])}
+          >
+            打印本单
+          </button>
           <h3>实物预占凭据</h3>
           {detail.allocations?.map((a, i) => (
             <p key={i}>
@@ -143,11 +159,47 @@ export function RedemptionsWorkbench() {
               查询兑换单
             </button>
           </form>
+          <div className="points-toolbar">
+            <label>
+              <input
+                type="checkbox"
+                aria-label="选择本页有效订单"
+                disabled={loading || !items.some((o) => o.status === 'ACTIVE')}
+                checked={
+                  items.some((o) => o.status === 'ACTIVE') &&
+                  items
+                    .filter((o) => o.status === 'ACTIVE')
+                    .slice(0, 20)
+                    .every((o) => selected.includes(o.id))
+                }
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? items
+                          .filter((o) => o.status === 'ACTIVE')
+                          .slice(0, 20)
+                          .map((o) => o.id)
+                      : [],
+                  )
+                }
+              />
+              选择当前列表有效订单（最多20单）
+            </label>
+            <span>已选 {selected.length} 单</span>
+            <button
+              className="primary-button"
+              disabled={loading || !selected.length}
+              onClick={() => setPrintIds([...selected])}
+            >
+              批量打印订单
+            </button>
+          </div>
           {items.length > 0 && (
             <div className="points-table-wrap">
               <table className="points-table">
                 <thead>
                   <tr>
+                    <th>选择</th>
                     <th>兑换商品</th>
                     <th>数量 / 积分</th>
                     <th>状态</th>
@@ -158,8 +210,26 @@ export function RedemptionsWorkbench() {
                   {items.map((o) => (
                     <tr key={o.id}>
                       <td>
+                        <input
+                          type="checkbox"
+                          aria-label={'选择订单 ' + o.orderNo}
+                          disabled={
+                            loading ||
+                            o.status === 'CANCELED' ||
+                            (!selected.includes(o.id) && selected.length >= 20)
+                          }
+                          checked={selected.includes(o.id)}
+                          onChange={(e) =>
+                            setSelected((old) =>
+                              e.target.checked ? [...old, o.id] : old.filter((id) => id !== o.id),
+                            )
+                          }
+                        />
+                      </td>
+                      <td>
                         {o.title}
                         <p>{o.spec}</p>
+                        <p className="redemption-order-no">{o.orderNo}</p>
                       </td>
                       <td>
                         {o.quantity} 件 / {o.totalPoints} 积分
@@ -167,25 +237,27 @@ export function RedemptionsWorkbench() {
                       <td>
                         {o.status === 'CANCELED'
                           ? '已取消'
-                          : o.fulfillmentState === 'DELIVERED'
-                            ? '骑手已确认送达。'
-                            : o.fulfillmentState === 'DELIVERING'
-                              ? '骑手配送中。'
-                              : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                                ? '骑手已核对接货，等待开始配送。'
-                                : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                                  ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                                  : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                                    ? '已出库，等待骑手接货；尚未开始配送。'
-                                    : o.fulfillmentState === 'PACKED_WAIT_SHIP'
-                                      ? '已打包，等待仓库出库；尚未配送。'
-                                      : o.fulfillmentState === 'PICKED_WAIT_PACK'
-                                        ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                                        : o.fulfillmentState === 'PICKING'
-                                          ? '仓库已领取'
-                                          : o.fulfillmentState === 'READY_TO_PICK'
-                                            ? '待仓库领取'
-                                            : '待建任务/核查'}
+                          : o.deliveryMode === 'EXPRESS'
+                            ? '待快递发货'
+                            : o.fulfillmentState === 'DELIVERED'
+                              ? '骑手已确认送达。'
+                              : o.fulfillmentState === 'DELIVERING'
+                                ? '骑手配送中。'
+                                : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                                  ? '骑手已核对接货，等待开始配送。'
+                                  : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                                    ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                                    : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                                      ? '已出库，等待骑手接货；尚未开始配送。'
+                                      : o.fulfillmentState === 'PACKED_WAIT_SHIP'
+                                        ? '已打包，等待仓库出库；尚未配送。'
+                                        : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                                          ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                                          : o.fulfillmentState === 'PICKING'
+                                            ? '仓库已领取'
+                                            : o.fulfillmentState === 'READY_TO_PICK'
+                                              ? '待仓库领取'
+                                              : '待建任务/核查'}
                       </td>
                       <td>
                         <button
@@ -193,7 +265,7 @@ export function RedemptionsWorkbench() {
                           disabled={loading}
                           onClick={() => void load({ id: o.id })}
                         >
-                          查看兑换凭据
+                          查看订单详情
                         </button>
                       </td>
                     </tr>
@@ -215,6 +287,14 @@ export function RedemptionsWorkbench() {
             </button>
           )}
         </>
+      )}
+      {printIds && (
+        <RedemptionPrintDialog
+          key={printIds.join(':')}
+          ids={printIds}
+          profile={profile}
+          onClose={() => setPrintIds(null)}
+        />
       )}
       {loading && <p role="status">正在读取兑换订单…</p>}
       {error && (

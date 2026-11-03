@@ -12,6 +12,7 @@ export default {
     'pages/redemption/index',
     'pages/service-area/index',
     'pages/addresses/index',
+    'pages/express-addresses/index',
     'pages/checkout/index',
     'pages/orders/index',
     'pages/order/index',

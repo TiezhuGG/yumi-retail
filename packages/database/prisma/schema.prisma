@@ -47,6 +47,7 @@ model ValidationLedger {
 }
 
 model Warehouse {
+ redemptionExpressPolicy RedemptionExpressPolicy?
  rewards RewardProduct[]
  pointsGrantPolicy PointsGrantPolicy?
  pointsGrants PointsGrant[]
@@ -640,6 +641,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ expressAddressBook ConsumerExpressAddressBook?
  redemptionPickingEvents RedemptionPickingEvent[]
  redemptionQuotes RedemptionQuote[]
  redemptions RedemptionOrder[]
@@ -1402,6 +1404,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ deliveryMode String @default("LOCAL_NO_CASH") @map("delivery_mode") @db.VarChar(20)
  pickingTask RedemptionPickingTask?
  id String @id @db.Uuid
  userId String @map("user_id") @db.Uuid
@@ -1749,4 +1752,56 @@ model RedemptionCustodyReturnLine {
  returned RedemptionCustodyReturn @relation(fields:[returnId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
  @@id([returnId,allocationId])
  @@map("redemption_custody_return_lines")
+}
+
+model ConsumerExpressAddressBook {
+ userId String @id @map("user_id") @db.Uuid
+ version Int @default(0)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ addresses ConsumerExpressAddress[]
+ operations ConsumerExpressAddressOperation[]
+ audits ConsumerExpressAddressAudit[]
+ @@map("consumer_express_address_books")
+}
+model ConsumerExpressAddress {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ payload String?
+ isDefault Boolean @default(false) @map("is_default")
+ deleted Boolean @default(false)
+ book ConsumerExpressAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@index([userId,deleted],map:"consumer_express_addresses_owner_idx")
+ @@map("consumer_express_addresses")
+}
+model ConsumerExpressAddressOperation {
+ userId String @map("user_id") @db.Uuid
+ key String @db.Uuid
+ digest String @db.Char(64)
+ result Json
+ book ConsumerExpressAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@id([userId,key])
+ @@map("consumer_express_address_operations")
+}
+model ConsumerExpressAddressAudit {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ addressId String @map("address_id") @db.Uuid
+ version Int
+ action String @db.VarChar(16)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ book ConsumerExpressAddressBook @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@index([userId,createdAt],map:"consumer_express_address_audits_owner_idx")
+ @@map("consumer_express_address_audits")
+}
+
+
+model RedemptionExpressPolicy {
+ warehouseId String @id @map("warehouse_id") @db.Uuid
+ enabled Boolean @default(false)
+ provinces String[]
+ shippingFeeMode String @map("shipping_fee_mode") @db.VarChar(20)
+ version Int @default(0)
+ warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_express_policies")
 }

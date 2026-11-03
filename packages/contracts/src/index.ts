@@ -822,10 +822,13 @@ export interface RedemptionQuoteView {
     totalPoints: string;
     balance: string;
     remainingBalance: string;
-    deliveryMode: 'LOCAL_NO_CASH';
+    deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
+    shippingFeeMode?: 'SENDER_PAID';
+    shippingFeeCents?: number;
   };
 }
 export interface RedemptionOrderView {
+  deliveryMode?: 'LOCAL_NO_CASH' | 'EXPRESS';
   deliveryReturnRecorded?: boolean;
   deliveryExceptionReported?: boolean;
   id: string;
@@ -842,6 +845,7 @@ export interface RedemptionOrderView {
   canceledAt: string | null;
   version: number;
   fulfillmentState:
+    | 'EXPRESS_WAIT_SHIP'
     | 'PENDING'
     | 'CANCELED'
     | 'MISSING'
@@ -855,7 +859,7 @@ export interface RedemptionOrderView {
     | 'DELIVERING'
     | 'DELIVERED'
     | 'REVIEW_REQUIRED';
-  address?: ConsumerOrderAddress;
+  address?: RedemptionOrderAddress;
   allocations?: Array<{
     quantity: number;
     batchNo: string;
@@ -1006,4 +1010,63 @@ export interface RedemptionDeliveryIncident {
   reason: string;
   createdAt: string;
   resolution: null | { id: string; actorName: string; reason: string; createdAt: string };
+}
+
+export interface RedemptionPrintPreview {
+  generatedAt: string;
+  items: Array<{
+    id: string;
+    orderNo: string;
+    createdAt: string;
+    title: string;
+    spec: string;
+    unit: string;
+    quantity: number;
+    pointsPrice: string;
+    totalPoints: string;
+    deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
+    address: RedemptionOrderAddress;
+  }>;
+}
+
+export interface ExpressAddressInput {
+  province: string;
+  city: string;
+  district: string;
+  detailAddress: string;
+  contactName: string;
+  phone: string;
+  note: string;
+  isDefault: boolean;
+}
+export interface ExpressAddress extends ExpressAddressInput {
+  id: string;
+  available: boolean;
+}
+export interface ExpressAddressBook {
+  version: number;
+  items: ExpressAddress[];
+}
+export interface ExpressOrderAddress {
+  province: string;
+  city: string;
+  district: string;
+  detailAddress: string;
+  contactName: string;
+  phone: string;
+  note: string;
+  orderNote: string;
+}
+export type RedemptionOrderAddress = ConsumerOrderAddress | ExpressOrderAddress;
+export interface RedemptionExpressPolicy {
+  enabled: boolean;
+  provinces: string[];
+  shippingFeeMode: 'SENDER_PAID';
+  version: number;
+}
+
+export function formatRedemptionAddress(a: RedemptionOrderAddress): string {
+  return 'province' in a
+    ? [a.province, a.city, a.district, a.detailAddress].filter(Boolean).join(' ')
+    : [a.areaName, a.buildingName, a.unit, a.room].filter(Boolean).join(' ');
 }

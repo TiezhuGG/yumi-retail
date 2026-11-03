@@ -690,3 +690,29 @@ POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/return-cu
 员工管理查询增加returnHistory及assignmentHistory.returned，显示原骑手/是否出发/接收人/原因/原异常；消费者只增加deliveryReturnRecorded并按本次配送阶段显示，不返回内部备注或人员。原未决异常随回交终止的是原配送尝试，不删除、不伪造原骑手继续型resolution；重新分配前由管理人员单独声明原地址和异常允许重配，并继续检查当前库存等资格。OpenAPI 0.51.0由代码导出。部署必须先迁移再更新API/Worker及三端，旧代码不识别回交不能盲退；不删除历史或恢复旧唯一约束。
 
 5项新真实PG专项及相关回归、实际API三端浏览器检查见[验证记录](../verification/P4I-REDEMPTION-CUSTODY-RETURNS-2026-11-03.md)。沿用默认关闭及生产/远程拒启，仅随机临时schema，未改主库/.env/生产，微信工具/真机和实际实物未验。下一项P4j仓库领取人停用后的接续与重核；部分/破损回交、协调取消及售后仍待后续切片，P4/P5未整体验收，商城未上线。
+
+
+## 2026-11-03 首发调整与E1订单打印（本地）
+
+用户明确将积分商城首发调整为积分兑换、生成订单、后台打印配货单、人工快递发货。原仓配/骑手P4路线及代码/事实保留扩展，暂停P4j，不再强制快递运营人员进入领取、逐项拣货或骑手界面。现行顺序为E1打印、E2快递地址与订单模式、E3快递发货与一次性库存出库、E4取消售后及上线验收，详见[新路线](../product/POINTS-MALL-EXPRESS-V1.md)和[原路线快照](../product/POINTS-MALL-LOCAL-DELIVERY-ARCHIVE-2026-11-03.md)。原小区地址订单不自动转换快递单；全国发货范围、运费及经营参数未擅自确认，不对接电子面单/自动轨迹。
+
+E1新增POST /api/v1/admin/redemptions/print-preview，严格body仅ids（1至20个不同UUID），沿用员工Cookie、本仓SUPER_ADMIN/OPERATIONS、points.read及Origin/CSRF；无Idempotency-Key要求，因为仅查询，无任何业务写入。整批验证归属、有效状态及当前会话；输入400、无权403、部分不存在/越界404、含取消单409。按请求顺序返回generatedAt及最小配货字段：原订单号/时间、原商品规格/件数/积分、真实配送模式和原加密收件地址快照。解密仅在本仓授权事务内进行，Cache-Control:no-store；普通列表仍无收件人地址，未知配送模式明确拒绝，不冒充快递。
+
+后台详情打印本单、列表勾选最多20单批量预览。屏幕预览和点击打印分别重新请求校验；失败清空旧预览，关闭/切换清理内存和iframe，不持久化收件信息。隔离同源空白iframe使用DOM textContent写数据，备注不会作为HTML执行；A4每单分页，显示原配送方式、配货单非面单、打印不等于发货。允许重复打印，不声称打印机成功；不改变积分、库存、配额、订单、Outbox或骑手阶段。OpenAPI0.52.0由代码导出，无模型/迁移，不删除或覆盖旧事实。新增API/页面需匹配发布；E2接入快递模式时扩展同一打印契约。
+
+3项专项及12项原兑换交易合计15项真实PG通过；实际API浏览器9张桌面/手机截图、两单两页A4 PDF输出、取消后拒绝打印及数据清理通过。全工作区构建、类型检查、lint和OpenAPI导出通过。仅随机临时schema，未改业务主库/.env或生产；打印机纸张、微信工具/真机、快递寄出及生产均未验。当前E1只完成旧单的真实配货打印，不将其记作快递交易上线。详见[E1验证记录](../verification/E1-REDEMPTION-PRINT-2026-11-03.md)。
+
+
+## 2026-11-03 E2 快递地址与订单模式（本地）
+
+新小程序兑换确认使用独立快递地址簿：完整省名、市、区县、详细地址、姓名、电话、选填备注及默认地址，最多20条、本人归属、独立版本/原键、软删除后清除加密载荷；旧小区地址簿及现金流程不变。全部快递收件字段AES-GCM加密，不将地址明文写入操作摘要或审计。页面隐藏/换账号清理旧地址及编辑状态，未知写结果同账号可用原请求核实，不冒用其他账号操作。
+
+后台兑换订单内新增可折叠快递寄送规则，由本仓有效负责人/运营配置是否开放、最多34个不重复完整省名、明确SENDER_PAID商家承担运费和原因；缺配置默认暂停，无默认全国寄送。顾客快递运费为0分，不接现金支付/到付。省市区为人工输入，目前只按完整省名白名单校验，不验证行政区划从属或承运可达性，寄出前仍需人工核实。规则有独立版本、原键和变更前后审计；更改/暂停/重新开放使旧报价失效。
+
+新增consumer/express-addresses及/:id/update、default、delete（消费者Bearer、原键、版本），GET /redemption-express-policy（公开支持范围），GET /admin/redemption-express-policy、POST /update（员工Cookie、points.read、Origin/CSRF、Idempotency-Key及事务内本仓校验）。原报价接口可选deliveryMode:EXPRESS，省略时兼容旧LOCAL_NO_CASH；报价仍120秒，明确模式、原地址簿版本、规则版本、运费承担及整数分0，提交再次核验。新订单delivery_mode明确保存EXPRESS、旧单默认LOCAL_NO_CASH且不可改写，地址原快照不随地址编辑/删除改变。
+
+新快递单扣分/预占/配额复用原交易同事务逻辑，Outbox为EXPRESS_WAIT（待快递发货），Worker仅选择LOCAL_NO_CASH，SQL禁止快递单进入骑手拣货及本地队列状态。消费者/后台显示EXPRESS_WAIT_SHIP，不显示骑手流程；E1打印兼容快递模式和结构化地址。当前未发货快递单可复用本人取消、退分释放预占与配额，取消事件/待办终态仍配平。未实现运单、实际出库发货及自动物流，留E3；不将打印当作发货。
+
+新增迁移202611030007_redemption_express：独立ConsumerExpressAddressBook/Address/Operation/Audit及RedemptionExpressPolicy；独立默认地址唯一索引、软删除载荷约束、地址审计不可变；RedemptionOrder.deliveryMode默认兼容旧单，新SQL匹配报价模式和待办分流，原事实不可变约束保持。扩展既有Outbox状态及取消合法迁移、verify_redemption配平检查，不删除历史。OpenAPI0.53.0由代码导出，快递/旧地址响应使用oneOf，旧报价客户端可省略模式，现金地址及订单契约不改。
+
+4项快递专项及3项打印/12项兑换回归共19项PG通过，补充跨账号报价和规则重启后旧报价拒绝后4项专项复跑通过。实际API浏览器弱网与后台/小程序截图详见[E2验证记录](../verification/E2-REDEMPTION-EXPRESS-2026-11-03.md)。迁移只在随机临时schema重放，未改业务主库、.env或生产，开发交易默认关闭/生产拒启保持。部署先迁移再匹配API、Worker及三端；旧客户端不理解快递地址/状态，不能盲退或把新单改回旧模式。微信工具/真机、正式经营配置、实际快递与生产仍未验。下一项E3快递公司、运单号录入及一次性库存出库/确认发货。

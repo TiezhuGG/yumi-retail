@@ -110,33 +110,35 @@ export default function Redemptions() {
             <Text className="account-copy">
               {o.status === 'CANCELED'
                 ? '已取消 · 积分已退还'
-                : o.deliveryExceptionReported
-                  ? '配送异常待处理'
-                  : o.fulfillmentState === 'DELIVERED'
-                    ? '骑手已确认送达。'
-                    : o.fulfillmentState === 'DELIVERING'
-                      ? '骑手配送中。'
-                      : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                        ? '骑手已核对接货，等待开始配送。'
-                        : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                          ? o.deliveryReturnRecorded
-                            ? '已重新分配，等待骑手核对接货。'
-                            : '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                          : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                : o.deliveryMode === 'EXPRESS'
+                  ? '待快递发货 · 商家承担运费'
+                  : o.deliveryExceptionReported
+                    ? '配送异常待处理'
+                    : o.fulfillmentState === 'DELIVERED'
+                      ? '骑手已确认送达。'
+                      : o.fulfillmentState === 'DELIVERING'
+                        ? '骑手配送中。'
+                        : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                          ? '骑手已核对接货，等待开始配送。'
+                          : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
                             ? o.deliveryReturnRecorded
-                              ? '包裹已回交，等待门店重新安排配送。'
-                              : '已出库，等待骑手接货；尚未开始配送。'
-                            : o.fulfillmentState === 'PACKED_WAIT_SHIP'
-                              ? '已打包，等待仓库出库；尚未配送。'
-                              : o.fulfillmentState === 'PICKED_WAIT_PACK'
-                                ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                                : o.fulfillmentState === 'PICKING'
-                                  ? '仓库已领取'
-                                  : o.fulfillmentState === 'READY_TO_PICK'
-                                    ? '待仓库领取'
-                                    : o.fulfillmentState === 'REVIEW_REQUIRED'
-                                      ? '待门店核查'
-                                      : '待创建拣货任务'}
+                              ? '已重新分配，等待骑手核对接货。'
+                              : '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                            : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                              ? o.deliveryReturnRecorded
+                                ? '包裹已回交，等待门店重新安排配送。'
+                                : '已出库，等待骑手接货；尚未开始配送。'
+                              : o.fulfillmentState === 'PACKED_WAIT_SHIP'
+                                ? '已打包，等待仓库出库；尚未配送。'
+                                : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                                  ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                                  : o.fulfillmentState === 'PICKING'
+                                    ? '仓库已领取'
+                                    : o.fulfillmentState === 'READY_TO_PICK'
+                                      ? '待仓库领取'
+                                      : o.fulfillmentState === 'REVIEW_REQUIRED'
+                                        ? '待门店核查'
+                                        : '待创建拣货任务'}
             </Text>
             <Button
               className="points-action"

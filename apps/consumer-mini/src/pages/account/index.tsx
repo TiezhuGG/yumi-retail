@@ -150,7 +150,13 @@ export default function Account() {
             className="account-link"
             onClick={() => void Taro.navigateTo({ url: '/pages/addresses/index' })}
           >
-            我的收货地址 →
+            小区收货地址 →
+          </Button>
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/express-addresses/index' })}
+          >
+            快递收货地址 →
           </Button>
           <Button
             className="account-link"

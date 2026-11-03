@@ -168,7 +168,15 @@
     "pretest:redemption-returns": "npm run build:server",
     "test:redemption-returns": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-custody-returns.integration.test.ts",
     "preverify:redemption-returns:ui": "npm run build:server",
-    "verify:redemption-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-returns.mjs"
+    "verify:redemption-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-returns.mjs",
+    "pretest:redemption-print": "npm run build:server",
+    "test:redemption-print": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-print.integration.test.ts",
+    "preverify:redemption-print:ui": "npm run build:server",
+    "verify:redemption-print:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-print.mjs",
+    "pretest:redemption-express": "npm run build:server",
+    "test:redemption-express": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-express.integration.test.ts",
+    "preverify:redemption-express:ui": "npm run build:server",
+    "verify:redemption-express:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-express.mjs"
   },
   "pnpm": {
     "overrides": {

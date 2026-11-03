@@ -2,7 +2,8 @@ import { View, Text, Button, Picker } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import type {
-  ConsumerAddressBook,
+  ExpressAddressBook,
+  RedemptionExpressPolicy,
   RedemptionQuoteView,
 } from '../../../../../packages/contracts/src/index';
 import { cartIdentity } from '../../account-cart';
@@ -15,7 +16,8 @@ import { redemptionIntentKey } from '../../redemption-storage';
 export default function RedemptionCheckout() {
   const params = useRouter().params;
   const [identity, setIdentity] = useState<CartIdentity | null>(null),
-    [book, setBook] = useState<ConsumerAddressBook | null>(null),
+    [policy, setPolicy] = useState<RedemptionExpressPolicy | null>(null),
+    [book, setBook] = useState<ExpressAddressBook | null>(null),
     [reward, setReward] = useState<Reward | null>(null),
     [selected, setSelected] = useState(''),
     [quote, setQuote] = useState<RedemptionQuoteView | null>(null),
@@ -36,6 +38,7 @@ export default function RedemptionCheckout() {
     setIdentity(null);
     setBook(null);
     setReward(null);
+    setPolicy(null);
     setQuote(null);
     setError('');
     try {
@@ -47,13 +50,15 @@ export default function RedemptionCheckout() {
       setPending(!!original);
       if (original && original.userId !== who.profile.user.id)
         throw Error('有其他账号的兑换待核实，请恢复原账号处理。');
-      const [addresses, product] = await Promise.all([
-        addressRequest<ConsumerAddressBook>(who, '/consumer/addresses'),
+      const [addresses, product, shippingPolicy] = await Promise.all([
+        addressRequest<ExpressAddressBook>(who, '/consumer/express-addresses'),
         request<Reward>('/rewards/' + encodeURIComponent(params.id ?? '')),
+        request<RedemptionExpressPolicy>('/redemption-express-policy'),
       ]);
       if (n !== seq.current) return;
       setBook(addresses);
       setReward(product);
+      setPolicy(shippingPolicy);
       setSelected(addresses.items.find((a) => a.isDefault && a.available)?.id ?? '');
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '兑换资料读取失败');
@@ -106,6 +111,7 @@ export default function RedemptionCheckout() {
           quantity,
           addressId: selected,
           addressVersion: book.version,
+          deliveryMode: 'EXPRESS',
         },
       };
       const q = await addressRequest<RedemptionQuoteView>(
@@ -205,8 +211,8 @@ export default function RedemptionCheckout() {
       </View>
       <View className="account-content">
         <View className="reward-notice">
-          <Text>仅本机开发验证。确认后会扣除测试积分并预占实物库存；尚未接入真实拣货配送。</Text>
-          <Text>本次隔离验证不收现金运费，正式经营方案仍待确认。</Text>
+          <Text>快递兑换开发验证。确认后扣除积分并预占商品，订单进入待快递发货。</Text>
+          <Text>寄送范围和运费以本次核验为准；当前未启用生产交易。</Text>
         </View>
         {loading && <Text className="account-copy">正在读取兑换资料…</Text>}
         {error && (
@@ -245,11 +251,16 @@ export default function RedemptionCheckout() {
               <Text className="account-copy">
                 {reward.spec} / {reward.unit} · {params.quantity ?? '1'} 件
               </Text>
-              <Text className="account-copy">请选择本人有效地址</Text>
+              <Text className="account-copy">
+                {policy?.enabled
+                  ? '可寄送：' + policy.provinces.join('、') + ' · 商家承担运费'
+                  : '快递兑换暂未开放，请联系门店核实寄送规则'}
+              </Text>
+              <Text className="account-copy">请选择本人有效快递地址</Text>
               <Picker
                 disabled={busy || quoteUnknown}
-                range={choices.map(
-                  (a) => a.areaName + ' ' + a.buildingName + ' ' + a.unit + ' ' + a.room,
+                range={choices.map((a) =>
+                  [a.province, a.city, a.district, a.detailAddress].join(' '),
                 )}
                 value={Math.max(
                   0,
@@ -262,27 +273,26 @@ export default function RedemptionCheckout() {
               >
                 <View className="redemption-address">
                   {address
-                    ? address.areaName +
-                      ' ' +
-                      address.buildingName +
-                      ' ' +
-                      address.unit +
-                      ' ' +
-                      address.room
+                    ? [
+                        address.province,
+                        address.city,
+                        address.district,
+                        address.detailAddress,
+                      ].join(' ')
                     : '点击选择收货地址'}
                 </View>
               </Picker>
               <Button
                 className="account-link"
                 disabled={busy || quoteUnknown}
-                onClick={() => void Taro.navigateTo({ url: '/pages/addresses/index' })}
+                onClick={() => void Taro.navigateTo({ url: '/pages/express-addresses/index' })}
               >
-                管理收货地址 →
+                管理快递地址 →
               </Button>
             </View>
             <Button
               className="points-action"
-              disabled={busy || !reward.redemptionEnabled || !selected}
+              disabled={busy || !reward.redemptionEnabled || !policy?.enabled || !selected}
               onClick={() => void makeQuote()}
             >
               {quoteUnknown ? '使用原请求重试报价' : '核验并生成兑换报价'}
@@ -295,6 +305,7 @@ export default function RedemptionCheckout() {
                 <Text className="account-copy">
                   积分单价 {quote.snapshot.pointsPrice} · 数量 {quote.snapshot.quantity} 件
                 </Text>
+                <Text className="account-copy">运费由商家承担，无需另付现金</Text>
                 <Text className="account-copy">
                   核验时余额 {quote.snapshot.balance} · 兑换后剩余 {quote.snapshot.remainingBalance}
                 </Text>

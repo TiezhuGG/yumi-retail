@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  Inject,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
 import { RedemptionService } from './redemptions.js';
 import { Consumer, Permissions } from './staff-guard.js';
@@ -8,28 +19,55 @@ import type { ApiRequest } from './http.js';
 import { ApiResult, object, text } from './api-result.js';
 const integer = { type: 'integer' as const, minimum: 0 },
   nullable = { type: 'string' as const, nullable: true };
-const quoteInput = object({
-  rewardId: text,
-  rewardVersion: integer,
-  quantity: { type: 'integer', minimum: 1, maximum: 100000 },
-  addressId: text,
-  addressVersion: integer,
-});
-const snapshot = object({
-  ...quoteInput.properties,
-  skuId: text,
-  title: text,
-  name: text,
-  spec: text,
-  unit: text,
-  pointsPrice: text,
-  totalPoints: text,
-  areaVersion: integer,
-  productVersion: integer,
-  balance: text,
-  remainingBalance: text,
-  deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH'] },
-});
+const quoteInput = object(
+  {
+    rewardId: text,
+    rewardVersion: integer,
+    quantity: { type: 'integer', minimum: 1, maximum: 100000 },
+    addressId: text,
+    addressVersion: integer,
+    deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
+  },
+  ['rewardId', 'rewardVersion', 'quantity', 'addressId', 'addressVersion'],
+);
+const snapshot = object(
+  {
+    ...quoteInput.properties,
+    skuId: text,
+    title: text,
+    name: text,
+    spec: text,
+    unit: text,
+    pointsPrice: text,
+    totalPoints: text,
+    areaVersion: integer,
+    productVersion: integer,
+    balance: text,
+    remainingBalance: text,
+    deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
+    shippingFeeMode: { type: 'string', enum: ['SENDER_PAID'] },
+    shippingFeeCents: { type: 'integer', enum: [0] },
+  },
+  [
+    'rewardId',
+    'rewardVersion',
+    'quantity',
+    'addressId',
+    'addressVersion',
+    'skuId',
+    'title',
+    'name',
+    'spec',
+    'unit',
+    'pointsPrice',
+    'totalPoints',
+    'areaVersion',
+    'productVersion',
+    'balance',
+    'remainingBalance',
+    'deliveryMode',
+  ],
+);
 const quote = object({
   id: text,
   createdAt: text,
@@ -38,6 +76,8 @@ const quote = object({
   snapshot,
 });
 const orderProperties = {
+  deliveryMode: { type: 'string' as const, enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
+  deliveryReturnRecorded: { type: 'boolean' as const },
   deliveryExceptionReported: { type: 'boolean' as const },
   id: text,
   orderNo: text,
@@ -55,6 +95,7 @@ const orderProperties = {
   fulfillmentState: {
     type: 'string' as const,
     enum: [
+      'EXPRESS_WAIT_SHIP',
       'PENDING',
       'CANCELED',
       'MISSING',
@@ -71,7 +112,7 @@ const orderProperties = {
     ],
   },
 };
-const address = object({
+const localAddress = object({
   areaName: text,
   buildingName: text,
   unit: text,
@@ -81,6 +122,21 @@ const address = object({
   note: text,
   orderNote: text,
 });
+const address = {
+  oneOf: [
+    localAddress,
+    object({
+      province: text,
+      city: text,
+      district: text,
+      detailAddress: text,
+      contactName: text,
+      phone: text,
+      note: text,
+      orderNote: text,
+    }),
+  ],
+};
 const consumerOrder = object({ ...orderProperties, address }),
   adminOrder = object(orderProperties);
 const paged = (schema: ReturnType<typeof object>) =>
@@ -142,12 +198,49 @@ export class RedemptionController {
     return success(r, await this.service.cancel(r, key(r), uuid(id), b));
   }
 }
-@ApiTags('积分兑换订单查询')
+@ApiTags('积分兑换订单查询与打印')
 @ApiCookieAuth('staffSession')
 @Permissions('points.read')
 @Controller('admin/redemptions')
 export class AdminRedemptionController {
   constructor(@Inject(RedemptionService) readonly service: RedemptionService) {}
+  @Post('print-preview')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      ids: { type: 'array', minItems: 1, maxItems: 20, uniqueItems: true, items: text },
+    }),
+  })
+  @ApiResult(
+    object({
+      generatedAt: text,
+      items: {
+        type: 'array',
+        maxItems: 20,
+        items: object({
+          id: text,
+          orderNo: text,
+          createdAt: text,
+          title: text,
+          spec: text,
+          unit: text,
+          quantity: integer,
+          pointsPrice: text,
+          totalPoints: text,
+          deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
+          address,
+        }),
+      },
+    }),
+    errors,
+  )
+  async printPreview(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.service.printPreview(r, b));
+  }
+
   @Get()
   @ApiResult(paged(adminOrder), errors)
   async list(@Req() r: ApiRequest, @Query() q: unknown) {

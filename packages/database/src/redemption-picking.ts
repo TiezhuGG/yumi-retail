@@ -163,7 +163,7 @@ export async function leaseRedemptionPicking(
   return db.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<
       Array<{ orderId: string }>
-    >`SELECT j.order_id AS "orderId" FROM redemption_outbox j JOIN redemption_orders o ON o.id=j.order_id WHERE o.status='ACTIVE' AND ((j.state IN ('PENDING','RETRY') AND j.next_attempt_at<=clock_timestamp()) OR (j.state='LEASED' AND j.lease_until<=clock_timestamp())) ORDER BY j.next_attempt_at,j.order_id LIMIT 1 FOR UPDATE OF j SKIP LOCKED`;
+    >`SELECT j.order_id AS "orderId" FROM redemption_outbox j JOIN redemption_orders o ON o.id=j.order_id WHERE o.status='ACTIVE' AND o.delivery_mode='LOCAL_NO_CASH' AND ((j.state IN ('PENDING','RETRY') AND j.next_attempt_at<=clock_timestamp()) OR (j.state='LEASED' AND j.lease_until<=clock_timestamp())) ORDER BY j.next_attempt_at,j.order_id LIMIT 1 FOR UPDATE OF j SKIP LOCKED`;
     if (!rows[0]) return null;
     const job = await tx.redemptionOutbox.findUniqueOrThrow({
       where: { orderId: rows[0].orderId },
