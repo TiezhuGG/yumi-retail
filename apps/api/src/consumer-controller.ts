@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Query } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Inject, Post, Req, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ConsumerAuthService } from './consumer-auth.js';
 import { Consumer, Public } from './staff-guard.js';
@@ -8,7 +8,7 @@ import { ApiResult, object, text } from './api-result.js';
 const userSchema = object({
   id: { type: 'string', format: 'uuid' },
   displayName: text,
-  provider: { type: 'string', enum: ['DEVELOPMENT'] },
+  provider: { type: 'string', enum: ['DEVELOPMENT', 'WECHAT'] },
 });
 const expiresAt = { type: 'string' as const, format: 'date-time' };
 function noFields(value: unknown) {
@@ -21,7 +21,7 @@ function noFields(value: unknown) {
   )
     throw failure(400, 'VALIDATION_ERROR', '此接口不接受额外字段');
 }
-@ApiTags('消费者会话（本机开发版）')
+@ApiTags('消费者会话')
 @Controller('consumer')
 export class ConsumerController {
   constructor(@Inject(ConsumerAuthService) private readonly auth: ConsumerAuthService) {}
@@ -35,6 +35,36 @@ export class ConsumerController {
   async login(@Req() request: ApiRequest, @Body() body: unknown, @Query() query: unknown) {
     noFields(query);
     return success(request, await this.auth.login(request, body));
+  }
+  @Public()
+  @Get('auth/methods')
+  @Header('Cache-Control', 'no-store')
+  @ApiResult(
+    object({
+      wechatLoginEnabled: { type: 'boolean' },
+      developmentLoginEnabled: { type: 'boolean' },
+    }),
+    [400],
+  )
+  methods(@Req() r: ApiRequest, @Query() q: unknown) {
+    noFields(q);
+    return success(r, {
+      wechatLoginEnabled: !!this.auth.config.wechatLogin,
+      developmentLoginEnabled: this.auth.developmentAllowed(r),
+    });
+  }
+  @Public()
+  @Post('auth/wechat-session')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiBody({ schema: object({ code: { type: 'string', minLength: 1, maxLength: 128 } }) })
+  @ApiResult(
+    object({ token: text, expiresAt, user: userSchema }),
+    [400, 401, 403, 404, 429, 500, 503],
+  )
+  async wechat(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    noFields(q);
+    return success(r, await this.auth.wechatLogin(r, b));
   }
   @Consumer()
   @Get('me')

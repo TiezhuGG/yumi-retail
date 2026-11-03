@@ -197,7 +197,11 @@
     "preverify:express-readiness:ui": "npm run build:server",
     "verify:express-readiness:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-readiness.mjs",
     "pretest:express:regression": "npm run build:server",
-    "test:express:regression": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/express-readiness.integration.test.ts tests/express-restart.integration.test.ts tests/redemption-print.integration.test.ts tests/redemption-express.integration.test.ts tests/redemption-express-shipping.integration.test.ts tests/redemption-express-corrections.integration.test.ts tests/redemption-after-sales.integration.test.ts tests/redemptions.integration.test.ts"
+    "test:express:regression": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/express-readiness.integration.test.ts tests/express-restart.integration.test.ts tests/redemption-print.integration.test.ts tests/redemption-express.integration.test.ts tests/redemption-express-shipping.integration.test.ts tests/redemption-express-corrections.integration.test.ts tests/redemption-after-sales.integration.test.ts tests/redemptions.integration.test.ts",
+    "pretest:wechat-login": "npm run build:server",
+    "test:wechat-login": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/wechat-login.integration.test.ts tests/wechat-login.test.ts",
+    "preverify:wechat-login:ui": "npm run build:server",
+    "verify:wechat-login:ui": "node --env-file=.env --import tsx scripts/ui/verify-wechat-login.mjs"
   },
   "pnpm": {
     "overrides": {

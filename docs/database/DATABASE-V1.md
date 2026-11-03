@@ -770,3 +770,19 @@ canLaunch始终false：目前仅DEVELOPMENT消费者适配器，且开发兑换/
 新增check:express:release/verify:express:migrations本地CLI，验证锁定Node、本机数据库范围、默认安全开关/支付禁用、必需构建入口，输出API版本、迁移名称与SHA256、固定产物指纹和小程序清单状态；不输出URL/密钥，未知参数拒绝。指纹只标识当前文件，不证明新鲜度、构建对应源码、健康或外部验收。rehearse须先通过本机配置检查，只在随机临时schema重放全部迁移并清理；生产/远程/打开开发写开关均拒绝演练。保持原仓配检查工具和历史方案不变，不将其现金支付/骑手条件移植为本次积分首发门槛。
 
 本轮54个迁移重放生成109张表后清理，43项检查及打印/地址/兑换/发货/纠错/反馈PG回归，加1项API关闭/连接池断开后同schema重建实例、原加密快照/事实和原键恢复，共44项PG通过；2项CLI保护通过，9张实际API后台桌面/390px浏览器截图通过。实例重建未丢失积分/库存/运单/反馈且原键不重复写，但不等于进程断电或备份恢复。新增接口OpenAPI0.57.0由代码导出，无新迁移；部署需配套API/后台。完整操作手册见operations/POINTS-EXPRESS-LAUNCH-RUNBOOK.md，未执行主库迁移或生产部署。
+
+## 2026-11-03 E4d 微信消费者身份适配器（本地）
+
+新增GET /api/v1/consumer/auth/methods（只返回微信与开发登录是否开放）和POST /consumer/auth/wechat-session（严格body仅code，1至128位字母/数字/下划线/连字符），no-store。小程序账户页按服务端能力显示开放/暂停/加载/读取失败，微信登录由Taro.login获取新code后发送服务端，不读取头像、昵称或手机号，不要求客户端填写用户编号/OpenID/UnionID，不将临时code存储到本机。已有本机会话须恢复或退出后切换；隐藏/离开取消晚响应，丢弃未使用会话时尽力撤销，登录记录仅保存本系统不透明token与expiresAt，状态不公开token。
+
+服务端固定HTTPS api.weixin.qq.com/sns/jscode2session，参数为配置AppID/AppSecret、临时code及authorization_code，不接受客户端指定地址或凭据；禁止重定向，5秒超时、最多16KiB响应，不自动重试同code。只提取合法OpenID，校验session_key格式后丢弃session_key/unionid；不持久化或返回这些原始值，不记录微信完整URL、响应errmsg、code或密钥。失效/已用code返回401、平台限频429、网络/服务/异常响应503，并使用固定脱敏错误。Taro官方登录文档说明了客户端取code再由服务端换取身份的流程，微信官方API页面本轮浏览不可达，真实平台响应仍需受控联调验证。
+
+配置新增WECHAT_LOGIN_ENABLED（默认0）、WECHAT_APP_ID、WECHAT_APP_SECRET（仅服务端）。启用时缺失或格式无效拒绝启动；只修改.env.example，不改实际.env或填写真实凭据。正式身份可独立于开发身份配置，但不开放正式兑换/出库门禁；开发身份仍拒绝生产、远程数据库及非回环请求。测试替身仅createApplication显式注入，且须test+本机yumi_test+随机临时schema；生产/普通schema拒绝，正常构建无环境变量可切成模拟微信。后台首发检查区分适配器是否配置与真实账号/HTTPS/真机仍未验收，canLaunch仍false。
+
+微信账号provider=WECHAT，subject=SHA256(AppID+分隔符+OpenID)，额外wechatAppId固定来源；原DEVELOPMENT主体与资料保留，未自动合并积分、购物车、地址或订单。不同AppID的相同OpenID映射到不同本系统用户，配置AppID变化后旧账号会话不可用。生成32字节随机token，数据库只保存token哈希；会话继续校验有效期、用户enabled、authVersion，微信会话还校验当前微信登录开关与AppID；退出仅撤销当前会话。通用显示名“微信顾客”不伪造昵称，新账号无自动赠分或历史账务迁入。
+
+微信登录以服务端socket地址哈希进行每分钟60次数据库限流，不信任客户端Forwarded/X-Forwarded-For。反向代理下可能共享同一桶，正式部署须单独验证可信代理和限流容量，不能直接放宽为信任任意请求头。AppID+code哈希在网络调用前原子占用10分钟，重复/并发只一次调用上游；过期哈希每次登录最多清理100条。网络未知、上游失败或晚期事务回滚均需要重新Taro.login取新code，不用原code恢复令牌，不在幂等表缓存原始token。数据库事务内并发upsert同一身份、签发会话及最小审计，失败不留下半个新账号/会话，已停用账号只留拒绝审计。
+
+迁移202611030011_wechat_consumer_identity兼容原账号：扩展provider/subject约束与WECHAT_LOGIN审计动作，新增consumer_users.wechat_app_id及consumer_wechat_login_codes哈希临时凭证表，身份来源不可变触发器禁止改写provider/subject/AppID/ID/创建时间。保留原provider+subject唯一键和原subject约束名，兼容测试扩展脚本。无开发账号迁移、无真实数据回填。OpenAPI0.58.0由代码导出，user.provider增加WECHAT；需先迁移，再配套API与小程序，旧客户端不认识新provider需升级，不能删除身份/会话事实或改回开发身份回退。
+
+本轮28项真实PG（微信4/旧会话9/快递地址4/发货8/首发检查3）及10项逻辑（微信协议和小程序流程2/旧会话8）通过；微信4项增强跨AppID后再次通过，11张同源码浏览器截图通过。适配器替身及传输模拟全部合成、未向真实微信发送凭据或连接账号；不能写成真实微信、开发工具或真机通过。生产交易门禁、HTTPS/合法域名、真实AppID工程匹配、真实联调/真机、备份恢复和实际快递仍待完成，下一项独立正式兑换/快递门禁与受控测试环境准备。

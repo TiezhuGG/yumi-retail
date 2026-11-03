@@ -643,6 +643,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ wechatAppId String? @map("wechat_app_id") @db.VarChar(18)
  expressAddressBook ConsumerExpressAddressBook?
  redemptionPickingEvents RedemptionPickingEvent[]
  redemptionQuotes RedemptionQuote[]

@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { readFile, readdir } from 'node:fs/promises';
 import { createApplication } from '../../apps/api/dist/app.js';
 import { applicationConfig } from '../../apps/api/dist/config.js';
+import type { WechatExchange } from '../../apps/api/src/wechat-login.js';
 export async function addressFixture(
   options: {
     orders?: boolean;
@@ -12,6 +13,7 @@ export async function addressFixture(
     holdSeconds?: number;
     pickingLab?: boolean;
     notificationLab?: boolean;
+    wechatExchange?: WechatExchange;
   } = {},
 ) {
   const url = new URL(process.env.TEST_DATABASE_URL ?? '');
@@ -56,9 +58,13 @@ export async function addressFixture(
         STAFF_ALLOWED_ORIGINS: 'http://127.0.0.1:5188,http://127.0.0.1:5173',
         PUBLIC_WAREHOUSE_ID: warehouseId,
         CONSUMER_DEV_LOGIN_ENABLED: '1',
+        WECHAT_LOGIN_ENABLED: options.wechatExchange ? '1' : '0',
+        WECHAT_APP_ID: options.wechatExchange ? 'wx' + '0'.repeat(16) : undefined,
+        WECHAT_APP_SECRET: options.wechatExchange ? randomBytes(16).toString('hex') : undefined,
         ADDRESS_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
       }),
       accessLog: () => {},
+      wechatExchange: options.wechatExchange,
     });
     await runtime.db.warehouse.create({
       data: { id: warehouseId, code: 'ADDRESS-UI', name: '隔离测试仓' },

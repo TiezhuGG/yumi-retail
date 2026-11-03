@@ -127,8 +127,12 @@ export class ExpressReadinessService {
             check(
               'WECHAT_IDENTITY',
               '正式微信身份',
-              'BLOCKED',
-              '当前仅有开发身份适配器；正式微信身份接入和账号绑定尚未实现。',
+              this.config.wechatLogin && this.config.wechatAppId && this.config.wechatAppSecret
+                ? 'CONFIGURED'
+                : 'BLOCKED',
+              this.config.wechatLogin
+                ? '服务端微信身份适配器已配置；真实账号、AppID匹配、HTTPS及真机联调仍未验收。'
+                : '微信身份适配器已实现但当前未开放或未配置；不会退回开发身份冒充登录。',
             ),
             check(
               'PRODUCTION_WRITE',

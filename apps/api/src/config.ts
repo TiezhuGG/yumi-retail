@@ -16,6 +16,9 @@ export interface ApplicationConfig {
   redemptionPickingDev?: boolean;
   orderDevHoldSeconds?: number;
   consumerDevLogin?: boolean;
+  wechatLogin?: boolean;
+  wechatAppId?: string;
+  wechatAppSecret?: string;
   consumerSessionSeconds?: number;
 }
 
@@ -55,6 +58,15 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
       (env.API_HOST && !['127.0.0.1', '::1', 'localhost'].includes(env.API_HOST)))
   )
     throw new Error('Consumer development login requires non-production loopback binding.');
+  if (env.WECHAT_LOGIN_ENABLED && !['0', '1'].includes(env.WECHAT_LOGIN_ENABLED))
+    throw Error('Invalid WECHAT_LOGIN_ENABLED.');
+  const wechatLogin = env.WECHAT_LOGIN_ENABLED === '1';
+  if (
+    wechatLogin &&
+    (!/^wx[a-f0-9]{16}$/.test(env.WECHAT_APP_ID ?? '') ||
+      !/^[A-Za-z0-9]{32}$/.test(env.WECHAT_APP_SECRET ?? ''))
+  )
+    throw Error('WeChat login requires valid server credentials.');
   const consumerSessionSeconds = Number(env.CONSUMER_SESSION_SECONDS ?? 28800);
   if (
     !Number.isInteger(consumerSessionSeconds) ||
@@ -143,6 +155,9 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
     staffSessionSeconds: seconds,
     docsEnabled: environment !== 'production',
     consumerDevLogin,
+    wechatLogin,
+    wechatAppId: wechatLogin ? env.WECHAT_APP_ID : undefined,
+    wechatAppSecret: wechatLogin ? env.WECHAT_APP_SECRET : undefined,
     consumerSessionSeconds,
     publicWarehouseId: env.PUBLIC_WAREHOUSE_ID || undefined,
     productImageRoot:

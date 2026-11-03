@@ -1,5 +1,5 @@
 export interface ConsumerProfile {
-  user: { id: string; displayName: string; provider: 'DEVELOPMENT' };
+  user: { id: string; displayName: string; provider: 'DEVELOPMENT' | 'WECHAT' };
   expiresAt: string;
 }
 interface SavedSession {
@@ -47,7 +47,7 @@ function validateProfile(value: ConsumerProfile) {
     typeof value.user.displayName !== 'string' ||
     !value.user.displayName ||
     value.user.displayName.length > 80 ||
-    value.user.provider !== 'DEVELOPMENT' ||
+    !['DEVELOPMENT', 'WECHAT'].includes(value.user.provider) ||
     typeof value.expiresAt !== 'string' ||
     !Number.isFinite(Date.parse(value.expiresAt))
   )
@@ -62,6 +62,7 @@ export function createConsumerSession(
     read(): unknown;
     write(value: SavedSession): void;
     clear(): void;
+    loginCode?(): Promise<string>;
     request<T>(path: string, token?: string, body?: unknown): Promise<T>;
   },
   publish: (state: SessionState) => void,
@@ -73,7 +74,7 @@ export function createConsumerSession(
     running = false;
   }
   async function run(
-    action: 'restore' | 'login' | 'logout',
+    action: 'restore' | 'login' | 'wechat' | 'logout',
     profile?: 'customer-a' | 'customer-b',
   ) {
     if (running) return;
@@ -85,16 +86,25 @@ export function createConsumerSession(
     let issued: string | undefined;
     try {
       saved = parseSession(io.read());
-      if (action === 'login') {
+      if (action === 'login' || action === 'wechat') {
         // Do not silently replace an existing session on this device.
-        if (saved) throw Error('请先恢复或清除当前设备的登录记录，再切换开发身份。');
+        if (saved) throw Error('请先恢复或退出当前设备的登录，再切换身份。');
+        let code: string | undefined;
+        if (action === 'wechat') {
+          if (!io.loginCode) throw Error('请在微信小程序中登录');
+          code = await io.loginCode();
+          if (!active()) return;
+          if (typeof code !== 'string' || !code) throw Error('未能获取微信登录凭证，请重试');
+        }
         const result = await io.request<ConsumerProfile & { token: string }>(
-          '/consumer/auth/dev-session',
+          action === 'wechat' ? '/consumer/auth/wechat-session' : '/consumer/auth/dev-session',
           undefined,
-          { profile },
+          action === 'wechat' ? { code } : { profile },
         );
         issued = parseSession({ token: result.token, expiresAt: result.expiresAt })!.token;
         const verified = validateProfile(result);
+        if (verified.user.provider !== (action === 'wechat' ? 'WECHAT' : 'DEVELOPMENT'))
+          throw Error('登录身份来源不符，请重新核验');
         if (!active()) return;
         io.write({ token: issued, expiresAt: result.expiresAt });
         issued = undefined;
@@ -141,6 +151,7 @@ export function createConsumerSession(
   return {
     restore: () => run('restore'),
     login: (p: 'customer-a' | 'customer-b') => run('login', p),
+    wechatLogin: () => run('wechat'),
     logout: () => run('logout'),
     cancel,
     clearLocal() {

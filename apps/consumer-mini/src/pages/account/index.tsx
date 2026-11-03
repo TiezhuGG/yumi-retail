@@ -4,15 +4,50 @@ import { useEffect, useRef, useState } from 'react';
 import { initialSessionState } from '../../consumer-session';
 import { consumerSession } from '../../session-storage';
 declare const CONSUMER_DEV_LOGIN: boolean;
+declare const API_BASE_URL: string;
 export default function Account() {
   const [state, setState] = useState(initialSessionState);
+  const [methods, setMethods] = useState<{ wechatLoginEnabled: boolean } | null>(null),
+    [methodError, setMethodError] = useState('');
+  const methodSeq = useRef(0);
+  async function loadMethods() {
+    const n = ++methodSeq.current;
+    setMethods(null);
+    setMethodError('');
+    try {
+      const r = await Taro.request<{ data: { wechatLoginEnabled: boolean } }>({
+        url: API_BASE_URL + '/consumer/auth/methods',
+        method: 'GET',
+        timeout: 10000,
+      });
+      if (n !== methodSeq.current) return;
+      if (r.statusCode !== 200 || typeof r.data?.data?.wechatLoginEnabled !== 'boolean')
+        throw Error('METHODS');
+      setMethods(r.data.data);
+    } catch {
+      if (n === methodSeq.current) setMethodError('登录方式读取失败，请重试');
+    }
+  }
   const session = useRef<ReturnType<typeof consumerSession> | null>(null);
   if (!session.current) session.current = consumerSession(setState);
   useDidShow(() => {
     void session.current!.restore();
+    void loadMethods();
   });
-  useDidHide(() => session.current!.cancel());
-  useEffect(() => () => session.current!.cancel(), []);
+  useDidHide(() => {
+    session.current!.cancel();
+    methodSeq.current++;
+    setState(initialSessionState);
+    setMethods(null);
+    setMethodError('');
+  });
+  useEffect(
+    () => () => {
+      session.current!.cancel();
+      methodSeq.current++;
+    },
+    [],
+  );
   const { profile, phase, busy, error } = state;
   async function clearLocal() {
     const result = await Taro.showModal({
@@ -34,7 +69,11 @@ export default function Account() {
               {busy ? '正在核验身份…' : profile ? profile.user.displayName : '欢迎来到玉米百货'}
             </Text>
             <Text className="account-tag">
-              {profile ? '开发身份 · 非微信登录' : '好好生活，从日常开始'}
+              {profile
+                ? profile.user.provider === 'WECHAT'
+                  ? '微信账号'
+                  : '开发身份 · 非微信登录'
+                : '好好生活，从日常开始'}
             </Text>
           </View>
         </View>
@@ -43,7 +82,12 @@ export default function Account() {
         <View className="account-card">
           <Text className="account-card-title">我的积分</Text>
           <Text className="account-copy">查看积分余额与收支明细</Text>
-          <Button onClick={() => Taro.navigateTo({ url: '/pages/points/index' })}>查看积分</Button>
+          <Button
+            className="account-link"
+            onClick={() => Taro.navigateTo({ url: '/pages/points/index' })}
+          >
+            查看积分
+          </Button>
         </View>
         {error && (
           <View className="account-error">
@@ -71,7 +115,7 @@ export default function Account() {
           <Text className="account-copy">
             {profile
               ? `有效至 ${profile.expiresAt.slice(0, 16).replace('T', ' ')} UTC。退出后可继续浏览商品。`
-              : '浏览商品和保存本机购物车无需登录。微信登录接入后，可继续完善个人服务。'}
+              : '浏览商品和保存本机购物车无需登录。登录后可查看本人积分、收货地址和兑换订单。'}
           </Text>
           {profile ? (
             <Button
@@ -82,11 +126,27 @@ export default function Account() {
               退出当前登录
             </Button>
           ) : (
-            <Button className="account-primary" disabled>
-              微信登录尚未开放
+            <Button
+              className="account-primary"
+              disabled={busy || phase !== 'guest' || !methods?.wechatLoginEnabled}
+              onClick={() => void session.current!.wechatLogin()}
+            >
+              {methods?.wechatLoginEnabled
+                ? '微信登录'
+                : methodError
+                  ? '登录方式暂不可用'
+                  : methods
+                    ? '微信登录暂未开放'
+                    : '正在读取登录方式…'}
             </Button>
           )}
         </View>
+        {methodError && !profile && (
+          <View className="account-error">
+            <Text>{methodError}</Text>
+            <Button onClick={() => void loadMethods()}>重试登录方式</Button>
+          </View>
+        )}
         {CONSUMER_DEV_LOGIN && !profile && (
           <View className="account-card account-dev">
             <Text className="account-card-title">本机开发验证</Text>
@@ -164,10 +224,12 @@ export default function Account() {
           >
             我的订单 →
           </Button>
-          <View>
-            <Text>售后服务</Text>
-            <Text>待开放</Text>
-          </View>
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/redemptions/index' })}
+          >
+            兑换售后反馈 →
+          </Button>
         </View>
         {!busy && (
           <Button className="account-clear" onClick={() => void clearLocal()}>

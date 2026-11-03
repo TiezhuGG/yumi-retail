@@ -44,6 +44,7 @@ import type { ApplicationConfig } from './config.js';
 import { ApiExceptionFilter, failure, success } from './http.js';
 import type { ApiRequest, ApiResponse } from './http.js';
 import { StaffAuthService } from './staff-auth.js';
+import type { WechatExchange } from './wechat-login.js';
 import { ConsumerAuthService, validateConsumerEnvironment } from './consumer-auth.js';
 import { ConsumerController } from './consumer-controller.js';
 import { PaymentPreparationService, PaymentPreparationController } from './payment-preparation.js';
@@ -107,7 +108,11 @@ export interface AccessEvent {
 
 export async function createApplication(
   databaseUrl: string,
-  options: { config?: ApplicationConfig; accessLog?: (event: AccessEvent) => void } = {},
+  options: {
+    config?: ApplicationConfig;
+    accessLog?: (event: AccessEvent) => void;
+    wechatExchange?: WechatExchange;
+  } = {},
 ): Promise<{
   app: INestApplication;
   db: ReturnType<typeof createDatabase>;
@@ -116,6 +121,16 @@ export async function createApplication(
 }> {
   const config = options.config ?? applicationConfig();
   validateConsumerEnvironment(databaseUrl, config);
+  if (options.wechatExchange) {
+    const u = new URL(databaseUrl);
+    if (
+      config.environment !== 'test' ||
+      !['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) ||
+      u.pathname !== '/yumi_test' ||
+      !/^([a-z_]+)_[a-f0-9]{32}$/.test(u.searchParams.get('schema') ?? '')
+    )
+      throw Error('Wechat test adapter requires disposable local test schema.');
+  }
   if (
     config.orderDevSubmit ||
     config.redemptionDevSubmit ||
@@ -134,7 +149,7 @@ export async function createApplication(
   }
   const db = createDatabase(databaseUrl);
   const auth = new StaffAuthService(db, config);
-  const consumer = new ConsumerAuthService(db, config);
+  const consumer = new ConsumerAuthService(db, config, options.wechatExchange);
   const catalog = new CatalogService(db, config.publicWarehouseId);
   const checkout = new CheckoutService(catalog, config.orderDevSubmit);
   const addresses = new ConsumerAddressService(catalog, config.addressEncryptionKey);
@@ -389,9 +404,9 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
+        '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、人工快递及售后反馈已实现本地验证；微信适配器真实账号联调与真机未验，正式交易门禁及支付尚未实现。',
       )
-      .setVersion('0.57.0')
+      .setVersion('0.58.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

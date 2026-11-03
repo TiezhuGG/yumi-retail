@@ -169,7 +169,7 @@ test('duplicate taps do not create duplicate sessions; login refuses silently re
 test('invalid API profiles are rejected and clear failures after 401 remain recoverable', async () => {
   const f = fixture();
   f.raw = { token, expiresAt };
-  f.response = async () => ({ user: { ...profile.user, provider: 'WECHAT' }, expiresAt });
+  f.response = async () => ({ user: { ...profile.user, provider: 'UNKNOWN' }, expiresAt });
   await f.store.restore();
   assert.equal(f.state.phase, 'error');
   f.failClear = true;

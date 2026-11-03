@@ -87,7 +87,7 @@ export async function expressReleaseReport(env, options = {}) {
       'Hashes identify current files only; they do not prove a matching build, health, device acceptance or deployment.',
     migrationRehearsal: null,
     remaining: [
-      { code: 'WECHAT_IDENTITY', status: 'BLOCKED', detail: '正式微信身份接入尚未实现。' },
+      { code: 'WECHAT_IDENTITY', status: 'BLOCKED', detail: '微信身份适配器已实现；真实账号/凭据/HTTPS及真机联调未验收。' },
       {
         code: 'PRODUCTION_WRITE',
         status: 'BLOCKED',

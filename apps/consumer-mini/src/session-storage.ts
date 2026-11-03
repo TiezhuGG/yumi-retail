@@ -23,6 +23,15 @@ export function consumerSession(publish: (state: SessionState) => void) {
       clear() {
         Taro.removeStorageSync(sessionStorageKey);
       },
+      async loginCode() {
+        try {
+          const r = await Taro.login({ timeout: 10000 });
+          if (!r.code) throw Error('NO_CODE');
+          return r.code;
+        } catch {
+          throw Error('未能获取微信登录凭证，请重试');
+        }
+      },
       async request<T>(path: string, token?: string, body?: unknown) {
         let result;
         try {
@@ -32,7 +41,11 @@ export function consumerSession(publish: (state: SessionState) => void) {
             data: body,
             header: {
               'Content-Type': 'application/json',
-              ...(token ? { Authorization: `Bearer ${token}` } : { 'X-Yumi-Dev-Login': '1' }),
+              ...(token
+                ? { Authorization: `Bearer ${token}` }
+                : path.endsWith('/dev-session')
+                  ? { 'X-Yumi-Dev-Login': '1' }
+                  : {}),
             },
             timeout: 10000,
           });

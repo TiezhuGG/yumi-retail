@@ -3,13 +3,15 @@ import type { createDatabase } from '@yumi/database';
 import type { ApplicationConfig } from './config.js';
 import { failure, header } from './http.js';
 import type { ApiRequest } from './http.js';
+import { wechatExchange, type WechatExchange } from './wechat-login.js';
+import { fields, str } from './catalog-input.js';
 import { tokenHash } from './staff-auth.js';
 
 export interface ConsumerContext {
   sessionId: string;
   userId: string;
   displayName: string;
-  provider: 'DEVELOPMENT';
+  provider: 'DEVELOPMENT' | 'WECHAT';
   expiresAt: string;
 }
 export function validateConsumerEnvironment(databaseUrl: string, config: ApplicationConfig) {
@@ -26,6 +28,7 @@ export class ConsumerAuthService {
   constructor(
     readonly db: ReturnType<typeof createDatabase>,
     readonly config: ApplicationConfig,
+    readonly exchange: WechatExchange = wechatExchange(config),
   ) {}
 
   developmentAllowed(request: ApiRequest) {
@@ -40,6 +43,89 @@ export class ConsumerAuthService {
       ) &&
       (!origin || this.config.staffOrigins.includes(origin))
     );
+  }
+  async wechatLogin(request: ApiRequest, input: unknown) {
+    if (!this.config.wechatLogin || !this.config.wechatAppId || !this.config.wechatAppSecret)
+      throw failure(404, 'RESOURCE_NOT_FOUND', '微信登录暂未开放');
+    const origin = header(request, 'origin');
+    if (origin && !this.config.staffOrigins.includes(origin))
+      throw failure(403, 'ORIGIN_REJECTED', '登录来源未获允许');
+    const b = fields(input, ['code']),
+      code = str(b.code, 128);
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(code))
+      throw failure(400, 'VALIDATION_ERROR', '微信登录凭证格式无效，请重新登录');
+    const throttle = tokenHash('wechat-login-ip:' + (request.socket.remoteAddress ?? 'unknown'));
+    const rows = await this.db.$queryRaw<
+      Array<{ attempt_count: number }>
+    >`INSERT INTO consumer_login_throttles(key,attempt_count,window_started_at) VALUES(${throttle},1,clock_timestamp()) ON CONFLICT(key) DO UPDATE SET attempt_count=CASE WHEN consumer_login_throttles.window_started_at<clock_timestamp()-interval '1 minute' THEN 1 ELSE consumer_login_throttles.attempt_count+1 END,window_started_at=CASE WHEN consumer_login_throttles.window_started_at<clock_timestamp()-interval '1 minute' THEN clock_timestamp() ELSE consumer_login_throttles.window_started_at END RETURNING attempt_count`;
+    if (rows[0]!.attempt_count > 60) throw failure(429, 'RATE_LIMITED', '登录过于频繁，请稍后再试');
+    const keyHash = tokenHash(this.config.wechatAppId + ':' + code);
+    await this.db
+      .$executeRaw`DELETE FROM consumer_wechat_login_codes WHERE key_hash IN (SELECT key_hash FROM consumer_wechat_login_codes WHERE expires_at<clock_timestamp() ORDER BY expires_at LIMIT 100)`;
+    // Claim before network I/O, outside issuance transaction. Never replay a token from a login code.
+    const claimed = await this.db.$queryRaw<
+      Array<{ key_hash: string }>
+    >`INSERT INTO consumer_wechat_login_codes(key_hash,expires_at) VALUES(${keyHash},clock_timestamp()+interval '10 minutes') ON CONFLICT(key_hash) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE consumer_wechat_login_codes.expires_at<=clock_timestamp() RETURNING key_hash`;
+    if (!claimed.length) throw failure(401, 'WECHAT_CODE_USED', '该微信登录凭证已使用，请重新登录');
+    const { openid } = await this.exchange(code);
+    if (typeof openid !== 'string' || !/^[A-Za-z0-9_-]{16,128}$/.test(openid))
+      throw failure(503, 'WECHAT_RESPONSE_INVALID', '微信身份服务返回异常，请重新登录');
+    const subject = tokenHash(this.config.wechatAppId + ':' + openid),
+      token = randomBytes(32).toString('base64url');
+    const result = await this.db.$transaction(async (tx) => {
+      const user = await tx.consumerUser.upsert({
+        where: { provider_subject: { provider: 'WECHAT', subject } },
+        create: {
+          id: randomUUID(),
+          provider: 'WECHAT',
+          subject,
+          wechatAppId: this.config.wechatAppId!,
+          displayName: '微信顾客',
+        },
+        update: { subject },
+      });
+      if (!user.enabled) {
+        await tx.consumerAuthAudit.create({
+          data: {
+            id: randomUUID(),
+            userId: user.id,
+            action: 'WECHAT_LOGIN',
+            outcome: 'DENIED',
+            requestId: request.requestId,
+          },
+        });
+        return null;
+      }
+      const now = (await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`)[0]!
+          .now,
+        expiresAt = new Date(now.getTime() + (this.config.consumerSessionSeconds ?? 28800) * 1000);
+      await tx.consumerSession.create({
+        data: {
+          id: randomUUID(),
+          userId: user.id,
+          authVersion: user.authVersion,
+          tokenHash: tokenHash(token),
+          createdAt: now,
+          expiresAt,
+        },
+      });
+      await tx.consumerAuthAudit.create({
+        data: {
+          id: randomUUID(),
+          userId: user.id,
+          action: 'WECHAT_LOGIN',
+          outcome: 'SUCCEEDED',
+          requestId: request.requestId,
+        },
+      });
+      return {
+        token,
+        expiresAt: expiresAt.toISOString(),
+        user: { id: user.id, displayName: user.displayName, provider: 'WECHAT' as const },
+      };
+    });
+    if (!result) throw failure(401, 'IDENTITY_UNAVAILABLE', '此账号暂不可用');
+    return result;
   }
   async login(request: ApiRequest, body: unknown) {
     if (!this.developmentAllowed(request))
@@ -131,15 +217,18 @@ export class ConsumerAuthService {
       session.expiresAt.getTime() <= Date.now() ||
       !session.user.enabled ||
       session.authVersion !== session.user.authVersion ||
-      session.user.provider !== 'DEVELOPMENT' ||
-      !this.developmentAllowed(request)
+      (session.user.provider === 'DEVELOPMENT'
+        ? !this.developmentAllowed(request)
+        : session.user.provider !== 'WECHAT' ||
+          !this.config.wechatLogin ||
+          session.user.wechatAppId !== this.config.wechatAppId)
     )
       throw failure(401, 'SESSION_EXPIRED', '登录已失效，请重新登录');
     return {
       sessionId: session.id,
       userId: session.userId,
       displayName: session.user.displayName,
-      provider: 'DEVELOPMENT',
+      provider: session.user.provider as 'DEVELOPMENT' | 'WECHAT',
       expiresAt: session.expiresAt.toISOString(),
     };
   }
