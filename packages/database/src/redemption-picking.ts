@@ -56,6 +56,7 @@ export async function redemptionJobChange(
   return next;
 }
 const sourceInclude = {
+  expressShipment: true,
   outbox: true,
   pickingTask: {
     include: {
@@ -129,7 +130,7 @@ export async function redemptionPickingReadiness(tx: Tx, id: string) {
     const p = a.position,
       l = p.lot;
     if (a.releaseLedgerId) blockers.push('ALLOCATION_RELEASED');
-    if (a.consumeLedgerId && !order.pickingTask?.pack?.shipment)
+    if (a.consumeLedgerId && !order.pickingTask?.pack?.shipment && !order.expressShipment)
       blockers.push('CONSUMPTION_UNVERIFIED');
     if (!p.location.enabled) blockers.push('LOCATION_DISABLED');
     if (l.expiresAt && l.expiresAt <= at) blockers.push('LOT_EXPIRED');

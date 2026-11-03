@@ -477,6 +477,7 @@ export class RedemptionService {
       if (
         !job ||
         job.state === 'CANCELED' ||
+        job.state === 'EXPRESS_SHIPPED' ||
         task?.state === 'CLAIMED' ||
         task?.state === 'CHECKED'
       )
@@ -485,7 +486,7 @@ export class RedemptionService {
         where: { orderId: id },
         orderBy: [{ lotId: 'asc' }, { positionId: 'asc' }],
       })) {
-        if (a.releaseLedgerId)
+        if (a.releaseLedgerId || a.consumeLedgerId)
           throw failure(409, 'RESERVATION_RECONCILIATION_REQUIRED', '库存释放凭据需核查');
         const releaseLedgerId = await orderReservationDelta(
           tx,
@@ -568,7 +569,7 @@ export class RedemptionService {
         await tx.$queryRaw`SELECT id FROM redemption_orders WHERE warehouse_id=${warehouseId}::uuid AND id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`;
         const rows = await tx.redemptionOrder.findMany({
           where: { id: { in: ids }, warehouseId },
-          include: { quote: true },
+          include: { quote: true, expressShipment: true },
         });
         if (rows.length !== ids.length)
           throw failure(
@@ -594,6 +595,14 @@ export class RedemptionService {
             pointsPrice: o.pointsPrice.toString(),
             totalPoints: o.totalPoints.toString(),
             deliveryMode: snapshot.deliveryMode,
+            expressShipment: o.expressShipment
+              ? {
+                  carrierCode: o.expressShipment.carrierCode,
+                  carrierName: o.expressShipment.carrierName,
+                  trackingNo: o.expressShipment.trackingNo,
+                  shippedAt: o.expressShipment.createdAt.toISOString(),
+                }
+              : null,
             address: this.privateData.decrypt<RedemptionOrderAddress>(
               o.userId,
               o.id,
@@ -612,6 +621,7 @@ export class RedemptionService {
     row: Prisma.RedemptionOrderGetPayload<{
       include: {
         outbox: true;
+        expressShipment: true;
         pickingTask: {
           include: {
             pack: {
@@ -650,6 +660,14 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
+      expressShipment: row.expressShipment
+        ? {
+            carrierCode: row.expressShipment.carrierCode,
+            carrierName: row.expressShipment.carrierName,
+            trackingNo: row.expressShipment.trackingNo,
+            shippedAt: row.expressShipment.createdAt.toISOString(),
+          }
+        : null,
       deliveryMode: row.deliveryMode as 'LOCAL_NO_CASH' | 'EXPRESS',
       deliveryReturnRecorded: !!row.pickingTask?.pack?.shipment?.returns.length,
       deliveryExceptionReported:
@@ -660,7 +678,9 @@ export class RedemptionService {
         row.status === 'CANCELED'
           ? 'CANCELED'
           : row.deliveryMode === 'EXPRESS'
-            ? 'EXPRESS_WAIT_SHIP'
+            ? row.expressShipment
+              ? 'EXPRESS_SHIPPED'
+              : 'EXPRESS_WAIT_SHIP'
             : row.pickingTask?.pack?.shipment?.assignments[0]?.handoff?.journey.some(
                   (f) => f.kind === 'COMPLETE',
                 )
@@ -700,11 +720,17 @@ export class RedemptionService {
     };
   }
   async list(r: ApiRequest, q: unknown, admin = false, id?: string) {
-    const b = fields(q, admin ? ['cursor', 'status', 'keyword'] : ['cursor', 'status']);
+    const b = fields(
+      q,
+      admin ? ['cursor', 'status', 'keyword', 'fulfillment'] : ['cursor', 'status'],
+    );
     const cursor = b.cursor === undefined ? null : uuid(b.cursor),
       status = b.status === undefined ? null : str(b.status, 16);
     if (status && !['ACTIVE', 'CANCELED'].includes(status))
       throw failure(400, 'VALIDATION_ERROR', '兑换单状态无效');
+    const fulfillment = b.fulfillment === undefined ? '' : str(b.fulfillment, 24);
+    if (fulfillment && !['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED', 'LOCAL'].includes(fulfillment))
+      throw failure(400, 'VALIDATION_ERROR', '履约筛选无效');
     const keyword = b.keyword === undefined ? '' : str(b.keyword, 80);
     if (keyword.length > 80) throw failure(400, 'VALIDATION_ERROR', '搜索词过长');
     return this.catalog.db.$transaction(async (tx) => {
@@ -714,6 +740,15 @@ export class RedemptionService {
         ...(userId ? { userId } : {}),
         ...(warehouseId ? { warehouseId } : {}),
         ...(status ? { status } : {}),
+        ...(fulfillment === 'LOCAL'
+          ? { deliveryMode: 'LOCAL_NO_CASH' }
+          : fulfillment
+            ? {
+                deliveryMode: 'EXPRESS',
+                AND: [{ status: 'ACTIVE' }],
+                expressShipment: fulfillment === 'EXPRESS_WAIT_SHIP' ? null : { isNot: null },
+              }
+            : {}),
         ...(id ? { id } : {}),
         ...(keyword
           ? { OR: [{ orderNo: { contains: keyword } }, { title: { contains: keyword } }] }
@@ -727,6 +762,7 @@ export class RedemptionService {
         take: 21,
         include: {
           outbox: true,
+          expressShipment: true,
           pickingTask: {
             include: {
               pack: {
@@ -769,6 +805,7 @@ export class RedemptionService {
         where: { id, warehouseId },
         include: {
           outbox: true,
+          expressShipment: true,
           pickingTask: {
             include: {
               pack: {

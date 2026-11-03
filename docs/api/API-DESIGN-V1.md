@@ -902,3 +902,17 @@ E1新增POST /api/v1/admin/redemptions/print-preview，严格body仅ids（1至20
 新增迁移202611030007_redemption_express：独立ConsumerExpressAddressBook/Address/Operation/Audit及RedemptionExpressPolicy；独立默认地址唯一索引、软删除载荷约束、地址审计不可变；RedemptionOrder.deliveryMode默认兼容旧单，新SQL匹配报价模式和待办分流，原事实不可变约束保持。扩展既有Outbox状态及取消合法迁移、verify_redemption配平检查，不删除历史。OpenAPI0.53.0由代码导出，快递/旧地址响应使用oneOf，旧报价客户端可省略模式，现金地址及订单契约不改。
 
 4项快递专项及3项打印/12项兑换回归共19项PG通过，补充跨账号报价和规则重启后旧报价拒绝后4项专项复跑通过。实际API浏览器弱网与后台/小程序截图详见[E2验证记录](../verification/E2-REDEMPTION-EXPRESS-2026-11-03.md)。迁移只在随机临时schema重放，未改业务主库、.env或生产，开发交易默认关闭/生产拒启保持。部署先迁移再匹配API、Worker及三端；旧客户端不理解快递地址/状态，不能盲退或把新单改回旧模式。微信工具/真机、正式经营配置、实际快递与生产仍未验。下一项E3快递公司、运单号录入及一次性库存出库/确认发货。
+
+## 2026-11-03 E3 快递确认发货（本地）
+
+后台兑换订单增加待快递发货/已快递发货/原配送筛选；详情展示原收件快照、原预占批次/库位/件数，填写快递公司、实际运单号并勾选整单实物、地址、运单和交快递确认后操作。首发一单一运单、一次整单出库，不支持拆包、分次发货或电子面单。已发货详情、配货打印及消费者订单显示快递公司/运单/记录时间，小程序可复制单号，运输进度由用户凭单号联系快递公司查询，不伪造轨迹或签收。
+
+GET /api/v1/admin/redemptions/:id/shipping返回本仓原地址、发货开关、可发状态、阻断原因及既有凭据，Cache-Control:no-store。POST /:id/ship严格body为version、carrierCode、可选carrierName（OTHER必填）、trackingNo、dispatchConfirmed:true；员工Cookie、本仓SUPER_ADMIN/OPERATIONS、points.read、Origin/CSRF及Idempotency-Key校验。已知承运方代码SF/ZTO/YTO/STO/YUNDA/JD/EMS/POST/DEPPON/OTHER；已知名称服务端固定，其他名称最多40字且无控制字符；运单标准化大写，6至40位字母/数字/连字符，同仓同公司名称与单号不得用于第二单。格式校验不等于快递公司验证。
+
+仅ACTIVE+EXPRESS+EXPRESS_WAIT、原版本、原预占完整且未释放/消费、无骑手任务时可新发货；仓库、商品、批次效期、冻结/盘点、库位、库存及扣分凭据须通过服务端检查。沿用元数据→库存→订单→Outbox锁序，事务内保存发货事实、消费全部原预占，逐项扣减仓库/批次/库位onHand与reserved，创建库存/库位流水、Outbox事件、审计及原键结果。末尾再次校验会话和效期，任一步失败全部回滚。发货与取消互斥，已发货拒绝取消/退分/释放；没有重复扣积分、释放配额或改写原订单版本，原订单status仍ACTIVE，由快递事实和EXPRESS_SHIPPED履约状态表示发货。
+
+发货复用现有默认关闭的REDEMPTION_PICKING_DEV_ENABLED本地作业开关，内部名称不要求运营走拣货页；生产/远程拒启保持。关闭开关阻断新操作，已成功原键可核实。浏览器按员工和订单在sessionStorage仅保留原请求，不保存地址；结果未知时禁止另起请求，重载后可核实原键。资料重读/失权/失败先清旧地址，已知拒绝后需重新获取服务端状态。暂停新兑换的寄送规则不改写已接受订单的原收件/运费快照；发货另受作业开关和实时库存约束。
+
+迁移202611030008_redemption_express_shipping新增RedemptionExpressShipment不可变事实、一单唯一、同仓同承运方运单唯一、来源复合外键、操作者快照和请求编号；数据库延迟约束同时核验整单全部原预占消费、匹配负数库存/库位流水及发货Outbox。扩展EXPRESS_SHIPPED及其事件和合法迁移；保留旧LOCAL_NO_CASH打包/出库校验路径，禁止两种履约混用。没有快递回调、轨迹或签收状态。OpenAPI0.54.0由代码导出，订单/打印增加expressShipment及EXPRESS_SHIPPED，后台列表增加fulfillment过滤，消费者不能使用后台筛选参数。
+
+部署需先迁移再匹配API、Worker及客户端；已消费库存的发货事实不可盲删、盲退旧版本或改回待发货。只在随机临时schema运行迁移和合成验收，未改业务主库/.env/生产。8项专项加31项快递地址/打印/兑换/旧打包回归，共39项真实PG通过；13张真实API浏览器截图通过。未声称全量历史仓配回归或微信开发工具/真机、实物打印机、实际交快递/承运验证、生产验收。下一项E4：纠错留痕、最小售后与受控上线准备。

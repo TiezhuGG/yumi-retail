@@ -70,6 +70,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionExpressShipments RedemptionExpressShipment[]
  redemptionCustodyReturns RedemptionCustodyReturn[]
  redemptionAssignmentWithdrawals RedemptionAssignmentWithdrawal[]
  redemptionDeliveryResolutions RedemptionDeliveryResolution[]
@@ -1404,6 +1405,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ expressShipment RedemptionExpressShipment?
  deliveryMode String @default("LOCAL_NO_CASH") @map("delivery_mode") @db.VarChar(20)
  pickingTask RedemptionPickingTask?
  id String @id @db.Uuid
@@ -1804,4 +1806,23 @@ model RedemptionExpressPolicy {
  version Int @default(0)
  warehouse Warehouse @relation(fields:[warehouseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("redemption_express_policies")
+}
+
+model RedemptionExpressShipment {
+ id String @id @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ skuId String @map("sku_id") @db.Uuid
+ carrierCode String @map("carrier_code") @db.VarChar(20)
+ carrierName String @map("carrier_name") @db.VarChar(40)
+ trackingNo String @map("tracking_no") @db.VarChar(40)
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId,warehouseId,skuId],references:[id,warehouseId,skuId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([orderId,warehouseId,skuId])
+ @@unique([warehouseId,carrierCode,carrierName,trackingNo],map:"redemption_express_tracking_key")
+ @@map("redemption_express_shipments")
 }

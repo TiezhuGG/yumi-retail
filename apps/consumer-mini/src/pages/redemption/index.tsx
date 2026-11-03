@@ -109,7 +109,9 @@ export default function RedemptionDetail() {
                 {order.status === 'CANCELED'
                   ? '积分已退还，库存和限兑配额已释放。'
                   : order.deliveryMode === 'EXPRESS'
-                    ? '待快递发货 · 商家承担运费'
+                    ? order.expressShipment
+                      ? '已快递发货'
+                      : '待快递发货 · 商家承担运费'
                     : order.deliveryExceptionReported
                       ? '配送异常待处理'
                       : order.fulfillmentState === 'DELIVERED'
@@ -167,6 +169,31 @@ export default function RedemptionDetail() {
                 </Text>
               </View>
             )}
+            {order.expressShipment && (
+              <View className="account-card">
+                <Text className="account-card-title">快递发货信息</Text>
+                <Text className="account-copy">{order.expressShipment.carrierName}</Text>
+                <Text className="account-copy">运单号：{order.expressShipment.trackingNo}</Text>
+                <Text className="account-copy">
+                  发货记录：
+                  {new Date(order.expressShipment.shippedAt).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                  })}
+                  （北京时间）
+                </Text>
+                <Text className="account-copy">运输进度请凭运单号联系快递公司查询。</Text>
+                <Button
+                  className="account-link"
+                  onClick={() =>
+                    void Taro.setClipboardData({ data: order.expressShipment!.trackingNo }).catch(
+                      () => setError('复制失败，请手动记录运单号'),
+                    )
+                  }
+                >
+                  复制运单号
+                </Button>
+              </View>
+            )}
             {order.address && (
               <View className="account-card">
                 <Text className="account-card-title">收货地址快照</Text>
@@ -178,6 +205,7 @@ export default function RedemptionDetail() {
             )}
             {order.status === 'ACTIVE' &&
               ![
+                'EXPRESS_SHIPPED',
                 'PICKING',
                 'PICKED_WAIT_PACK',
                 'PACKED_WAIT_SHIP',

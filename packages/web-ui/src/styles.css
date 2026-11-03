@@ -3261,3 +3261,19 @@ small {
   color: #23362e;
   font-family: inherit;
 }
+.express-shipping-form .express-dispatch-confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.express-shipping-form .express-dispatch-confirm input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  margin: 2px 0 0;
+}
+.express-shipping-form > p {
+  grid-column: 1 / -1;
+}

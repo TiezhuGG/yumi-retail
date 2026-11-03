@@ -828,6 +828,7 @@ export interface RedemptionQuoteView {
   };
 }
 export interface RedemptionOrderView {
+  expressShipment?: RedemptionExpressShipmentView | null;
   deliveryMode?: 'LOCAL_NO_CASH' | 'EXPRESS';
   deliveryReturnRecorded?: boolean;
   deliveryExceptionReported?: boolean;
@@ -845,6 +846,7 @@ export interface RedemptionOrderView {
   canceledAt: string | null;
   version: number;
   fulfillmentState:
+    | 'EXPRESS_SHIPPED'
     | 'EXPRESS_WAIT_SHIP'
     | 'PENDING'
     | 'CANCELED'
@@ -1026,6 +1028,7 @@ export interface RedemptionPrintPreview {
     totalPoints: string;
     deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
     address: RedemptionOrderAddress;
+    expressShipment?: RedemptionExpressShipmentView | null;
   }>;
 }
 
@@ -1069,4 +1072,36 @@ export function formatRedemptionAddress(a: RedemptionOrderAddress): string {
   return 'province' in a
     ? [a.province, a.city, a.district, a.detailAddress].filter(Boolean).join(' ')
     : [a.areaName, a.buildingName, a.unit, a.room].filter(Boolean).join(' ');
+}
+
+export const EXPRESS_CARRIERS = {
+  SF: '顺丰速运',
+  ZTO: '中通快递',
+  YTO: '圆通速递',
+  STO: '申通快递',
+  YUNDA: '韵达快递',
+  JD: '京东物流',
+  EMS: 'EMS',
+  POST: '中国邮政',
+  DEPPON: '德邦快递',
+  OTHER: '其他快递',
+} as const;
+export interface RedemptionExpressShipmentView {
+  carrierCode: string;
+  carrierName: string;
+  trackingNo: string;
+  shippedAt: string;
+}
+export interface RedemptionExpressShippingView {
+  id: string;
+  orderNo: string;
+  version: number;
+  title: string;
+  spec: string;
+  quantity: number;
+  address: RedemptionOrderAddress;
+  shipment: RedemptionExpressShipmentView | null;
+  enabled: boolean;
+  canShip: boolean;
+  blockers: string[];
 }

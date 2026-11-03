@@ -111,7 +111,9 @@ export default function Redemptions() {
               {o.status === 'CANCELED'
                 ? '已取消 · 积分已退还'
                 : o.deliveryMode === 'EXPRESS'
-                  ? '待快递发货 · 商家承担运费'
+                  ? o.expressShipment
+                    ? '已快递发货 · ' + o.expressShipment.carrierName
+                    : '待快递发货 · 商家承担运费'
                   : o.deliveryExceptionReported
                     ? '配送异常待处理'
                     : o.fulfillmentState === 'DELIVERED'

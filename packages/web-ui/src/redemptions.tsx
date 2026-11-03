@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RedemptionOrderView, RedemptionOrderPage, StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
+import { ExpressShippingPanel } from './express-shipping.js';
 import { ExpressPolicyWorkbench } from './express-policy.js';
 import { RedemptionPrintDialog } from './redemption-print.js';
 export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
@@ -10,11 +11,12 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
     [detail, setDetail] = useState<RedemptionOrderView | null>(null),
     [keyword, setKeyword] = useState(''),
     [status, setStatus] = useState(''),
+    [fulfillment, setFulfillment] = useState(''),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState('');
   const seq = useRef(0),
-    applied = useRef({ keyword: '', status: '' }),
+    applied = useRef({ keyword: '', status: '', fulfillment: '' }),
     pending = useRef<{ cursor?: string; id?: string }>({});
   async function load(intent: { cursor?: string; id?: string } = {}) {
     const n = ++seq.current;
@@ -31,6 +33,7 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
         const q = new URLSearchParams();
         if (applied.current.keyword) q.set('keyword', applied.current.keyword);
         if (applied.current.status) q.set('status', applied.current.status);
+        if (applied.current.fulfillment) q.set('fulfillment', applied.current.fulfillment);
         if (intent.cursor) q.set('cursor', intent.cursor);
         const p = await staffRequest<RedemptionOrderPage>('/admin/redemptions?' + q);
         if (n !== seq.current) return;
@@ -77,7 +80,9 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
             {detail.status === 'CANCELED'
               ? '已取消 · 已退积分'
               : detail.deliveryMode === 'EXPRESS'
-                ? '待快递发货 · 商家承担运费'
+                ? detail.expressShipment
+                  ? '已快递发货'
+                  : '待快递发货 · 商家承担运费'
                 : detail.deliveryExceptionReported
                   ? '配送异常待处理'
                   : detail.fulfillmentState === 'DELIVERED'
@@ -110,6 +115,14 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
           >
             打印本单
           </button>
+          {detail.deliveryMode === 'EXPRESS' && (
+            <ExpressShippingPanel
+              key={detail.id}
+              id={detail.id}
+              profile={profile}
+              onShipped={() => void load({ id: detail.id })}
+            />
+          )}
           <h3>实物预占凭据</h3>
           {detail.allocations?.map((a, i) => (
             <p key={i}>
@@ -139,7 +152,7 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
             className="points-toolbar"
             onSubmit={(e) => {
               e.preventDefault();
-              applied.current = { keyword: keyword.trim(), status };
+              applied.current = { keyword: keyword.trim(), status, fulfillment };
               void load();
             }}
           >
@@ -153,6 +166,19 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
                 <option value="">全部状态</option>
                 <option value="ACTIVE">有效兑换</option>
                 <option value="CANCELED">已取消</option>
+              </select>
+            </label>
+            <label>
+              履约阶段
+              <select
+                aria-label="履约阶段"
+                value={fulfillment}
+                onChange={(e) => setFulfillment(e.target.value)}
+              >
+                <option value="">全部方式与阶段</option>
+                <option value="EXPRESS_WAIT_SHIP">待快递发货</option>
+                <option value="EXPRESS_SHIPPED">已快递发货</option>
+                <option value="LOCAL">原小区配送</option>
               </select>
             </label>
             <button className="primary-button" disabled={loading}>
@@ -238,7 +264,9 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
                         {o.status === 'CANCELED'
                           ? '已取消'
                           : o.deliveryMode === 'EXPRESS'
-                            ? '待快递发货'
+                            ? o.expressShipment
+                              ? '已快递发货'
+                              : '待快递发货'
                             : o.fulfillmentState === 'DELIVERED'
                               ? '骑手已确认送达。'
                               : o.fulfillmentState === 'DELIVERING'

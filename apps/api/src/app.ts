@@ -7,6 +7,7 @@ import {
   PublicExpressPolicyController,
   AdminExpressPolicyController,
 } from './express-policy.js';
+import { ExpressShippingService } from './express-shipping.js';
 import { RedemptionService } from './redemptions.js';
 import { RedemptionController, AdminRedemptionController } from './redemption-controller.js';
 import { RewardService, AdminRewardController, PublicRewardController } from './rewards.js';
@@ -228,6 +229,14 @@ export async function createApplication(
           config.redemptionDevSubmit,
         ),
       },
+      {
+        provide: ExpressShippingService,
+        useValue: new ExpressShippingService(
+          catalog,
+          config.redemptionPickingDev,
+          config.addressEncryptionKey,
+        ),
+      },
       { provide: RewardService, useValue: new RewardService(catalog, config.redemptionDevSubmit) },
       { provide: PointsCorrectionService, useValue: new PointsCorrectionService(catalog) },
       { provide: PointsGrantService, useValue: new PointsGrantService(catalog) },
@@ -364,7 +373,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。',
       )
-      .setVersion('0.53.0')
+      .setVersion('0.54.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

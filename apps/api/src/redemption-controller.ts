@@ -11,6 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ExpressShippingService } from './express-shipping.js';
 import { RedemptionService } from './redemptions.js';
 import { Consumer, Permissions } from './staff-guard.js';
 import { fields, key, uuid } from './catalog-input.js';
@@ -75,7 +76,12 @@ const quote = object({
   expired: { type: 'boolean' },
   snapshot,
 });
+const expressShipment = {
+  ...object({ carrierCode: text, carrierName: text, trackingNo: text, shippedAt: text }),
+  nullable: true,
+};
 const orderProperties = {
+  expressShipment,
   deliveryMode: { type: 'string' as const, enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
   deliveryReturnRecorded: { type: 'boolean' as const },
   deliveryExceptionReported: { type: 'boolean' as const },
@@ -96,6 +102,7 @@ const orderProperties = {
     type: 'string' as const,
     enum: [
       'EXPRESS_WAIT_SHIP',
+      'EXPRESS_SHIPPED',
       'PENDING',
       'CANCELED',
       'MISSING',
@@ -203,7 +210,61 @@ export class RedemptionController {
 @Permissions('points.read')
 @Controller('admin/redemptions')
 export class AdminRedemptionController {
-  constructor(@Inject(RedemptionService) readonly service: RedemptionService) {}
+  constructor(
+    @Inject(RedemptionService) readonly service: RedemptionService,
+    @Inject(ExpressShippingService) readonly shipping: ExpressShippingService,
+  ) {}
+  @Get(':id/shipping')
+  @Header('Cache-Control', 'no-store')
+  @ApiResult(
+    object({
+      id: text,
+      orderNo: text,
+      version: integer,
+      title: text,
+      spec: text,
+      quantity: integer,
+      address,
+      shipment: expressShipment,
+      enabled: { type: 'boolean' },
+      canShip: { type: 'boolean' },
+      blockers: { type: 'array', items: text },
+    }),
+    errors,
+  )
+  async shippingRead(@Req() r: ApiRequest, @Param('id') id: string, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.shipping.read(r, uuid(id)));
+  }
+  @Post(':id/ship')
+  @HttpCode(200)
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object(
+      {
+        version: integer,
+        carrierCode: {
+          type: 'string',
+          enum: ['SF', 'ZTO', 'YTO', 'STO', 'YUNDA', 'JD', 'EMS', 'POST', 'DEPPON', 'OTHER'],
+        },
+        carrierName: { type: 'string', maxLength: 40 },
+        trackingNo: { type: 'string', minLength: 6, maxLength: 40 },
+        dispatchConfirmed: { type: 'boolean', enum: [true] },
+      },
+      ['version', 'carrierCode', 'trackingNo', 'dispatchConfirmed'],
+    ),
+  })
+  @ApiResult(object({ id: text }), errors)
+  async ship(
+    @Req() r: ApiRequest,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.shipping.ship(r, uuid(id), key(r), b));
+  }
   @Post('print-preview')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
@@ -229,6 +290,7 @@ export class AdminRedemptionController {
           quantity: integer,
           pointsPrice: text,
           totalPoints: text,
+          expressShipment,
           deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
           address,
         }),

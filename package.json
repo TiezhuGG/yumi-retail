@@ -176,7 +176,11 @@
     "pretest:redemption-express": "npm run build:server",
     "test:redemption-express": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-express.integration.test.ts",
     "preverify:redemption-express:ui": "npm run build:server",
-    "verify:redemption-express:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-express.mjs"
+    "verify:redemption-express:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-express.mjs",
+    "pretest:express-shipping": "npm run build:server",
+    "test:express-shipping": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-express-shipping.integration.test.ts",
+    "preverify:express-shipping:ui": "npm run build:server",
+    "verify:express-shipping:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-shipping.mjs"
   },
   "pnpm": {
     "overrides": {

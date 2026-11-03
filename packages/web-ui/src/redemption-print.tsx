@@ -37,6 +37,16 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
         'meta',
       ),
     );
+    if (o.expressShipment)
+      sheet.append(
+        node(
+          'p',
+          '已快递发货：' +
+            o.expressShipment.carrierName +
+            ' · 运单号：' +
+            o.expressShipment.trackingNo,
+        ),
+      );
     const recipient = node('section', undefined, 'recipient');
     recipient.append(
       node('h2', '收件信息'),
