@@ -4,6 +4,16 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { inspectLocalConfiguration, rehearseMigrations } from './check-fulfillment-local.mjs';
 export async function expressReleaseReport(env, options = {}) {
   const checks = inspectLocalConfiguration(env, options.nodeVersion);
+  checks.push({
+    code: 'FORMAL_SWITCHES_OFF',
+    ok:
+      (env.POINTS_EXPRESS_MODE === undefined || env.POINTS_EXPRESS_MODE === 'off') &&
+      ['POINTS_EXPRESS_SUBMIT_ENABLED', 'POINTS_EXPRESS_OPERATIONS_ENABLED'].every(
+        (k) => env[k] === undefined || env[k] === '0',
+      ),
+    detail:
+      'Local preparation keeps formal points mode and write switches off; inspect formal configuration separately.',
+  });
   const json = JSON.parse(
     await readFile(new URL('../docs/api/openapi.json', import.meta.url), 'utf8'),
   );
@@ -87,11 +97,15 @@ export async function expressReleaseReport(env, options = {}) {
       'Hashes identify current files only; they do not prove a matching build, health, device acceptance or deployment.',
     migrationRehearsal: null,
     remaining: [
-      { code: 'WECHAT_IDENTITY', status: 'BLOCKED', detail: '微信身份适配器已实现；真实账号/凭据/HTTPS及真机联调未验收。' },
+      {
+        code: 'WECHAT_IDENTITY',
+        status: 'BLOCKED',
+        detail: '微信身份适配器已实现；真实账号/凭据/HTTPS及真机联调未验收。',
+      },
       {
         code: 'PRODUCTION_WRITE',
         status: 'BLOCKED',
-        detail: '生产兑换/快递作业门禁尚未实现及验收，不能开启开发开关替代。',
+        detail: '独立正式门禁已实现；真实环境配置、身份、设备及发布验收仍待完成。',
       },
       { code: 'DEVICE', status: 'UNVERIFIED', detail: 'HTTPS/合法域名/开发工具/真机验收。' },
       { code: 'PHYSICAL', status: 'UNVERIFIED', detail: '实物/打印机/实际交快递和真实运单核实。' },

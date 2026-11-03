@@ -9324,6 +9324,14 @@
                               "enum": [
                                 0
                               ]
+                            },
+                            "executionMode": {
+                              "type": "string",
+                              "enum": [
+                                "DEVELOPMENT",
+                                "CONTROLLED",
+                                "PRODUCTION"
+                              ]
                             }
                           },
                           "additionalProperties": false
@@ -9788,6 +9796,14 @@
                               "type": "integer",
                               "enum": [
                                 0
+                              ]
+                            },
+                            "executionMode": {
+                              "type": "string",
+                              "enum": [
+                                "DEVELOPMENT",
+                                "CONTROLLED",
+                                "PRODUCTION"
                               ]
                             }
                           },
@@ -10513,6 +10529,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "executionMode",
                               "expressShipment",
                               "deliveryMode",
                               "deliveryReturnRecorded",
@@ -10534,6 +10551,14 @@
                               "address"
                             ],
                             "properties": {
+                              "executionMode": {
+                                "type": "string",
+                                "enum": [
+                                  "DEVELOPMENT",
+                                  "CONTROLLED",
+                                  "PRODUCTION"
+                                ]
+                              },
                               "expressShipment": {
                                 "type": "object",
                                 "required": [
@@ -11088,6 +11113,7 @@
                     "data": {
                       "type": "object",
                       "required": [
+                        "executionMode",
                         "expressShipment",
                         "deliveryMode",
                         "deliveryReturnRecorded",
@@ -11109,6 +11135,14 @@
                         "address"
                       ],
                       "properties": {
+                        "executionMode": {
+                          "type": "string",
+                          "enum": [
+                            "DEVELOPMENT",
+                            "CONTROLLED",
+                            "PRODUCTION"
+                          ]
+                        },
                         "expressShipment": {
                           "type": "object",
                           "required": [
@@ -13500,6 +13534,7 @@
                               "pointsPrice",
                               "totalPoints",
                               "expressShipment",
+                              "executionMode",
                               "deliveryMode",
                               "address"
                             ],
@@ -13566,6 +13601,14 @@
                                 },
                                 "additionalProperties": false,
                                 "nullable": true
+                              },
+                              "executionMode": {
+                                "type": "string",
+                                "enum": [
+                                  "DEVELOPMENT",
+                                  "CONTROLLED",
+                                  "PRODUCTION"
+                                ]
                               },
                               "deliveryMode": {
                                 "type": "string",
@@ -14011,6 +14054,7 @@
                           "items": {
                             "type": "object",
                             "required": [
+                              "executionMode",
                               "expressShipment",
                               "deliveryMode",
                               "deliveryReturnRecorded",
@@ -14031,6 +14075,14 @@
                               "fulfillmentState"
                             ],
                             "properties": {
+                              "executionMode": {
+                                "type": "string",
+                                "enum": [
+                                  "DEVELOPMENT",
+                                  "CONTROLLED",
+                                  "PRODUCTION"
+                                ]
+                              },
                               "expressShipment": {
                                 "type": "object",
                                 "required": [
@@ -14501,6 +14553,7 @@
                     "data": {
                       "type": "object",
                       "required": [
+                        "executionMode",
                         "expressShipment",
                         "deliveryMode",
                         "deliveryReturnRecorded",
@@ -14523,6 +14576,14 @@
                         "events"
                       ],
                       "properties": {
+                        "executionMode": {
+                          "type": "string",
+                          "enum": [
+                            "DEVELOPMENT",
+                            "CONTROLLED",
+                            "PRODUCTION"
+                          ]
+                        },
                         "expressShipment": {
                           "type": "object",
                           "required": [
@@ -15013,6 +15074,179 @@
         ],
         "tags": [
           "积分兑换订单查询与打印"
+        ]
+      }
+    },
+    "/api/v1/consumer/redemption-access": {
+      "get": {
+        "operationId": "RedemptionAccessController_read",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "executionMode",
+                        "canSubmit",
+                        "reason"
+                      ],
+                      "properties": {
+                        "executionMode": {
+                          "type": "string",
+                          "enum": [
+                            "DEVELOPMENT",
+                            "CONTROLLED",
+                            "PRODUCTION"
+                          ]
+                        },
+                        "canSubmit": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "consumerSession": []
+          }
+        ],
+        "tags": [
+          "积分兑换当前访问条件"
         ]
       }
     },
@@ -84836,8 +85070,8 @@
   },
   "info": {
     "title": "玉米百货 API",
-    "description": "员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、人工快递及售后反馈已实现本地验证；微信适配器真实账号联调与真机未验，正式交易门禁及支付尚未实现。",
-    "version": "0.58.0",
+    "description": "员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。",
+    "version": "0.59.0",
     "contact": {}
   },
   "tags": [],

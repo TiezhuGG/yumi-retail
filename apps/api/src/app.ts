@@ -1,3 +1,4 @@
+import { RedemptionAccessController } from './points-express-controller.js';
 import { RedemptionDeliveryController, RedemptionDeliveryService } from './redemption-delivery.js';
 import { RedemptionPickingService, RedemptionPickingController } from './redemption-picking.js';
 import { ConsumerExpressAddressService } from './express-address.js';
@@ -8,6 +9,7 @@ import {
   AdminExpressPolicyController,
 } from './express-policy.js';
 import { ExpressReadinessService, ExpressReadinessController } from './express-readiness.js';
+import { PointsExpressGate, validatePointsExpressRuntime } from './points-express-gate.js';
 import { ExpressShippingService } from './express-shipping.js';
 import { RedemptionAfterSalesService } from './redemption-after-sales.js';
 import {
@@ -121,6 +123,7 @@ export async function createApplication(
 }> {
   const config = options.config ?? applicationConfig();
   validateConsumerEnvironment(databaseUrl, config);
+  validatePointsExpressRuntime(databaseUrl, config);
   if (options.wechatExchange) {
     const u = new URL(databaseUrl);
     if (
@@ -147,6 +150,7 @@ export async function createApplication(
     )
       throw new Error('Development order submission requires local isolated database.');
   }
+  const expressGate = new PointsExpressGate(config);
   const db = createDatabase(databaseUrl);
   const auth = new StaffAuthService(db, config);
   const consumer = new ConsumerAuthService(db, config, options.wechatExchange);
@@ -182,6 +186,7 @@ export async function createApplication(
       RedemptionDeliveryController,
       RedemptionController,
       AdminRedemptionController,
+      RedemptionAccessController,
       ExpressReadinessController,
       ConsumerAfterSalesController,
       AdminAfterSalesController,
@@ -251,6 +256,7 @@ export async function createApplication(
           addresses,
           config.addressEncryptionKey,
           config.redemptionDevSubmit,
+          expressGate,
         ),
       },
       {
@@ -259,6 +265,7 @@ export async function createApplication(
           catalog,
           config.redemptionPickingDev,
           config.addressEncryptionKey,
+          expressGate,
         ),
       },
       {
@@ -267,10 +274,18 @@ export async function createApplication(
           catalog,
           config.redemptionPickingDev,
           config.addressEncryptionKey,
+          expressGate,
         ),
       },
       { provide: ExpressReadinessService, useValue: new ExpressReadinessService(catalog, config) },
-      { provide: RewardService, useValue: new RewardService(catalog, config.redemptionDevSubmit) },
+      {
+        provide: RewardService,
+        useValue: new RewardService(
+          catalog,
+          config.redemptionDevSubmit ||
+            (config.pointsExpress?.mode !== 'off' && config.pointsExpress?.submit === true),
+        ),
+      },
       { provide: PointsCorrectionService, useValue: new PointsCorrectionService(catalog) },
       { provide: PointsGrantService, useValue: new PointsGrantService(catalog) },
       { provide: PointsService, useValue: new PointsService(catalog) },
@@ -346,6 +361,7 @@ export async function createApplication(
       },
       { provide: PickingReadinessService, useValue: new PickingReadinessService(catalog) },
       { provide: AdminOrderService, useValue: new AdminOrderService(catalog) },
+      { provide: PointsExpressGate, useValue: expressGate },
       { provide: CatalogService, useValue: catalog },
       { provide: ServiceAreaService, useValue: new ServiceAreaService(catalog) },
       {
@@ -404,9 +420,9 @@ export async function createApplication(
     new DocumentBuilder()
       .setTitle('玉米百货 API')
       .setDescription(
-        '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、人工快递及售后反馈已实现本地验证；微信适配器真实账号联调与真机未验，正式交易门禁及支付尚未实现。',
+        '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。',
       )
-      .setVersion('0.58.0')
+      .setVersion('0.59.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

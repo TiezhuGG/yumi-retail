@@ -32,6 +32,8 @@ test('unsafe or invalid environment prevents database rehearsal; unsupported pub
     { NODE_ENV: 'production' },
     { REDEMPTION_DEV_SUBMIT_ENABLED: '1' },
     { REDEMPTION_PICKING_DEV_ENABLED: '1' },
+    { POINTS_EXPRESS_MODE: 'controlled' },
+    { POINTS_EXPRESS_OPERATIONS_ENABLED: '1' },
   ])
     await assert.rejects(
       expressReleaseReport({ ...env, ...changed }, { rehearse: true }),

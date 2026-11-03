@@ -114,8 +114,12 @@ export class ExpressReadinessService {
             ),
             check(
               'LOCAL_SWITCHES',
-              '当前开发开关',
-              'BLOCKED',
+              '开发模式隔离',
+              this.config.consumerDevLogin ||
+                this.config.redemptionDevSubmit ||
+                this.config.redemptionPickingDev
+                ? 'BLOCKED'
+                : 'CONFIGURED',
               '开发身份：' +
                 (this.config.consumerDevLogin ? '开' : '关') +
                 '；兑换提交：' +
@@ -137,8 +141,18 @@ export class ExpressReadinessService {
             check(
               'PRODUCTION_WRITE',
               '正式交易与作业门禁',
-              'BLOCKED',
-              '生产兑换及快递作业门禁尚未实现与验收；不会通过打开开发开关绕过。',
+              this.config.pointsExpress?.mode && this.config.pointsExpress.mode !== 'off'
+                ? 'CONFIGURED'
+                : 'BLOCKED',
+              '独立正式门禁已实现；当前模式：' +
+                (this.config.pointsExpress?.mode ?? 'off') +
+                '；新兑换：' +
+                (this.config.pointsExpress?.submit ? '开' : '关') +
+                '；快递/反馈作业：' +
+                (this.config.pointsExpress?.operations ? '开' : '关') +
+                '；受控账号数：' +
+                (this.config.pointsExpress?.allowedUsers.length ?? 0) +
+                '。配置不代表发布验收通过。',
             ),
             check(
               'DEVICE',

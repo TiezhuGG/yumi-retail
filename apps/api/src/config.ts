@@ -1,6 +1,14 @@
+import { pointsExpressConfiguration } from './points-express-config.js';
 import { assertDisabledPaymentMode, paymentConfiguration } from './payment-config.js';
 import type { PaymentReadinessCheck } from '@yumi/contracts';
 export interface ApplicationConfig {
+  pointsExpress?: {
+    mode: 'off' | 'controlled' | 'production';
+    submit: boolean;
+    operations: boolean;
+    allowedUsers: string[];
+    apiOrigin?: string;
+  };
   notificationLabEnabled?: boolean;
   pickingLabEnabled?: boolean;
   paymentConfiguration?: PaymentReadinessCheck[];
@@ -142,6 +150,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
   )
     throw new Error('Invalid ORDER_DEV_HOLD_SECONDS.');
   return {
+    pointsExpress: pointsExpressConfiguration(env),
     notificationLabEnabled,
     pickingLabEnabled,
     paymentConfiguration: paymentConfiguration(env),

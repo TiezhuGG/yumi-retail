@@ -1,3 +1,4 @@
+import type { PointsExpressGate } from './points-express-gate.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@yumi/database';
 import type { RedemptionAfterSalesView, RedemptionAfterSalesPage } from '@yumi/contracts';
@@ -20,6 +21,7 @@ export class RedemptionAfterSalesService {
     readonly catalog: CatalogService,
     readonly enabled = false,
     key?: string,
+    readonly formalGate?: PointsExpressGate,
   ) {
     this.checkout = new CheckoutService(catalog);
     this.staff = new PointsGrantService(catalog);
@@ -47,7 +49,11 @@ export class RedemptionAfterSalesService {
       throw failure(409, 'EXPRESS_ORDER_REQUIRED', '此反馈入口仅支持快递兑换订单');
     return o;
   }
-  gate() {
+  gate(mode: string) {
+    if (this.formalGate) {
+      this.formalGate.assertOperate(mode, this.enabled);
+      return;
+    }
     if (!this.enabled) throw failure(503, 'AFTER_SALES_DISABLED', '售后反馈操作暂未开放');
   }
   text(v: unknown) {
@@ -72,9 +78,13 @@ export class RedemptionAfterSalesService {
       title: o.title,
       spec: o.spec,
       quantity: o.quantity,
-      enabled: this.enabled,
+      enabled: this.formalGate
+        ? this.formalGate.canOperate(o.executionMode, this.enabled)
+        : this.enabled,
       canSubmit:
-        this.enabled &&
+        (this.formalGate
+          ? this.formalGate.canOperate(o.executionMode, this.enabled)
+          : this.enabled) &&
         !c &&
         o.status === 'ACTIVE' &&
         o.outbox?.state === 'EXPRESS_SHIPPED' &&
@@ -238,7 +248,7 @@ export class RedemptionAfterSalesService {
             await this.consumer(tx, r);
             return previous.result;
           }
-          this.gate();
+          this.gate((await this.source(tx, id, u)).executionMode);
           await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${id}::uuid FOR UPDATE`;
           const o = await this.source(tx, id, u),
             c = await tx.redemptionAfterSales.findUnique({ where: { orderId: id }, include });
@@ -312,7 +322,7 @@ export class RedemptionAfterSalesService {
       { version, message },
       async (tx) => {
         await this.staff.authorize(r, tx);
-        this.gate();
+        this.gate((await this.source(tx, id, undefined, w)).executionMode);
         await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${id}::uuid FOR UPDATE`;
         await this.source(tx, id, undefined, w);
         const c = await tx.redemptionAfterSales.findUnique({ where: { orderId: id }, include });

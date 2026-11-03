@@ -77,6 +77,13 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
           </p>
           <p className="reward-price">{detail.totalPoints} 积分</p>
           <p>
+            {detail.executionMode === 'CONTROLLED'
+              ? '受控测试订单'
+              : detail.executionMode === 'PRODUCTION'
+                ? '积分快递订单'
+                : '本地开发订单'}
+          </p>
+          <p>
             {detail.status === 'CANCELED'
               ? '已取消 · 已退积分'
               : detail.deliveryMode === 'EXPRESS'

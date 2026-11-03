@@ -1407,6 +1407,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ executionMode String @default("DEVELOPMENT") @map("execution_mode") @db.VarChar(20)
  afterSales RedemptionAfterSales?
  expressShipment RedemptionExpressShipment?
  deliveryMode String @default("LOCAL_NO_CASH") @map("delivery_mode") @db.VarChar(20)

@@ -201,7 +201,13 @@
     "pretest:wechat-login": "npm run build:server",
     "test:wechat-login": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/wechat-login.integration.test.ts tests/wechat-login.test.ts",
     "preverify:wechat-login:ui": "npm run build:server",
-    "verify:wechat-login:ui": "node --env-file=.env --import tsx scripts/ui/verify-wechat-login.mjs"
+    "verify:wechat-login:ui": "node --env-file=.env --import tsx scripts/ui/verify-wechat-login.mjs",
+    "pretest:points-express-gate": "npm run build:server",
+    "test:points-express-gate": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/points-express-gate.integration.test.ts tests/points-express-config.test.ts",
+    "preverify:points-express-gate:ui": "npm run build:server",
+    "verify:points-express-gate:ui": "node --env-file=.env --import tsx scripts/ui/verify-points-express-gate.mjs",
+    "precheck:points-express:config": "npm run build:server",
+    "check:points-express:config": "node --env-file-if-exists=.env scripts/check-points-express-config.mjs"
   },
   "pnpm": {
     "overrides": {

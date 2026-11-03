@@ -29,6 +29,14 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
       node('div', '玉米百货 · 社区好生活', 'brand'),
       node('h1', '积分兑换订单配货单'),
       node('p', '兑换单号：' + o.orderNo),
+      node(
+        'p',
+        o.executionMode === 'CONTROLLED'
+          ? '受控测试订单'
+          : o.executionMode === 'PRODUCTION'
+            ? '积分快递订单'
+            : '本地开发订单',
+      ),
       node('p', '下单时间：' + stamp(o.createdAt) + '（北京时间）', 'meta'),
       node(
         'p',

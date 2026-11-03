@@ -786,3 +786,17 @@ canLaunch始终false：目前仅DEVELOPMENT消费者适配器，且开发兑换/
 迁移202611030011_wechat_consumer_identity兼容原账号：扩展provider/subject约束与WECHAT_LOGIN审计动作，新增consumer_users.wechat_app_id及consumer_wechat_login_codes哈希临时凭证表，身份来源不可变触发器禁止改写provider/subject/AppID/ID/创建时间。保留原provider+subject唯一键和原subject约束名，兼容测试扩展脚本。无开发账号迁移、无真实数据回填。OpenAPI0.58.0由代码导出，user.provider增加WECHAT；需先迁移，再配套API与小程序，旧客户端不认识新provider需升级，不能删除身份/会话事实或改回开发身份回退。
 
 本轮28项真实PG（微信4/旧会话9/快递地址4/发货8/首发检查3）及10项逻辑（微信协议和小程序流程2/旧会话8）通过；微信4项增强跨AppID后再次通过，11张同源码浏览器截图通过。适配器替身及传输模拟全部合成、未向真实微信发送凭据或连接账号；不能写成真实微信、开发工具或真机通过。生产交易门禁、HTTPS/合法域名、真实AppID工程匹配、真实联调/真机、备份恢复和实际快递仍待完成，下一项独立正式兑换/快递门禁与受控测试环境准备。
+
+## 2026-11-03 E4e 独立正式积分快递门禁（本地）
+
+新增POINTS_EXPRESS_MODE=off/controlled/production，默认off，POINTS_EXPRESS_SUBMIT_ENABLED和POINTS_EXPRESS_OPERATIONS_ENABLED均默认0。controlled仅允许1至50个指定本系统微信账号，production仅NODE_ENV=production且不得保留受控名单；两种正式模式只支持当前AppID的WECHAT账号和EXPRESS订单。开发开关保持原生产/远程拒启，并只处理开发身份的新交易；正式模式启动拒绝开发身份/交易/作业、现金开发下单、拣货/支付演练及原开发Worker混用。微信凭据、经营仓库、加密密钥和声明的HTTPS API origin须配置，正式部署不得连接yumi_dev/yumi_test或自定义schema URL；test仅允许本机yumi_test随机schema，不等于真实TLS受控环境。
+
+新报价/提交独立受submit开关与当前账号资格控制，快递出库/运单更正/消费者反馈/后台回复结束受operations开关与本单原执行模式控制。暂停新提交不阻断已受理单查询、原规则取消/全额退分释放预占配额、既有成功原键核实；名单移除只影响新提交，不追溯取消已受理单的作业资格。关闭作业阻断新动作但成功原键可核实。开关按进程配置生效，环境替换前等待在途事务并核实结果，不承诺撤销已受理事务。真实会话/归属/本仓/当前人员/版本/库存等原校验保持，前端隐藏按钮不替代服务端门禁。
+
+报价快照与订单executionMode由服务端写入DEVELOPMENT/CONTROLLED/PRODUCTION，客户端不能指定。迁移202611030012_points_express_execution_mode新增不可变字段，旧单默认DEVELOPMENT，SQL校验原报价模式一致、正式单必须EXPRESS+WECHAT。正式作业不能处理开发单或其他正式模式单；配置模式变化后旧报价不能新创建，但成功请求仍可恢复。消费者订单/后台详情/配货打印明确来源模式，不把开发或受控单冒充正式单。原本地配送与现金流程不由新门禁启用，未删除旧计划/事实。
+
+GET /api/v1/consumer/redemption-access新增当前本人访问条件，Bearer/no-store、未知查询字段拒绝，返回executionMode/canSubmit/reason，不返回名单或凭据。仅表示可继续核验，报价/提交时仍再次检查资格、快递规则、价格、积分、配额和实时库存。小程序确认页展示暂停/受控限制/读取失败并禁用新报价，仍可核实原请求；报价后暂停由服务端阻断且保留原请求，恢复后可核实。服务端仍对503统一脱敏，小程序仅按明确EXPRESS_SUBMISSION_PAUSED错误码展示固定暂停文案，未放宽错误过滤。403明确拒绝也可确认未创建后重新核验，账号不匹配的原请求不能由其他账号清除。
+
+后台首发检查展示正式模式、独立写开关及受控账号数量，开发适配器均关闭时显示隔离配置满足，不返回ID名单；配置不是验收，canLaunch仍false。新增不含凭据的受控环境模板和只读check:points-express:config工具；工具不联网/不接数据库、不修改配置、不输出URL/secret/名单/仓库ID，只检查声明与隔离规则，configurationValid=true不代表已验收。原本地发布检查新增正式模式/写开关须关闭的保护，不用其操作远程环境。
+
+OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先迁移再匹配API/Worker/后台与小程序。旧报价模式缺失兼容DEVELOPMENT，历史订单不自动转换。30项真实PG（受控3/旧兑换12/出库8/反馈7）与配置及只读保护测试通过，浏览器12张截图通过。只在随机临时schema和合成微信账号/积分验证；未连接真实微信、HTTPS、外部账号或生产，未改实际.env或主库，仍待真实受控环境、设备、实物、备份恢复和部署授权验收。

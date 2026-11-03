@@ -1,3 +1,4 @@
+import { PointsExpressGate, type ExecutionMode } from './points-express-gate.js';
 import { expressShipmentInclude, expressShipmentView } from './express-shipment-view.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { Prisma, orderReservationDelta, redemptionJobChange } from '@yumi/database';
@@ -22,6 +23,7 @@ type QuoteInput = {
   deliveryMode?: 'LOCAL_NO_CASH' | 'EXPRESS';
 };
 export type RedemptionSnapshot = QuoteInput & {
+  executionMode?: ExecutionMode;
   skuId: string;
   title: string;
   name: string;
@@ -48,6 +50,7 @@ export class RedemptionService {
     readonly addresses: ConsumerAddressService,
     key?: string,
     readonly enabled = false,
+    readonly formalGate?: PointsExpressGate,
   ) {
     this.checkout = new CheckoutService(catalog);
     this.privateData = new OrderPrivateData(key);
@@ -59,13 +62,16 @@ export class RedemptionService {
       throw failure(503, 'STORE_UNAVAILABLE', '经营仓库尚未配置');
     return this.catalog.publicWarehouseId;
   }
-  private gate() {
+  private async gate(tx: Tx, userId: string, deliveryMode: string): Promise<ExecutionMode> {
+    if (this.formalGate && this.formalGate.mode() !== 'DEVELOPMENT')
+      return this.formalGate.assertSubmit(tx, userId, deliveryMode);
     if (!this.enabled)
       throw failure(
         503,
         'REDEMPTION_SUBMISSION_DISABLED',
         '兑换提交尚未开放，仅支持已受理订单查询与取消',
       );
+    return this.formalGate ? this.formalGate.assertSubmit(tx, userId, deliveryMode) : 'DEVELOPMENT';
   }
   private async clock(tx: Tx) {
     return (await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`)[0]!.now;
@@ -266,11 +272,11 @@ export class RedemptionService {
       ...(b.deliveryMode ? { deliveryMode: b.deliveryMode as 'EXPRESS' | 'LOCAL_NO_CASH' } : {}),
     };
     const result = await this.run(r, key, 'QUOTE', input, async (tx, userId) => {
-      this.gate();
+      const executionMode = await this.gate(tx, userId, input.deliveryMode ?? 'LOCAL_NO_CASH');
       const balance = await this.account(tx, userId),
         p = await this.reward(tx, input.rewardId);
       await metadataLocks(tx, [p.skuId]);
-      const snapshot = await this.snapshot(tx, userId, input, balance, p),
+      const snapshot = { ...(await this.snapshot(tx, userId, input, balance, p)), executionMode },
         now = await this.clock(tx);
       if ((await tx.redemptionQuote.count({ where: { userId, expiresAt: { gt: now } } })) >= 20)
         throw failure(429, 'QUOTE_LIMIT', '报价刷新过于频繁，请稍后再试');
@@ -307,7 +313,7 @@ export class RedemptionService {
     const b = fields(body, ['quoteId']),
       quoteId = uuid(b.quoteId);
     return this.run(r, key, 'CREATE', { quoteId }, async (tx, userId) => {
-      this.gate();
+      const executionMode = await this.gate(tx, userId, 'EXPRESS');
       const balance = await this.account(tx, userId);
       const quote = await tx.redemptionQuote.findFirst({ where: { id: quoteId, userId } });
       if (!quote) throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人兑换报价');
@@ -317,11 +323,14 @@ export class RedemptionService {
         throw failure(409, 'QUOTE_EXPIRED', '兑换报价已过期，请重新确认');
       const old = quote.snapshot as unknown as RedemptionSnapshot,
         p = await this.reward(tx, quote.rewardId);
+      await this.gate(tx, userId, old.deliveryMode);
+      if ((old.executionMode ?? 'DEVELOPMENT') !== executionMode)
+        throw failure(409, 'EXECUTION_MODE_CHANGED', '兑换模式已变化，请重新核验报价');
       // Before stock locks, hold address/range/catalogue shared locks in the cash-order order.
       await this.address(tx, userId, old);
       await metadataLocks(tx, [p.skuId]);
       await inventoryLocks(tx, this.warehouse(), [p.skuId]);
-      const fresh = await this.snapshot(tx, userId, old, balance, p);
+      const fresh = { ...(await this.snapshot(tx, userId, old, balance, p)), executionMode };
       const compare = (s: RedemptionSnapshot) =>
         JSON.stringify([
           s.rewardId,
@@ -367,6 +376,7 @@ export class RedemptionService {
           rewardVersion: p.version,
           addressPayload,
           deliveryMode: fresh.deliveryMode,
+          executionMode,
           createdAt: now,
         },
       });
@@ -596,6 +606,7 @@ export class RedemptionService {
             pointsPrice: o.pointsPrice.toString(),
             totalPoints: o.totalPoints.toString(),
             deliveryMode: snapshot.deliveryMode,
+            executionMode: o.executionMode as ExecutionMode,
             expressShipment: expressShipmentView(o.expressShipment),
             address: this.privateData.decrypt<RedemptionOrderAddress>(
               o.userId,
@@ -655,6 +666,7 @@ export class RedemptionService {
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
       expressShipment: expressShipmentView(row.expressShipment),
+      executionMode: row.executionMode,
       deliveryMode: row.deliveryMode as 'LOCAL_NO_CASH' | 'EXPRESS',
       deliveryReturnRecorded: !!row.pickingTask?.pack?.shipment?.returns.length,
       deliveryExceptionReported:

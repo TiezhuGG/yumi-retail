@@ -825,9 +825,11 @@ export interface RedemptionQuoteView {
     deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
     shippingFeeMode?: 'SENDER_PAID';
     shippingFeeCents?: number;
+    executionMode?: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
   };
 }
 export interface RedemptionOrderView {
+  executionMode?: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
   expressShipment?: RedemptionExpressShipmentView | null;
   deliveryMode?: 'LOCAL_NO_CASH' | 'EXPRESS';
   deliveryReturnRecorded?: boolean;
@@ -1027,6 +1029,7 @@ export interface RedemptionPrintPreview {
     pointsPrice: string;
     totalPoints: string;
     deliveryMode: 'LOCAL_NO_CASH' | 'EXPRESS';
+    executionMode?: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
     address: RedemptionOrderAddress;
     expressShipment?: RedemptionExpressShipmentView | null;
   }>;

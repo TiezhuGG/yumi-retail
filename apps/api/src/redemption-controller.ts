@@ -48,6 +48,7 @@ const snapshot = object(
     deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
     shippingFeeMode: { type: 'string', enum: ['SENDER_PAID'] },
     shippingFeeCents: { type: 'integer', enum: [0] },
+    executionMode: { type: 'string', enum: ['DEVELOPMENT', 'CONTROLLED', 'PRODUCTION'] },
   },
   [
     'rewardId',
@@ -88,6 +89,7 @@ const expressShipment = {
   nullable: true,
 };
 const orderProperties = {
+  executionMode: { type: 'string' as const, enum: ['DEVELOPMENT', 'CONTROLLED', 'PRODUCTION'] },
   expressShipment,
   deliveryMode: { type: 'string' as const, enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
   deliveryReturnRecorded: { type: 'boolean' as const },
@@ -341,6 +343,7 @@ export class AdminRedemptionController {
           pointsPrice: text,
           totalPoints: text,
           expressShipment,
+          executionMode: { type: 'string', enum: ['DEVELOPMENT', 'CONTROLLED', 'PRODUCTION'] },
           deliveryMode: { type: 'string', enum: ['LOCAL_NO_CASH', 'EXPRESS'] },
           address,
         }),

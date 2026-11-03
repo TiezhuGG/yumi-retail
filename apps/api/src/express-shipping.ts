@@ -1,3 +1,4 @@
+import type { PointsExpressGate } from './points-express-gate.js';
 import { expressShipmentInclude, expressShipmentView } from './express-shipment-view.js';
 import { randomUUID } from 'node:crypto';
 import {
@@ -20,6 +21,7 @@ export class ExpressShippingService {
     readonly catalog: CatalogService,
     readonly enabled = false,
     hex?: string,
+    readonly formalGate?: PointsExpressGate,
   ) {
     this.staff = new PointsGrantService(catalog);
     this.privateData = new OrderPrivateData(hex);
@@ -56,7 +58,9 @@ export class ExpressShippingService {
         address: this.privateData.decrypt<RedemptionOrderAddress>(o.userId, o.id, o.addressPayload),
         shipment: expressShipmentView(o.expressShipment),
         canCorrect:
-          this.enabled &&
+          (this.formalGate
+            ? this.formalGate.canOperate(o.executionMode, this.enabled)
+            : this.enabled) &&
           o.status === 'ACTIVE' &&
           o.outbox?.state === 'EXPRESS_SHIPPED' &&
           !!o.expressShipment,
@@ -85,8 +89,15 @@ export class ExpressShippingService {
                 })),
             ]
           : [],
-        enabled: this.enabled,
-        canShip: this.enabled && !o.expressShipment && !blockers.length,
+        enabled: this.formalGate
+          ? this.formalGate.canOperate(o.executionMode, this.enabled)
+          : this.enabled,
+        canShip:
+          (this.formalGate
+            ? this.formalGate.canOperate(o.executionMode, this.enabled)
+            : this.enabled) &&
+          !o.expressShipment &&
+          !blockers.length,
         blockers: [...new Set(blockers)],
       };
     });
@@ -144,10 +155,12 @@ export class ExpressShippingService {
       { version, ...values, reason, verified: true },
       async (tx) => {
         await this.staff.authorize(r, tx);
-        if (!this.enabled) throw failure(503, 'EXPRESS_SHIPPING_DISABLED', '快递作业暂未开放');
+        if (!this.formalGate && !this.enabled)
+          throw failure(503, 'EXPRESS_SHIPPING_DISABLED', '快递作业暂未开放');
         await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${id}::uuid FOR UPDATE`;
         const o = await this.source(tx, w, id),
           s = o.expressShipment;
+        this.formalGate?.assertOperate(o.executionMode, this.enabled);
         if (o.status !== 'ACTIVE' || o.outbox?.state !== 'EXPRESS_SHIPPED' || !s)
           throw failure(409, 'EXPRESS_SHIPMENT_REQUIRED', '仅已快递发货订单可更正运单资料');
         const latest = expressShipmentView(s)!;
@@ -217,8 +230,10 @@ export class ExpressShippingService {
       { version, carrierCode, carrierName, trackingNo, dispatchConfirmed: true },
       async (tx) => {
         await this.staff.authorize(r, tx);
-        if (!this.enabled) throw failure(503, 'EXPRESS_SHIPPING_DISABLED', '快递发货暂未开放');
+        if (!this.formalGate && !this.enabled)
+          throw failure(503, 'EXPRESS_SHIPPING_DISABLED', '快递发货暂未开放');
         const initial = await this.source(tx, w, id);
+        this.formalGate?.assertOperate(initial.executionMode, this.enabled);
         const wh = await tx.$queryRaw<
           Array<{ id: string }>
         >`SELECT id FROM warehouses WHERE id=${w}::uuid AND enabled FOR SHARE`;

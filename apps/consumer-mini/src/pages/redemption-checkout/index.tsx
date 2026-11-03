@@ -14,6 +14,11 @@ import type { Reward } from '../../rewards-api';
 import { orderSubmission, parseOrderIntent, OrderIntentRejection } from '../../order-intent';
 import { redemptionIntentKey } from '../../redemption-storage';
 export default function RedemptionCheckout() {
+  const [access, setAccess] = useState<{
+    executionMode: string;
+    canSubmit: boolean;
+    reason: string;
+  } | null>(null);
   const params = useRouter().params;
   const [identity, setIdentity] = useState<CartIdentity | null>(null),
     [policy, setPolicy] = useState<RedemptionExpressPolicy | null>(null),
@@ -36,6 +41,7 @@ export default function RedemptionCheckout() {
     const n = ++seq.current;
     setLoading(true);
     setIdentity(null);
+    setAccess(null);
     setBook(null);
     setReward(null);
     setPolicy(null);
@@ -50,15 +56,20 @@ export default function RedemptionCheckout() {
       setPending(!!original);
       if (original && original.userId !== who.profile.user.id)
         throw Error('有其他账号的兑换待核实，请恢复原账号处理。');
-      const [addresses, product, shippingPolicy] = await Promise.all([
+      const [addresses, product, shippingPolicy, accessInfo] = await Promise.all([
         addressRequest<ExpressAddressBook>(who, '/consumer/express-addresses'),
         request<Reward>('/rewards/' + encodeURIComponent(params.id ?? '')),
         request<RedemptionExpressPolicy>('/redemption-express-policy'),
+        addressRequest<{ executionMode: string; canSubmit: boolean; reason: string }>(
+          who,
+          '/consumer/redemption-access',
+        ),
       ]);
       if (n !== seq.current) return;
       setBook(addresses);
       setReward(product);
       setPolicy(shippingPolicy);
+      setAccess(accessInfo);
       setSelected(addresses.items.find((a) => a.isDefault && a.available)?.id ?? '');
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '兑换资料读取失败');
@@ -168,7 +179,12 @@ export default function RedemptionCheckout() {
             );
           } catch (e) {
             if (e instanceof AddressRequestError)
-              throw new OrderIntentRejection(e.status, e.message);
+              throw new OrderIntentRejection(
+                e.status,
+                e.code === 'EXPRESS_SUBMISSION_PAUSED'
+                  ? '新兑换已暂停，已受理订单仍可查询与处理'
+                  : e.message,
+              );
             throw e;
           }
         },
@@ -180,7 +196,7 @@ export default function RedemptionCheckout() {
     } catch (e) {
       if (n === seq.current) {
         setError(e instanceof Error ? e.message : '兑换结果尚未确认，请使用原请求核实');
-        setRejected(e instanceof OrderIntentRejection && [400, 404, 409].includes(e.status));
+        setRejected(e instanceof OrderIntentRejection && [400, 403, 404, 409].includes(e.status));
       }
     } finally {
       writing.current = false;
@@ -211,8 +227,16 @@ export default function RedemptionCheckout() {
       </View>
       <View className="account-content">
         <View className="reward-notice">
-          <Text>快递兑换开发验证。确认后扣除积分并预占商品，订单进入待快递发货。</Text>
-          <Text>寄送范围和运费以本次核验为准；当前未启用生产交易。</Text>
+          <Text>确认后扣除积分并预占商品，订单进入待快递发货。</Text>
+          <Text>
+            {access?.executionMode === 'CONTROLLED'
+              ? '受控测试，仅向指定账号开放；不代表生产验收通过。'
+              : access?.executionMode === 'PRODUCTION'
+                ? '寄送范围和运费以本次核验为准。'
+                : access
+                  ? '本地开发验证；当前未启用生产交易。'
+                  : '正在核实当前开放范围。'}
+          </Text>
         </View>
         {loading && <Text className="account-copy">正在读取兑换资料…</Text>}
         {error && (
@@ -290,9 +314,25 @@ export default function RedemptionCheckout() {
                 管理快递地址 →
               </Button>
             </View>
+            {access && (
+              <Text className="account-copy">
+                {access.executionMode === 'CONTROLLED'
+                  ? '受控测试兑换'
+                  : access.executionMode === 'PRODUCTION'
+                    ? '积分快递兑换'
+                    : '本地开发兑换'}{' '}
+                · {access.reason}
+              </Text>
+            )}
             <Button
               className="points-action"
-              disabled={busy || !reward.redemptionEnabled || !policy?.enabled || !selected}
+              disabled={
+                busy ||
+                !access?.canSubmit ||
+                !reward.redemptionEnabled ||
+                !policy?.enabled ||
+                !selected
+              }
               onClick={() => void makeQuote()}
             >
               {quoteUnknown ? '使用原请求重试报价' : '核验并生成兑换报价'}
