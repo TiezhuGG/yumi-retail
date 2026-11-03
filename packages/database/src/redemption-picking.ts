@@ -61,7 +61,12 @@ const sourceInclude = {
     include: {
       owner: { select: { displayName: true } },
       work: { orderBy: { version: 'asc' as const } },
-      pack: { include: { lines: true, shipment: true } },
+      pack: {
+        include: {
+          lines: true,
+          shipment: { include: { assignment: { include: { handoff: true } } } },
+        },
+      },
     },
   },
   reward: {

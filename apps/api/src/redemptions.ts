@@ -504,7 +504,13 @@ export class RedemptionService {
     row: Prisma.RedemptionOrderGetPayload<{
       include: {
         outbox: true;
-        pickingTask: { include: { pack: { include: { shipment: true } } } };
+        pickingTask: {
+          include: {
+            pack: {
+              include: { shipment: { include: { assignment: { include: { handoff: true } } } } };
+            };
+          };
+        };
       };
     }>,
     consumer: boolean,
@@ -526,21 +532,25 @@ export class RedemptionService {
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
-          : row.pickingTask?.pack?.shipment
-            ? 'SHIPPED_WAIT_HANDOFF'
-            : row.pickingTask?.pack
-              ? 'PACKED_WAIT_SHIP'
-              : row.pickingTask?.state === 'CHECKED'
-                ? 'PICKED_WAIT_PACK'
-                : row.pickingTask?.state === 'CLAIMED'
-                  ? 'PICKING'
-                  : row.pickingTask?.state === 'READY'
-                    ? 'READY_TO_PICK'
-                    : row.outbox?.state === 'FAILED'
-                      ? 'REVIEW_REQUIRED'
-                      : row.outbox
-                        ? 'PENDING'
-                        : 'MISSING',
+          : row.pickingTask?.pack?.shipment?.assignment?.handoff
+            ? 'RIDER_RECEIVED_WAIT_START'
+            : row.pickingTask?.pack?.shipment?.assignment
+              ? 'ASSIGNED_WAIT_HANDOFF'
+              : row.pickingTask?.pack?.shipment
+                ? 'SHIPPED_WAIT_HANDOFF'
+                : row.pickingTask?.pack
+                  ? 'PACKED_WAIT_SHIP'
+                  : row.pickingTask?.state === 'CHECKED'
+                    ? 'PICKED_WAIT_PACK'
+                    : row.pickingTask?.state === 'CLAIMED'
+                      ? 'PICKING'
+                      : row.pickingTask?.state === 'READY'
+                        ? 'READY_TO_PICK'
+                        : row.outbox?.state === 'FAILED'
+                          ? 'REVIEW_REQUIRED'
+                          : row.outbox
+                            ? 'PENDING'
+                            : 'MISSING',
       ...(consumer
         ? {
             address: this.privateData.decrypt<ConsumerOrderAddress>(
@@ -580,7 +590,13 @@ export class RedemptionService {
         take: 21,
         include: {
           outbox: true,
-          pickingTask: { include: { pack: { include: { shipment: true } } } },
+          pickingTask: {
+            include: {
+              pack: {
+                include: { shipment: { include: { assignment: { include: { handoff: true } } } } },
+              },
+            },
+          },
         },
       });
       if (id && !rows.length) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');
@@ -596,7 +612,13 @@ export class RedemptionService {
         where: { id, warehouseId },
         include: {
           outbox: true,
-          pickingTask: { include: { pack: { include: { shipment: true } } } },
+          pickingTask: {
+            include: {
+              pack: {
+                include: { shipment: { include: { assignment: { include: { handoff: true } } } } },
+              },
+            },
+          },
         },
       });
       if (!row) throw failure(404, 'REDEMPTION_NOT_FOUND', '未找到可访问的兑换单');

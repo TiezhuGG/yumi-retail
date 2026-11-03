@@ -105,19 +105,23 @@ export default function Redemptions() {
             <Text className="account-copy">
               {o.status === 'CANCELED'
                 ? '已取消 · 积分已退还'
-                : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                  ? '已出库，等待骑手接货；尚未开始配送。'
-                  : o.fulfillmentState === 'PACKED_WAIT_SHIP'
-                    ? '已打包，等待仓库出库；尚未配送。'
-                    : o.fulfillmentState === 'PICKED_WAIT_PACK'
-                      ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                      : o.fulfillmentState === 'PICKING'
-                        ? '仓库已领取'
-                        : o.fulfillmentState === 'READY_TO_PICK'
-                          ? '待仓库领取'
-                          : o.fulfillmentState === 'REVIEW_REQUIRED'
-                            ? '待门店核查'
-                            : '待创建拣货任务'}
+                : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                  ? '骑手已核对接货，等待开始配送。'
+                  : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                    ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                    : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                      ? '已出库，等待骑手接货；尚未开始配送。'
+                      : o.fulfillmentState === 'PACKED_WAIT_SHIP'
+                        ? '已打包，等待仓库出库；尚未配送。'
+                        : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                          ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                          : o.fulfillmentState === 'PICKING'
+                            ? '仓库已领取'
+                            : o.fulfillmentState === 'READY_TO_PICK'
+                              ? '待仓库领取'
+                              : o.fulfillmentState === 'REVIEW_REQUIRED'
+                                ? '待门店核查'
+                                : '待创建拣货任务'}
             </Text>
             <Button
               className="points-action"

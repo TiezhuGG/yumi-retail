@@ -107,25 +107,34 @@ export default function RedemptionDetail() {
               <Text className="account-copy">
                 {order.status === 'CANCELED'
                   ? '积分已退还，库存和限兑配额已释放。'
-                  : order.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                    ? '已出库，等待骑手接货；尚未开始配送。'
-                    : order.fulfillmentState === 'PACKED_WAIT_SHIP'
-                      ? '已打包，等待仓库出库；尚未配送。'
-                      : order.fulfillmentState === 'PICKED_WAIT_PACK'
-                        ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                        : order.fulfillmentState === 'PICKING'
-                          ? '仓库已领取，正在准备拣货；尚未出库或配送。'
-                          : order.fulfillmentState === 'READY_TO_PICK'
-                            ? '已创建拣货任务，等待仓库领取。'
-                            : order.fulfillmentState === 'REVIEW_REQUIRED'
-                              ? '履约待办需要门店核查，积分和预占仍保留。'
-                              : '已扣积分并预占库存，正在等待创建拣货任务。'}
+                  : order.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                    ? '骑手已核对接货，等待开始配送。'
+                    : order.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                      ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                      : order.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                        ? '已出库，等待骑手接货；尚未开始配送。'
+                        : order.fulfillmentState === 'PACKED_WAIT_SHIP'
+                          ? '已打包，等待仓库出库；尚未配送。'
+                          : order.fulfillmentState === 'PICKED_WAIT_PACK'
+                            ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                            : order.fulfillmentState === 'PICKING'
+                              ? '仓库已领取，正在准备拣货；尚未出库或配送。'
+                              : order.fulfillmentState === 'READY_TO_PICK'
+                                ? '已创建拣货任务，等待仓库领取。'
+                                : order.fulfillmentState === 'REVIEW_REQUIRED'
+                                  ? '履约待办需要门店核查，积分和预占仍保留。'
+                                  : '已扣积分并预占库存，正在等待创建拣货任务。'}
               </Text>
               <Text className="account-copy redemption-order-no">兑换单号：{order.orderNo}</Text>
             </View>
-            {['PICKING', 'PICKED_WAIT_PACK', 'PACKED_WAIT_SHIP', 'SHIPPED_WAIT_HANDOFF'].includes(
-              order.fulfillmentState,
-            ) && (
+            {[
+              'PICKING',
+              'PICKED_WAIT_PACK',
+              'PACKED_WAIT_SHIP',
+              'SHIPPED_WAIT_HANDOFF',
+              'ASSIGNED_WAIT_HANDOFF',
+              'RIDER_RECEIVED_WAIT_START',
+            ].includes(order.fulfillmentState) && (
               <View className="account-card">
                 <Text className="account-copy">
                   仓库已开始作业，暂不支持直接取消。如需停止履约，请联系门店核实。
@@ -145,9 +154,14 @@ export default function RedemptionDetail() {
               </View>
             )}
             {order.status === 'ACTIVE' &&
-              !['PICKING', 'PICKED_WAIT_PACK', 'PACKED_WAIT_SHIP', 'SHIPPED_WAIT_HANDOFF'].includes(
-                order.fulfillmentState,
-              ) && (
+              ![
+                'PICKING',
+                'PICKED_WAIT_PACK',
+                'PACKED_WAIT_SHIP',
+                'SHIPPED_WAIT_HANDOFF',
+                'ASSIGNED_WAIT_HANDOFF',
+                'RIDER_RECEIVED_WAIT_START',
+              ].includes(order.fulfillmentState) && (
                 <View className="account-card">
                   <Text className="account-copy">
                     仓库领取前可直接取消，退还全部积分并释放预占；领取和取消以服务端先完成的结果为准。

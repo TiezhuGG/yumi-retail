@@ -62,6 +62,8 @@ const orderProperties = {
       'PICKED_WAIT_PACK',
       'PACKED_WAIT_SHIP',
       'SHIPPED_WAIT_HANDOFF',
+      'ASSIGNED_WAIT_HANDOFF',
+      'RIDER_RECEIVED_WAIT_START',
       'REVIEW_REQUIRED',
     ],
   },

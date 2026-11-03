@@ -3114,3 +3114,25 @@ small {
     width: 100%;
   }
 }
+
+.redemption-delivery-panel .picking-allocation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.redemption-delivery-panel select {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid #dce6de;
+  border-radius: 8px;
+  background: white;
+}
+.delivery-state {
+  color: #008a42;
+  font-weight: 700;
+}
+@media (max-width: 680px) {
+  .redemption-delivery-panel .picking-allocation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

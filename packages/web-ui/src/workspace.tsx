@@ -1,3 +1,4 @@
+import { RedemptionDeliveryWorkbench } from './redemption-delivery.js';
 import { RedemptionPickingWorkbench } from './redemption-picking.js';
 import { RedemptionsWorkbench } from './redemptions.js';
 import { RewardsWorkbench } from './rewards.js';
@@ -23,6 +24,7 @@ import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 export type WorkspaceView =
+  | 'redemption-delivery'
   | 'redemption-picking'
   | 'redemptions'
   | 'rewards'
@@ -58,6 +60,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'redemption-delivery',
+    name: '兑换骑手交接',
+    glyph: '◇',
+    hint: '真实出库单分配与本人接货',
+    permission: 'redemption-delivery.read',
+  },
   {
     id: 'redemption-picking',
     name: '兑换拣货',
@@ -281,6 +290,7 @@ function WorkspaceSession({
   const mobileViews = new Set<WorkspaceView>(
     pickerOnly
       ? [
+          'redemption-delivery',
           'redemption-picking',
           'picking-readiness',
           'picking-lab',
@@ -289,6 +299,7 @@ function WorkspaceSession({
           'locations',
         ]
       : [
+          'redemption-delivery',
           'redemption-picking',
           'picking-readiness',
           'picking-lab',
@@ -338,6 +349,7 @@ function WorkspaceSession({
     }
   };
   const retainedViews: WorkspaceView[] = [
+    'redemption-delivery',
     'redemption-picking',
     'delivery-lab',
     'picking-lab',
@@ -448,7 +460,9 @@ function WorkspaceSession({
               className="retained-payment-view"
               data-payment-view={v}
             >
-              {v === 'redemption-picking' ? (
+              {v === 'redemption-delivery' ? (
+                <RedemptionDeliveryWorkbench profile={profile} />
+              ) : v === 'redemption-picking' ? (
                 <RedemptionPickingWorkbench profile={profile} />
               ) : v === 'delivery-lab' ? (
                 <DeliveryLabWorkbench profile={profile} />

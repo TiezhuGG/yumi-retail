@@ -848,6 +848,8 @@ export interface RedemptionOrderView {
     | 'PICKED_WAIT_PACK'
     | 'PACKED_WAIT_SHIP'
     | 'SHIPPED_WAIT_HANDOFF'
+    | 'ASSIGNED_WAIT_HANDOFF'
+    | 'RIDER_RECEIVED_WAIT_START'
     | 'REVIEW_REQUIRED';
   address?: ConsumerOrderAddress;
   allocations?: Array<{
@@ -900,7 +902,12 @@ export interface RedemptionPickingView {
       createdAt: string;
       lines: Array<{ allocationId: string; quantity: number }>;
     };
-    shipment: null | { id: string; actorId: string; createdAt: string };
+    shipment: null | {
+      id: string;
+      actorId: string;
+      createdAt: string;
+      deliveryState: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER';
+    };
   };
   work: { complete: boolean; canComplete: boolean };
   history: Array<{
@@ -925,5 +932,40 @@ export interface RedemptionPickingView {
 export interface RedemptionPickingPage {
   enabled: boolean;
   items: RedemptionPickingView[];
+  nextCursor: string | null;
+}
+
+export interface RedemptionDeliveryView {
+  id: string;
+  orderNo: string;
+  title: string;
+  spec: string;
+  quantity: number;
+  packageCount: number;
+  shippedAt: string;
+  state: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER';
+  assignment: null | {
+    id: string;
+    riderId: string;
+    riderName: string;
+    actorName: string;
+    createdAt: string;
+  };
+  handoff: null | { id: string; packageCount: number; createdAt: string };
+  readiness: { ready: boolean; blockers: string[] };
+  lines: Array<{
+    allocationId: string;
+    quantity: number;
+    batchNo: string;
+    locationName: string;
+    locationCode: string;
+    expiresAt: string | null;
+  }>;
+  address?: ConsumerOrderAddress;
+}
+export interface RedemptionDeliveryPage {
+  enabled: boolean;
+  selfOnly: boolean;
+  items: RedemptionDeliveryView[];
   nextCursor: string | null;
 }

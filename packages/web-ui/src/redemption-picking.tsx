@@ -449,7 +449,12 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
               </p>
               {detail.packing.shipment ? (
                 <div className="notice">
-                  已按原预占批次和库位完成出库，实物与预占已同步扣减。等待骑手接货，尚未开始配送。
+                  已按原预占批次和库位完成出库，实物与预占已同步扣减。
+                  {detail.packing.shipment.deliveryState === 'HANDED_OVER'
+                    ? '骑手已核对接货，等待开始配送。'
+                    : detail.packing.shipment.deliveryState === 'ASSIGNED'
+                      ? '已分配骑手，等待本人核对接货。'
+                      : '等待骑手接货，尚未开始配送。'}
                   <p>
                     出库时间：
                     {new Date(detail.packing.shipment.createdAt).toLocaleString('zh-CN', {

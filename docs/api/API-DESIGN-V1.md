@@ -795,3 +795,28 @@ OpenAPI 0.45.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption
 GET列表增加互斥status=PACKED/SHIPPED；CHECKED只筛拣货完成但尚未打包。列表/详情新增packing.canPack/canShip（阶段和源资格条件，不代替员工权限校验）、packing.pack（id、包裹数、执行人、时间及逐项件数）、packing.shipment（id、执行人、时间）。顶层state是事实派生PACKED/SHIPPED，task.state仍CHECKED表示原拣货完成事实；实际阶段以顶层state和packing读取。
 
 消费者及后台订单fulfillmentState增加PACKED_WAIT_SHIP、SHIPPED_WAIT_HANDOFF；出库后不声称开始配送。后台分配增加consumed布尔，released仍为取消释放，reserved沿用历史已预占凭据含义；显示优先consumed→released→预占中。出库后的当前待预占量按未消费分配计算，不错误要求已消费预占仍留在reserved。新旧客户端和服务端应匹配部署。
+
+
+## 2026-11-03 P4d真实兑换骑手分配与本人接货
+
+已出库的真实兑换单接入本仓负责人/仓管分配、被分配骑手精确核对包裹及原装包逐项件数后接货，本地验证见[P4d记录](../verification/P4D-REDEMPTION-DELIVERY-2026-11-03.md)。分配/接货为独立不可变事实，引用原shipment/pack/allocation；不再变库存、积分或配额，不接合成演练。骑手只读本人分配单；列表不返回顾客地址，授权详情才解密原订单地址，403/404等失权或范围变化清空旧详情。原分配人及骑手当前角色/仓库资格、货品效期和原出库完整性变化会阻断新交接；这些为保守开发校验，不等同于经营应急规则已确认。消费者与仓库页同步分配/已接货状态，明确尚未开始配送。沿用本机REDEMPTION_PICKING_DEV_ENABLED默认0及生产/远程拒启，业务主库、现有.env和生产未改，未进行真实人员实物交接。下一项P4e真实配送开始与送达；改派/撤权接续、异常处置、协调取消、售后与P5仍待交付，商城未上线。
+
+OpenAPI0.46.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-delivery`，id指原真实shipment.id，不能传合成演练任务或未出库order.id。
+
+|接口|请求/行为|
+|---|---|
+|GET /|cursor、status可选；status=UNASSIGNED/ASSIGNED/HANDED_OVER，默认全部；UUID升序20条，游标必须在当前状态和授权范围，跨范围409|
+|GET /:id|单条Page信封；授权详情才附address原订单地址快照，列表不包含address|
+|GET /riders|负责人/仓管读取有效本仓RIDER候选的id/displayName；非本仓、停用及无骑手角色者不列入|
+|POST /:id/assign|{riderId}；本仓SUPER_ADMIN/WAREHOUSE_MANAGER，原出库只分配一次，不提供改派|
+|POST /:id/accept|{assignmentId,packageCount,lines:[{allocationId,quantity}],physicalConfirmed:true}；仅有RIDER角色的被分配本人，逐项精确完整接货|
+
+新增权限redemption-delivery.read（负责人/仓管/骑手）、redemption-delivery.assign（负责人/仓管）、redemption-delivery.accept（骑手）；给骑手增加warehouse.read仅用于读取本人授权仓库列表，不授予拣货/库存明细权限。DISPATCHER、PICKER、骑手无管理分配权限；双角色员工按当前有效角色授权，接货仍必须本人被分配且有RIDER资格。
+
+员工Cookie、Origin/CSRF、Idempotency-Key，严格请求体/查询字段；包裹数1..100、最多1000个不同原分配、件数1..100000整数作为开发技术保护，数量必须与原pack全部匹配。接口不接受任意状态、员工姓名或顾客信息。分配和接货唯一事实充当阶段版本，接货必须绑定当前assignmentId；同员工/仓库/动作/出库单/原键返回历史结果，改体409，lines按allocationId排序规范化。失权或非本人范围不能重放。停止写开关后读取保留，写入及原写请求核实503，不自动换键。
+
+响应Page含enabled、selfOnly、items、nextCursor；每项含原兑换单号/商品/规格/件数、包裹数、出库时间、state、原批次库位/效期、assignment（id、骑手id/名称、分配人名称、时间）、handoff（id、包裹数、时间）及readiness。readiness.ready为阶段与当前源资格条件，不替代服务端操作权限；已接货后ready=false而历史事实仍保留。原分配人仅检查当前启用/管理角色/本仓授权，不要求其原登录会话一直在线。
+
+错误包括：403 FORBIDDEN；404 REDEMPTION_DELIVERY_NOT_FOUND（含非本人/错仓/未出库，不泄露资源是否存在）；409 CURSOR_INVALID、DELIVERY_PERSON_UNAVAILABLE、DELIVERY_ALREADY_ASSIGNED、ASSIGNMENT_CHANGED、DELIVERY_ALREADY_ACCEPTED、DELIVERY_BLOCKED、HANDOFF_QUANTITY_MISMATCH、IDEMPOTENCY_CONFLICT；400 VALIDATION_ERROR/PHYSICAL_CONFIRMATION_REQUIRED；503 REDEMPTION_DELIVERY_DISABLED/RETRYABLE_CONFLICT。未知网络/5xx保存原始输入和键，重载原键核实。401/403/404清除缓存的地址、详情及人员，避免范围改变后继续展示旧详情。
+
+消费者/后台订单增加ASSIGNED_WAIT_HANDOFF与RIDER_RECEIVED_WAIT_START；禁止显示已开始配送/送达或重新允许直接取消。仓库拣货详情packing.shipment增加deliveryState=UNASSIGNED/ASSIGNED/HANDED_OVER，避免已接货后仍提示等待接货。部署须同步API、Worker依赖客户端及三端。
