@@ -6,6 +6,7 @@ import { cartIdentity } from '../../account-cart';
 import { addressRequest, addressOperationKey } from '../../address-api';
 import { acknowledgeRedemption, redemptionCancelKey } from '../../redemption-storage';
 import { formatRedemptionAddress } from '../../redemption-address';
+import { RedemptionAfterSales } from '../../redemption-after-sales';
 export default function RedemptionDetail() {
   const id = useRouter().params.id;
   const [order, setOrder] = useState<RedemptionOrderView | null>(null),
@@ -198,6 +199,9 @@ export default function RedemptionDetail() {
                   复制运单号
                 </Button>
               </View>
+            )}
+            {order.deliveryMode === 'EXPRESS' && order.expressShipment && (
+              <RedemptionAfterSales key={order.id} orderId={order.id} />
             )}
             {order.address && (
               <View className="account-card">

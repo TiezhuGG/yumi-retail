@@ -1117,3 +1117,42 @@ export interface RedemptionExpressShippingView {
   canShip: boolean;
   blockers: string[];
 }
+
+export interface RedemptionAfterSalesView {
+  orderId: string;
+  orderNo: string;
+  title: string;
+  spec: string;
+  quantity: number;
+  enabled: boolean;
+  canSubmit: boolean;
+  ticket: null | {
+    id: string;
+    category: 'NOT_RECEIVED' | 'DAMAGED' | 'WRONG_ITEM' | 'OTHER';
+    status: 'OPEN' | 'PROCESSING' | 'CLOSED';
+    version: number;
+    createdAt: string;
+    updatedAt: string;
+    events: Array<{
+      version: number;
+      kind: string;
+      status: string;
+      message: string;
+      actor: 'CUSTOMER' | 'STORE';
+      staffName?: string;
+      createdAt: string;
+    }>;
+  };
+}
+export interface RedemptionAfterSalesPage {
+  items: Array<{
+    orderId: string;
+    orderNo: string;
+    title: string;
+    category: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  nextCursor: string | null;
+}

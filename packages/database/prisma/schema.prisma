@@ -1406,6 +1406,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ afterSales RedemptionAfterSales?
  expressShipment RedemptionExpressShipment?
  deliveryMode String @default("LOCAL_NO_CASH") @map("delivery_mode") @db.VarChar(20)
  pickingTask RedemptionPickingTask?
@@ -1845,4 +1846,36 @@ model RedemptionExpressShipmentCorrection {
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([shipmentId,version])
  @@map("redemption_express_shipment_corrections")
+}
+
+model RedemptionAfterSales {
+ id String @id @db.Uuid
+ orderId String @unique @map("order_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ category String @db.VarChar(24)
+ status String @default("OPEN") @db.VarChar(20)
+ version Int @default(0)
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ updatedAt DateTime @default(dbgenerated("clock_timestamp()")) @map("updated_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events RedemptionAfterSalesEvent[]
+ @@index([warehouseId,status,id])
+ @@map("redemption_after_sales")
+}
+model RedemptionAfterSalesEvent {
+ id String @id @db.Uuid
+ caseId String @map("case_id") @db.Uuid
+ version Int
+ kind String @db.VarChar(24)
+ status String @db.VarChar(20)
+ messagePayload String @map("message_payload")
+ consumerId String? @map("consumer_id") @db.Uuid
+ staffId String? @map("staff_id") @db.Uuid
+ staffName String? @map("staff_name") @db.VarChar(80)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ case RedemptionAfterSales @relation(fields:[caseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([caseId,version])
+ @@map("redemption_after_sales_events")
 }

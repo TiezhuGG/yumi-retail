@@ -184,7 +184,11 @@
     "pretest:express-corrections": "npm run build:server",
     "test:express-corrections": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-express-corrections.integration.test.ts",
     "preverify:express-corrections:ui": "npm run build:server",
-    "verify:express-corrections:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-corrections.mjs"
+    "verify:express-corrections:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-corrections.mjs",
+    "pretest:after-sales": "npm run build:server",
+    "test:after-sales": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-after-sales.integration.test.ts",
+    "preverify:after-sales:ui": "npm run build:server",
+    "verify:after-sales:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-after-sales.mjs"
   },
   "pnpm": {
     "overrides": {

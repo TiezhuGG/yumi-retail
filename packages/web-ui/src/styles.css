@@ -3277,3 +3277,38 @@ small {
 .express-shipping-form > p {
   grid-column: 1 / -1;
 }
+.after-sales-message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.after-sales-timeline {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0;
+}
+.after-sales-form > h3,
+.after-sales-form > p,
+.after-sales-form > label {
+  grid-column: 1 / -1;
+}
+.after-sales-form .express-dispatch-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.after-sales-form .express-dispatch-confirm input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  margin: 2px 0 0;
+}
+.after-sales-form textarea {
+  min-height: 120px;
+}
+.after-sales-form h3 {
+  margin-bottom: 0;
+}
+.after-sales-table {
+  overflow-x: auto;
+}
