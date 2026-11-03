@@ -64,7 +64,9 @@ const sourceInclude = {
       pack: {
         include: {
           lines: true,
-          shipment: { include: { assignment: { include: { handoff: true } } } },
+          shipment: {
+            include: { assignment: { include: { handoff: { include: { journey: true } } } } },
+          },
         },
       },
     },

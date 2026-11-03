@@ -150,7 +150,9 @@
     "pretest:redemption-picking": "npm run build:server",
     "test:redemption-picking": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-picking.integration.test.ts",
     "preverify:redemption-picking:ui": "npm run build:server",
-    "verify:redemption-picking:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-picking.mjs"
+    "verify:redemption-picking:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-picking.mjs",
+    "pretest:redemption-journey": "npm run build:server",
+    "test:redemption-journey": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-journey.integration.test.ts"
   },
   "pnpm": {
     "overrides": {

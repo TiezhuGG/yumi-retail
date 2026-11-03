@@ -89,7 +89,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   async function shot(name, p = page) {
-    const path = `docs/verification/UI-REDEMPTION-DELIVERY-${name}-2026-11-03.png`;
+    const path = `docs/verification/UI-REDEMPTION-JOURNEY-${name}-2026-11-03.png`;
     if (!name.startsWith('MINI-'))
       await p.evaluate(() => {
         window.scrollTo(0, 0);
@@ -285,6 +285,56 @@ try {
   await shot('RIDER-LOADING', ops);
   release();
   await ops.getByRole('status').waitFor({ state: 'hidden' });
+  await ops.unroute('**/redemption-delivery/' + shipment.id);
+  for (const [action, label, check, state, copy] of [
+    ['start', '确认开始配送', '已携带本单全部包裹，确认实际出发配送', '骑手配送中', '骑手配送中。'],
+    [
+      'complete',
+      '确认全部送达',
+      '已按原收货地址将全部包裹交付收货人',
+      '骑手已确认送达',
+      '骑手已确认送达。',
+    ],
+  ]) {
+    assert.equal(await ops.getByRole('button', { name: label, exact: true }).isEnabled(), false);
+    await shot('RIDER-' + action.toUpperCase() + '-UNCONFIRMED', ops);
+    await ops.getByLabel(check, { exact: true }).check();
+    await shot('RIDER-' + action.toUpperCase() + '-FORM', ops);
+    let drop = true;
+    await ops.route('**/redemption-delivery/*/' + action, async (route) => {
+      if (drop) {
+        drop = false;
+        await route.fetch();
+        await route.abort();
+      } else await route.continue();
+    });
+    await ops.getByRole('button', { name: label, exact: true }).click();
+    await ops.getByRole('alert').waitFor();
+    await shot('RIDER-' + action.toUpperCase() + '-UNKNOWN', ops);
+    await ops.reload();
+    await ops
+      .getByRole('button', {
+        name: '使用原请求核实' + (action === 'start' ? '开始配送' : '送达'),
+        exact: true,
+      })
+      .click();
+    await ops.locator('.delivery-state').filter({ hasText: state }).waitFor();
+    await ops.getByText('出库与交接记录', { exact: true }).click();
+    await shot('RIDER-' + action.toUpperCase() + '-RECOVERED', ops);
+    await page.getByRole('button', { name: '刷新交接', exact: true }).click();
+    await page.locator('.delivery-state').filter({ hasText: state }).waitFor();
+    await shot('ADMIN-' + action.toUpperCase());
+    await mini.reload();
+    await mini.getByText(copy, { exact: true }).waitFor();
+    assert.equal(
+      await mini.getByRole('button', { name: '取消兑换并退还 120 积分', exact: true }).count(),
+      0,
+    );
+    await shot('MINI-' + action.toUpperCase(), mini);
+    await otherPage.getByRole('button', { name: '刷新交接', exact: true }).click();
+    await otherPage.getByText('暂无匹配的兑换交接单', { exact: true }).waitFor();
+  }
+  assert.equal(await f.runtime.db.redemptionJourneyFact.count(), 2);
   // A manager who becomes rider-only loses access to this other rider's private detail.
   const admin = await f.runtime.db.staff.findFirstOrThrow({ where: { loginName: 'points-ui' } });
   await f.runtime.db.staffRole.deleteMany({ where: { staffId: admin.id } });

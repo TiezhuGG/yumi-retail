@@ -16,7 +16,7 @@ import { failure, success, type ApiRequest } from './http.js';
 import { object, text, ApiResult } from './api-result.js';
 type Tx = Prisma.TransactionClient;
 const include = {
-  assignment: { include: { handoff: { include: { lines: true } } } },
+  assignment: { include: { handoff: { include: { lines: true, journey: true } } } },
   pack: { include: { task: true, lines: true } },
 } as const;
 export class RedemptionDeliveryService {
@@ -66,7 +66,9 @@ export class RedemptionDeliveryService {
     detail = false,
   ): Promise<RedemptionDeliveryView> {
     const { sh, o, blockers } = await this.source(tx, w, id, self),
-      a = sh.assignment;
+      a = sh.assignment,
+      start = a?.handoff?.journey.find((f) => f.kind === 'START'),
+      completion = a?.handoff?.journey.find((f) => f.kind === 'COMPLETE');
     if (
       o.status !== 'ACTIVE' ||
       o.pickingTask?.state !== 'CHECKED' ||
@@ -85,7 +87,23 @@ export class RedemptionDeliveryService {
       quantity: o.quantity,
       packageCount: sh.pack.packageCount,
       shippedAt: sh.createdAt.toISOString(),
-      state: a?.handoff ? 'HANDED_OVER' : a ? 'ASSIGNED' : 'UNASSIGNED',
+      state: completion
+        ? 'DELIVERED'
+        : start
+          ? 'DELIVERING'
+          : a?.handoff
+            ? 'HANDED_OVER'
+            : a
+              ? 'ASSIGNED'
+              : 'UNASSIGNED',
+      journey: {
+        start: start ? { id: start.id, createdAt: start.createdAt.toISOString() } : null,
+        completion: completion
+          ? { id: completion.id, createdAt: completion.createdAt.toISOString() }
+          : null,
+      },
+      canStart: !blockers.length && !!a?.handoff && !start,
+      canComplete: !blockers.length && !!start && !completion,
       assignment: a
         ? {
             id: a.id,
@@ -129,7 +147,10 @@ export class RedemptionDeliveryService {
     const q = fields(input, ['cursor', 'status']),
       cursor = q.cursor === undefined ? null : uuid(q.cursor),
       status = q.status === undefined ? '' : str(q.status, 20);
-    if (status && !['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER'].includes(status))
+    if (
+      status &&
+      !['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'].includes(status)
+    )
       throw failure(400, 'VALIDATION_ERROR', '交接状态筛选无效');
     return this.catalog.db.$transaction(
       async (tx) => {
@@ -144,7 +165,19 @@ export class RedemptionDeliveryService {
               ? {
                   assignment: {
                     ...(self ? { riderId: self } : {}),
-                    handoff: status === 'ASSIGNED' ? null : { isNot: null },
+                    handoff:
+                      status === 'ASSIGNED'
+                        ? null
+                        : {
+                            is: {
+                              journey:
+                                status === 'HANDED_OVER'
+                                  ? { none: { kind: 'START' } }
+                                  : status === 'DELIVERING'
+                                    ? { some: { kind: 'START' }, none: { kind: 'COMPLETE' } }
+                                    : { some: { kind: 'COMPLETE' } },
+                            },
+                          },
                   },
                 }
               : {}),
@@ -195,6 +228,88 @@ export class RedemptionDeliveryService {
       };
     });
   }
+  async progress(
+    r: ApiRequest,
+    w: string,
+    id: string,
+    action: 'start' | 'complete',
+    k: string,
+    input: unknown,
+  ) {
+    const b = fields(
+      input,
+      action === 'start' ? ['handoffId', 'departureConfirmed'] : ['startId', 'deliveryConfirmed'],
+    );
+    const sourceId = uuid(action === 'start' ? b.handoffId : b.startId),
+      riderId = r.staffContext!.staffId;
+    if ((action === 'start' ? b.departureConfirmed : b.deliveryConfirmed) !== true)
+      throw failure(
+        400,
+        'PHYSICAL_CONFIRMATION_REQUIRED',
+        '须由骑手本人确认实际出发或全部包裹已交付原收货人',
+      );
+    await this.authorize(this.catalog.db, r, w);
+    if (!(await this.person(this.catalog.db, riderId, w)))
+      throw failure(403, 'FORBIDDEN', '仅当前有效骑手本人可操作');
+    await this.source(this.catalog.db, w, id, riderId);
+    if (!this.enabled) throw failure(503, 'REDEMPTION_DELIVERY_DISABLED', '兑换配送写入尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_DELIVERY_' + action,
+      w + ':' + id,
+      k,
+      { sourceId, confirmed: true },
+      async (tx) => {
+        await this.authorize(tx, r, w);
+        const initial = await this.source(tx, w, id, riderId);
+        if (
+          !(await this.person(tx, riderId, w)) ||
+          !(await this.person(tx, initial.sh.assignment!.actorId, w, true))
+        )
+          throw failure(409, 'DELIVERY_PERSON_UNAVAILABLE', '骑手或原分配人权限已变化，请核查');
+        await metadataLocks(tx, [initial.o.skuId]);
+        await inventoryLocks(tx, w, [initial.o.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_shipments WHERE id=${id}::uuid FOR UPDATE`;
+        const { sh } = await this.source(tx, w, id, riderId),
+          v = await this.view(tx, w, id, riderId);
+        const h = sh.assignment?.handoff;
+        if (!h || (action === 'complete' && !v.journey.start))
+          throw failure(409, 'JOURNEY_SEQUENCE_REQUIRED', '须先由本人接货并按顺序开始配送');
+        if (sourceId !== (action === 'start' ? h.id : v.journey.start!.id))
+          throw failure(409, 'JOURNEY_SOURCE_CHANGED', '请刷新并使用本单原阶段凭据');
+        if (action === 'start' ? !!v.journey.start : !!v.journey.completion)
+          throw failure(409, 'JOURNEY_ALREADY_RECORDED', '本阶段已记录，请查看配送记录');
+        if (v.readiness.blockers.length)
+          throw failure(409, 'DELIVERY_BLOCKED', '原出库或人员资格变化，请先核查');
+        await tx.redemptionJourneyFact.create({
+          data: {
+            id: randomUUID(),
+            handoffId: h.id,
+            orderId: sh.orderId,
+            kind: action === 'start' ? 'START' : 'COMPLETE',
+            startId: action === 'complete' ? sourceId : null,
+            actorId: riderId,
+            requestId: r.requestId,
+          },
+        });
+        await this.catalog.audit(
+          tx,
+          r,
+          'REDEMPTION_DELIVERY_' + action.toUpperCase(),
+          sh.orderId,
+          w,
+        );
+        await this.authorize(tx, r, w);
+        const final = await this.view(tx, w, id, riderId);
+        if (final.readiness.blockers.length)
+          throw failure(409, 'DELIVERY_BLOCKED', '处理期间效期或配送人员资格失效，本次操作回滚');
+        return { id };
+      },
+    );
+  }
+
   async write(
     r: ApiRequest,
     w: string,
@@ -337,12 +452,21 @@ const task = object(
     quantity: n,
     packageCount: n,
     shippedAt: text,
-    state: { type: 'string', enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER'] },
+    state: {
+      type: 'string',
+      enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'],
+    },
     assignment: {
       ...object({ id: text, riderId: text, riderName: text, actorName: text, createdAt: text }),
       nullable: true,
     },
     handoff: { ...object({ id: text, packageCount: n, createdAt: text }), nullable: true },
+    journey: object({
+      start: { ...object({ id: text, createdAt: text }), nullable: true },
+      completion: { ...object({ id: text, createdAt: text }), nullable: true },
+    }),
+    canStart: { type: 'boolean' },
+    canComplete: { type: 'boolean' },
     readiness: object({ ready: { type: 'boolean' }, blockers: { type: 'array', items: text } }),
     lines: {
       type: 'array',
@@ -380,6 +504,9 @@ const task = object(
     'state',
     'assignment',
     'handoff',
+    'journey',
+    'canStart',
+    'canComplete',
     'readiness',
     'lines',
   ],
@@ -390,7 +517,7 @@ const page = object({
   items: { type: 'array', items: task },
   nextCursor: nullable,
 });
-@ApiTags('真实兑换骑手分配与接货')
+@ApiTags('真实兑换骑手交接与配送')
 @ApiCookieAuth('staffSession')
 @Controller('warehouse/warehouses/:warehouseId/redemption-delivery')
 export class RedemptionDeliveryController {
@@ -398,7 +525,11 @@ export class RedemptionDeliveryController {
   @Get()
   @Permissions('redemption-delivery.read')
   @ApiQuery({ name: 'cursor', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'],
+  })
   @ApiResult(page, [400, 401, 403, 409, 500])
   async list(@Req() r: ApiRequest, @Param('warehouseId') w: string, @Query() q: unknown) {
     return success(r, await this.service.read(r, uuid(w), q));
@@ -470,5 +601,44 @@ export class RedemptionDeliveryController {
   ) {
     fields(q, []);
     return success(r, await this.service.write(r, uuid(w), uuid(id), 'accept', key(r), b));
+  }
+  @Post(':id/start')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.work')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({ handoffId: text, departureConfirmed: { type: 'boolean', enum: [true] } }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async start(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.progress(r, uuid(w), uuid(id), 'start', key(r), b));
+  }
+
+  @Post(':id/complete')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.work')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({ startId: text, deliveryConfirmed: { type: 'boolean', enum: [true] } }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async complete(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.progress(r, uuid(w), uuid(id), 'complete', key(r), b));
   }
 }

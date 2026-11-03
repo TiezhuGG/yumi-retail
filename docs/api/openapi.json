@@ -501,7 +501,9 @@
                                         "enum": [
                                           "UNASSIGNED",
                                           "ASSIGNED",
-                                          "HANDED_OVER"
+                                          "HANDED_OVER",
+                                          "DELIVERING",
+                                          "DELIVERED"
                                         ]
                                       }
                                     },
@@ -1106,7 +1108,9 @@
                                         "enum": [
                                           "UNASSIGNED",
                                           "ASSIGNED",
-                                          "HANDED_OVER"
+                                          "HANDED_OVER",
+                                          "DELIVERING",
+                                          "DELIVERED"
                                         ]
                                       }
                                     },
@@ -4438,7 +4442,9 @@
               "enum": [
                 "UNASSIGNED",
                 "ASSIGNED",
-                "HANDED_OVER"
+                "HANDED_OVER",
+                "DELIVERING",
+                "DELIVERED"
               ],
               "type": "string"
             }
@@ -4492,6 +4498,9 @@
                               "state",
                               "assignment",
                               "handoff",
+                              "journey",
+                              "canStart",
+                              "canComplete",
                               "readiness",
                               "lines"
                             ],
@@ -4524,7 +4533,9 @@
                                 "enum": [
                                   "UNASSIGNED",
                                   "ASSIGNED",
-                                  "HANDED_OVER"
+                                  "HANDED_OVER",
+                                  "DELIVERING",
+                                  "DELIVERED"
                                 ]
                               },
                               "assignment": {
@@ -4577,6 +4588,56 @@
                                 },
                                 "additionalProperties": false,
                                 "nullable": true
+                              },
+                              "journey": {
+                                "type": "object",
+                                "required": [
+                                  "start",
+                                  "completion"
+                                ],
+                                "properties": {
+                                  "start": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  },
+                                  "completion": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "canStart": {
+                                "type": "boolean"
+                              },
+                              "canComplete": {
+                                "type": "boolean"
                               },
                               "readiness": {
                                 "type": "object",
@@ -4888,7 +4949,7 @@
           }
         ],
         "tags": [
-          "真实兑换骑手分配与接货"
+          "真实兑换骑手交接与配送"
         ]
       }
     },
@@ -5110,7 +5171,7 @@
           }
         ],
         "tags": [
-          "真实兑换骑手分配与接货"
+          "真实兑换骑手交接与配送"
         ]
       }
     },
@@ -5177,6 +5238,9 @@
                               "state",
                               "assignment",
                               "handoff",
+                              "journey",
+                              "canStart",
+                              "canComplete",
                               "readiness",
                               "lines"
                             ],
@@ -5209,7 +5273,9 @@
                                 "enum": [
                                   "UNASSIGNED",
                                   "ASSIGNED",
-                                  "HANDED_OVER"
+                                  "HANDED_OVER",
+                                  "DELIVERING",
+                                  "DELIVERED"
                                 ]
                               },
                               "assignment": {
@@ -5262,6 +5328,56 @@
                                 },
                                 "additionalProperties": false,
                                 "nullable": true
+                              },
+                              "journey": {
+                                "type": "object",
+                                "required": [
+                                  "start",
+                                  "completion"
+                                ],
+                                "properties": {
+                                  "start": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  },
+                                  "completion": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "additionalProperties": false,
+                                    "nullable": true
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "canStart": {
+                                "type": "boolean"
+                              },
+                              "canComplete": {
+                                "type": "boolean"
                               },
                               "readiness": {
                                 "type": "object",
@@ -5573,7 +5689,7 @@
           }
         ],
         "tags": [
-          "真实兑换骑手分配与接货"
+          "真实兑换骑手交接与配送"
         ]
       }
     },
@@ -5933,7 +6049,7 @@
           }
         ],
         "tags": [
-          "真实兑换骑手分配与接货"
+          "真实兑换骑手交接与配送"
         ]
       }
     },
@@ -6330,7 +6446,741 @@
           }
         ],
         "tags": [
-          "真实兑换骑手分配与接货"
+          "真实兑换骑手交接与配送"
+        ]
+      }
+    },
+    "/api/v1/warehouse/warehouses/{warehouseId}/redemption-delivery/{id}/start": {
+      "post": {
+        "operationId": "RedemptionDeliveryController_start",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "handoffId",
+                  "departureConfirmed"
+                ],
+                "properties": {
+                  "handoffId": {
+                    "type": "string"
+                  },
+                  "departureConfirmed": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "真实兑换骑手交接与配送"
+        ]
+      }
+    },
+    "/api/v1/warehouse/warehouses/{warehouseId}/redemption-delivery/{id}/complete": {
+      "post": {
+        "operationId": "RedemptionDeliveryController_complete",
+        "parameters": [
+          {
+            "name": "warehouseId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "startId",
+                  "deliveryConfirmed"
+                ],
+                "properties": {
+                  "startId": {
+                    "type": "string"
+                  },
+                  "deliveryConfirmed": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "真实兑换骑手交接与配送"
         ]
       }
     },
@@ -7753,6 +8603,8 @@
                                   "SHIPPED_WAIT_HANDOFF",
                                   "ASSIGNED_WAIT_HANDOFF",
                                   "RIDER_RECEIVED_WAIT_START",
+                                  "DELIVERING",
+                                  "DELIVERED",
                                   "REVIEW_REQUIRED"
                                 ]
                               },
@@ -8228,6 +9080,8 @@
                             "SHIPPED_WAIT_HANDOFF",
                             "ASSIGNED_WAIT_HANDOFF",
                             "RIDER_RECEIVED_WAIT_START",
+                            "DELIVERING",
+                            "DELIVERED",
                             "REVIEW_REQUIRED"
                           ]
                         },
@@ -9077,6 +9931,8 @@
                                   "SHIPPED_WAIT_HANDOFF",
                                   "ASSIGNED_WAIT_HANDOFF",
                                   "RIDER_RECEIVED_WAIT_START",
+                                  "DELIVERING",
+                                  "DELIVERED",
                                   "REVIEW_REQUIRED"
                                 ]
                               }
@@ -9513,6 +10369,8 @@
                             "SHIPPED_WAIT_HANDOFF",
                             "ASSIGNED_WAIT_HANDOFF",
                             "RIDER_RECEIVED_WAIT_START",
+                            "DELIVERING",
+                            "DELIVERED",
                             "REVIEW_REQUIRED"
                           ]
                         },
@@ -73433,7 +74291,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、本机开发消费者会话、账号购物车与游客幂等合并、服务范围与本人收货地址、结算核验及报价、商品收货、库位移位、库存核对、实物盘点、隔离报损及收货逆向纠错；本机开发订单与预占、后台订单只读查询已实现；微信登录与支付未实现。",
-    "version": "0.46.0",
+    "version": "0.47.0",
     "contact": {}
   },
   "tags": [],

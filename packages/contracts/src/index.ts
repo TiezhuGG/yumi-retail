@@ -850,6 +850,8 @@ export interface RedemptionOrderView {
     | 'SHIPPED_WAIT_HANDOFF'
     | 'ASSIGNED_WAIT_HANDOFF'
     | 'RIDER_RECEIVED_WAIT_START'
+    | 'DELIVERING'
+    | 'DELIVERED'
     | 'REVIEW_REQUIRED';
   address?: ConsumerOrderAddress;
   allocations?: Array<{
@@ -906,7 +908,7 @@ export interface RedemptionPickingView {
       id: string;
       actorId: string;
       createdAt: string;
-      deliveryState: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER';
+      deliveryState: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER' | 'DELIVERING' | 'DELIVERED';
     };
   };
   work: { complete: boolean; canComplete: boolean };
@@ -943,7 +945,7 @@ export interface RedemptionDeliveryView {
   quantity: number;
   packageCount: number;
   shippedAt: string;
-  state: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER';
+  state: 'UNASSIGNED' | 'ASSIGNED' | 'HANDED_OVER' | 'DELIVERING' | 'DELIVERED';
   assignment: null | {
     id: string;
     riderId: string;
@@ -952,6 +954,12 @@ export interface RedemptionDeliveryView {
     createdAt: string;
   };
   handoff: null | { id: string; packageCount: number; createdAt: string };
+  journey: {
+    start: null | { id: string; createdAt: string };
+    completion: null | { id: string; createdAt: string };
+  };
+  canStart: boolean;
+  canComplete: boolean;
   readiness: { ready: boolean; blockers: string[] };
   lines: Array<{
     allocationId: string;

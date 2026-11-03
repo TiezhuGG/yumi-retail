@@ -820,3 +820,19 @@ OpenAPI0.46.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-
 错误包括：403 FORBIDDEN；404 REDEMPTION_DELIVERY_NOT_FOUND（含非本人/错仓/未出库，不泄露资源是否存在）；409 CURSOR_INVALID、DELIVERY_PERSON_UNAVAILABLE、DELIVERY_ALREADY_ASSIGNED、ASSIGNMENT_CHANGED、DELIVERY_ALREADY_ACCEPTED、DELIVERY_BLOCKED、HANDOFF_QUANTITY_MISMATCH、IDEMPOTENCY_CONFLICT；400 VALIDATION_ERROR/PHYSICAL_CONFIRMATION_REQUIRED；503 REDEMPTION_DELIVERY_DISABLED/RETRYABLE_CONFLICT。未知网络/5xx保存原始输入和键，重载原键核实。401/403/404清除缓存的地址、详情及人员，避免范围改变后继续展示旧详情。
 
 消费者/后台订单增加ASSIGNED_WAIT_HANDOFF与RIDER_RECEIVED_WAIT_START；禁止显示已开始配送/送达或重新允许直接取消。仓库拣货详情packing.shipment增加deliveryState=UNASSIGNED/ASSIGNED/HANDED_OVER，避免已接货后仍提示等待接货。部署须同步API、Worker依赖客户端及三端。
+
+
+## 2026-11-03 P4e兑换配送开始与送达声明（OpenAPI 0.47.0）
+
+沿用真实兑换交接基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-delivery`，id是原shipment.id；不复用合成delivery_lab。新增RIDER独有`redemption-delivery.work`权限，必须是本仓当前有效且被分配的骑手本人。管理角色不能代操作；双角色也须满足当前RIDER和本人归属。Cookie、Origin/CSRF、Idempotency-Key及严格字段校验不变。
+
+| 动作 | 请求 | 验收语义 |
+|---|---|---|
+| POST `/:id/start` | `{handoffId, departureConfirmed:true}` | 绑定本单本人原接货，实际携全部包裹出发；只可追加一次START |
+| POST `/:id/complete` | `{startId, deliveryConfirmed:true}` | 绑定本单本人原START，声明全部包裹交付原地址收货人；只可追加一次COMPLETE |
+
+成功返回`{id:shipmentId}`。400 PHYSICAL_CONFIRMATION_REQUIRED/VALIDATION_ERROR，403当前权限失效/管理代操作，404非本人/错仓/无原出库，409 JOURNEY_SEQUENCE_REQUIRED未完成前序、JOURNEY_SOURCE_CHANGED原凭据不匹配、JOURNEY_ALREADY_RECORDED阶段重复、DELIVERY_PERSON_UNAVAILABLE人员资格变化、DELIVERY_BLOCKED当前来源/效期/冻结变化、IDEMPOTENCY_CONFLICT同键变参；默认关闭503 REDEMPTION_DELIVERY_DISABLED。请求失败不自动退分或释放/回库。事实、审计与幂等结果同事务，末尾真实时钟复查会话和效期，晚失败全回滚。已提交同键重放仍核验当前授权与本人资源，不因失权返回历史结果。
+
+列表/详情新增`journey:{start:{id,createdAt}|null,completion:{id,createdAt}|null}`、`canStart`和`canComplete`。readiness.ready仍只表示分配/接货资格，保留既有语义；readiness.blockers给出当前源资格告警，不覆盖历史阶段。state及status筛选新增DELIVERING、DELIVERED；HANDED_OVER仅接货且尚无START，DELIVERING有START无COMPLETE，DELIVERED有COMPLETE，五种状态互斥。20条UUID升序、游标本筛选及本仓/本人归属限制不变；列表仍不含地址，只有授权详情才解密原快照。
+
+消费者/后台兑换订单fulfillmentState新增DELIVERING/DELIVERED，仓库出库凭据deliveryState同步。DELIVERED仅表示骑手确认送达，不代表收货人独立确认。兑换主status不增加COMPLETED，仍ACTIVE用于累计有效额度，后续完整结案/售后另交付。所有已开始履约阶段继续禁止消费者直接取消。新旧端须协同部署，旧枚举客户端不得误报等待出库或开放取消。详见[P4e验证](../verification/P4E-REDEMPTION-JOURNEY-2026-11-03.md)。

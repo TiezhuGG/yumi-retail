@@ -10,6 +10,8 @@ const states = {
   UNASSIGNED: '已出库 · 待分配骑手',
   ASSIGNED: '已分配 · 待骑手接货',
   HANDED_OVER: '骑手已接货 · 待开始配送',
+  DELIVERING: '骑手配送中',
+  DELIVERED: '骑手已确认送达',
 };
 const blockers: Record<string, string> = {
   WAREHOUSE_PAUSED: '仓库已暂停',
@@ -27,7 +29,7 @@ const blockers: Record<string, string> = {
 };
 type Intent = {
   id: string;
-  action: 'assign' | 'accept';
+  action: 'assign' | 'accept' | 'start' | 'complete';
   key: string;
   body: Record<string, unknown>;
 };
@@ -62,7 +64,7 @@ export function RedemptionDeliveryWorkbench({ profile }: { profile: StaffProfile
   return (
     <section aria-label="兑换骑手交接">
       <div className="notice">
-        来自已完成实物出库的兑换单。管理人员分配本仓骑手，被分配骑手核对包裹和逐项件数后接货；接货不代表已开始配送。
+        来自已完成实物出库的兑换单。管理人员分配本仓骑手，被分配骑手核对包裹和逐项件数后接货；接货后由本人开始配送、交付全部包裹后确认送达。
       </div>
       {loading && <p role="status">正在读取交接仓库…</p>}
       {error && (
@@ -118,7 +120,7 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['assign', 'accept'].includes(v.action) ||
+      !['assign', 'accept', 'start', 'complete'].includes(v.action) ||
       !v.body ||
       typeof v.body !== 'object' ||
       Array.isArray(v.body)
@@ -334,7 +336,10 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             >
               {busy
                 ? '正在核实…'
-                : '使用原请求核实' + (intent.action === 'assign' ? '分配' : '接货')}
+                : '使用原请求核实' +
+                  { assign: '分配', accept: '接货', start: '开始配送', complete: '送达' }[
+                    intent.action
+                  ]}
             </button>
           ) : (
             <>
@@ -370,13 +375,34 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     write={write}
                   />
                 )}
+              {['HANDED_OVER', 'DELIVERING'].includes(detail.state) &&
+                detail.assignment?.riderId === profile.id &&
+                profile.permissions.includes('redemption-delivery.work') && (
+                  <JourneyForm
+                    key={detail.state + detail.id}
+                    detail={detail}
+                    disabled={
+                      disabled ||
+                      (detail.state === 'HANDED_OVER' ? !detail.canStart : !detail.canComplete)
+                    }
+                    write={write}
+                  />
+                )}
             </>
           )}
           {detail.state === 'ASSIGNED' && detail.assignment?.riderId !== profile.id && (
             <p className="notice">等待被分配骑手本人核对接货，管理人员不能代接。</p>
           )}
-          {detail.handoff && (
+          {detail.state === 'HANDED_OVER' && (
             <p className="notice">骑手已核对接货，等待开始配送。本次接货没有再次扣减库存或积分。</p>
+          )}
+          {detail.state === 'DELIVERING' && (
+            <p className="notice">骑手配送中，请按原收货地址交付全部包裹后确认送达。</p>
+          )}
+          {detail.state === 'DELIVERED' && (
+            <p className="notice">
+              骑手已确认全部包裹交付原收货人。此记录为骑手声明，不代表收货人独立确认。
+            </p>
           )}
           {detail.address && (
             <section className="picking-pack-proof">
@@ -412,6 +438,24 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
               <p>
                 本人接货：{detail.handoff.packageCount} 个包裹 ·{' '}
                 {new Date(detail.handoff.createdAt).toLocaleString('zh-CN', {
+                  timeZone: 'Asia/Shanghai',
+                })}
+                （北京时间）
+              </p>
+            )}
+            {detail.journey.start && (
+              <p>
+                本人开始配送：
+                {new Date(detail.journey.start.createdAt).toLocaleString('zh-CN', {
+                  timeZone: 'Asia/Shanghai',
+                })}
+                （北京时间）
+              </p>
+            )}
+            {detail.journey.completion && (
+              <p>
+                本人确认送达：
+                {new Date(detail.journey.completion.createdAt).toLocaleString('zh-CN', {
                   timeZone: 'Asia/Shanghai',
                 })}
                 （北京时间）
@@ -578,6 +622,53 @@ function AcceptForm({
       <p>实物、数量或包裹不符时请停止接货并联系仓管核查。</p>
       <button className="primary-button" disabled={disabled || !valid}>
         确认本人接货
+      </button>
+    </form>
+  );
+}
+
+function JourneyForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionDeliveryView;
+  disabled: boolean;
+  write: (action: Intent['action'], body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const start = detail.state === 'HANDED_OVER';
+  return (
+    <form
+      className="picking-pack-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (confirmed)
+          void write(
+            start ? 'start' : 'complete',
+            start
+              ? { handoffId: detail.handoff!.id, departureConfirmed: true }
+              : { startId: detail.journey.start!.id, deliveryConfirmed: true },
+          );
+      }}
+    >
+      <h3>{start ? '本人开始配送' : '本人确认送达'}</h3>
+      <label className="picking-physical">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          disabled={disabled}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        {start ? '已携带本单全部包裹，确认实际出发配送' : '已按原收货地址将全部包裹交付收货人'}
+      </label>
+      <p>
+        {start
+          ? '请在实际出发时操作，开始记录不能撤回。'
+          : '无法交付或存在异常时请联系仓管核查，不要确认送达。此记录为骑手本人声明。'}
+      </p>
+      <button className="primary-button" disabled={disabled || !confirmed}>
+        {start ? '确认开始配送' : '确认全部送达'}
       </button>
     </form>
   );

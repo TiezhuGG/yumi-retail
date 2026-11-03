@@ -123,6 +123,7 @@ export const rolePermissions: Record<string, readonly string[]> = {
     'warehouse.read',
     'redemption-delivery.read',
     'redemption-delivery.accept',
+    'redemption-delivery.work',
     'rider.tasks.self',
     'delivery-lab.read',
     'delivery-lab.accept',

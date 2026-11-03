@@ -97,11 +97,17 @@ export class RedemptionPickingService {
         shipment: task?.pack?.shipment
           ? {
               id: task.pack.shipment.id,
-              deliveryState: task.pack.shipment.assignment?.handoff
-                ? 'HANDED_OVER'
-                : task.pack.shipment.assignment
-                  ? 'ASSIGNED'
-                  : 'UNASSIGNED',
+              deliveryState: task.pack.shipment.assignment?.handoff?.journey.some(
+                (f) => f.kind === 'COMPLETE',
+              )
+                ? 'DELIVERED'
+                : task.pack.shipment.assignment?.handoff?.journey.some((f) => f.kind === 'START')
+                  ? 'DELIVERING'
+                  : task.pack.shipment.assignment?.handoff
+                    ? 'HANDED_OVER'
+                    : task.pack.shipment.assignment
+                      ? 'ASSIGNED'
+                      : 'UNASSIGNED',
               actorId: task.pack.shipment.actorId,
               createdAt: task.pack.shipment.createdAt.toISOString(),
             }
@@ -639,7 +645,10 @@ const task = object({
         id: text,
         actorId: text,
         createdAt: text,
-        deliveryState: { type: 'string', enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER'] },
+        deliveryState: {
+          type: 'string',
+          enum: ['UNASSIGNED', 'ASSIGNED', 'HANDED_OVER', 'DELIVERING', 'DELIVERED'],
+        },
       }),
       nullable: true,
     },

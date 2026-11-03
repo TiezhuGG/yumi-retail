@@ -54,7 +54,7 @@ export function RedemptionsWorkbench() {
   return (
     <section aria-label="积分兑换订单">
       <div className="notice">
-        本机开发兑换订单：积分扣账、预占与取消可追溯。核对、打包与出库可追溯，骑手分配及接货可追溯，开始配送后续交付；积分兑换不计现金销售额。
+        本机开发兑换订单：积分扣账、预占与取消可追溯。核对、打包与出库可追溯，骑手分配及接货可追溯，开始配送及骑手确认送达可追溯；积分兑换不计现金销售额。
       </div>
       {detail ? (
         <div className="reward-detail">
@@ -69,23 +69,27 @@ export function RedemptionsWorkbench() {
           <p>
             {detail.status === 'CANCELED'
               ? '已取消 · 已退积分'
-              : detail.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                ? '骑手已核对接货，等待开始配送。'
-                : detail.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                  ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                  : detail.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                    ? '已出库，等待骑手接货；尚未开始配送。'
-                    : detail.fulfillmentState === 'PACKED_WAIT_SHIP'
-                      ? '已打包，等待仓库出库；尚未配送。'
-                      : detail.fulfillmentState === 'PICKED_WAIT_PACK'
-                        ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                        : detail.fulfillmentState === 'PICKING'
-                          ? '仓库已领取'
-                          : detail.fulfillmentState === 'READY_TO_PICK'
-                            ? '待仓库领取'
-                            : detail.fulfillmentState === 'REVIEW_REQUIRED'
-                              ? '待核查'
-                              : '待创建拣货任务'}
+              : detail.fulfillmentState === 'DELIVERED'
+                ? '骑手已确认送达。'
+                : detail.fulfillmentState === 'DELIVERING'
+                  ? '骑手配送中。'
+                  : detail.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                    ? '骑手已核对接货，等待开始配送。'
+                    : detail.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                      ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                      : detail.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                        ? '已出库，等待骑手接货；尚未开始配送。'
+                        : detail.fulfillmentState === 'PACKED_WAIT_SHIP'
+                          ? '已打包，等待仓库出库；尚未配送。'
+                          : detail.fulfillmentState === 'PICKED_WAIT_PACK'
+                            ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                            : detail.fulfillmentState === 'PICKING'
+                              ? '仓库已领取'
+                              : detail.fulfillmentState === 'READY_TO_PICK'
+                                ? '待仓库领取'
+                                : detail.fulfillmentState === 'REVIEW_REQUIRED'
+                                  ? '待核查'
+                                  : '待创建拣货任务'}
           </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
           <h3>实物预占凭据</h3>
@@ -161,21 +165,25 @@ export function RedemptionsWorkbench() {
                       <td>
                         {o.status === 'CANCELED'
                           ? '已取消'
-                          : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
-                            ? '骑手已核对接货，等待开始配送。'
-                            : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
-                              ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
-                              : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
-                                ? '已出库，等待骑手接货；尚未开始配送。'
-                                : o.fulfillmentState === 'PACKED_WAIT_SHIP'
-                                  ? '已打包，等待仓库出库；尚未配送。'
-                                  : o.fulfillmentState === 'PICKED_WAIT_PACK'
-                                    ? '拣货已核对完成，等待打包；尚未出库或配送。'
-                                    : o.fulfillmentState === 'PICKING'
-                                      ? '仓库已领取'
-                                      : o.fulfillmentState === 'READY_TO_PICK'
-                                        ? '待仓库领取'
-                                        : '待建任务/核查'}
+                          : o.fulfillmentState === 'DELIVERED'
+                            ? '骑手已确认送达。'
+                            : o.fulfillmentState === 'DELIVERING'
+                              ? '骑手配送中。'
+                              : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                                ? '骑手已核对接货，等待开始配送。'
+                                : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                                  ? '已分配骑手，等待骑手核对接货；尚未开始配送。'
+                                  : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                                    ? '已出库，等待骑手接货；尚未开始配送。'
+                                    : o.fulfillmentState === 'PACKED_WAIT_SHIP'
+                                      ? '已打包，等待仓库出库；尚未配送。'
+                                      : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                                        ? '拣货已核对完成，等待打包；尚未出库或配送。'
+                                        : o.fulfillmentState === 'PICKING'
+                                          ? '仓库已领取'
+                                          : o.fulfillmentState === 'READY_TO_PICK'
+                                            ? '待仓库领取'
+                                            : '待建任务/核查'}
                       </td>
                       <td>
                         <button
