@@ -841,3 +841,14 @@ OpenAPI0.46.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-
 ## 2026-11-03 P4f真实兑换配送异常（本地）
 
 原骑手接货后/送达前可上报类型及说明，独立不可变异常绑定原handoff/order；未决阻断开始与送达，允许在货品冻结/效期异常时本人留证。无退款/回库/改派/恢复动作。新增迁移202611030003、RedemptionDeliveryException及SQL阶段门禁，POST兑换配送/:id/exception，员工详情exception、消费者deliveryExceptionReported，OpenAPI0.48.0；16项PG及24张双端浏览器截图通过。仅临时schema验证，微信/真机与生产未验，下一项P4g本仓异常处置凭据与恢复。详见P4F-REDEMPTION-EXCEPTIONS-2026-11-03验证记录。
+
+
+## 2026-11-03 P4g 配送异常处置与原骑手恢复（本地）
+
+本仓有效负责人/仓管填写处置说明并确认包裹、原地址可由原骑手继续，新增独立不可变处置凭据；不删除原异常，不自动送达。恢复前重新校验出库、库存效期/冻结、原骑手及分配人资格，其他阻断未解除仍拒绝。恢复后原骑手按原阶段继续，也可再次上报新异常。此规则取代P4f“每个接货仅一条异常”的阶段限制：每个接货可有多条历史异常，同时最多一条未决，每条异常最多一次处置。
+
+POST /api/v1/warehouse/warehouses/:warehouseId/redemption-delivery/:id/resolve：员工Cookie、Origin/CSRF、本仓redemption-delivery.assign权限及Idempotency-Key；body仅exceptionId、reason（必填最多300字）、continuationConfirmed:true。错误输入400、无权403、来源变化/已处置/其他阻断409，功能关闭503；处置、审计和幂等结果同事务。详情新增exception.resolution及exceptionHistory；消费者deliveryExceptionReported只表示当前未决，不返回内部说明与人员身份。OpenAPI 0.49.0由代码导出。
+
+新增迁移202611030004_redemption_delivery_resolutions及Prisma RedemptionDeliveryResolution，exception_id唯一外键、actor_id及姓名快照、reason、request_id和数据库时间；禁止UPDATE/DELETE。异常handoff唯一约束改普通索引，SQL触发器串行锁原handoff、限制一条未决，并仅用未决异常阻断START/COMPLETE。已消费库存、积分、订单主状态、地址、骑手分配及配额不变。处置确认是管理人员声明，并非独立实物证明。迁移先于API部署；旧P4f代码仍将历史异常视为未决，不可盲退或删除事实。
+
+3项新专项、3项P4f及13项P4e合计19项真实PG测试通过；实际API浏览器闭环30张截图，含处置响应丢失原键恢复、原骑手继续和消费者阶段同步。全工作区构建、类型检查、lint、Prisma生成及OpenAPI导出通过。仅随机临时schema，未改业务主库/.env/生产，沿用默认关闭及生产/远程拒启。微信工具、真机、真实实物和生产仍未验，P4/P5未整体验收。下一项P4h未接货分配撤回/改派及人员撤权接续，后续协调取消和售后。详见[本轮验证记录](../verification/P4G-REDEMPTION-RESOLUTIONS-2026-11-03.md)。

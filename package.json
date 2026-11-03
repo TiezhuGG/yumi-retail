@@ -156,7 +156,11 @@
     "pretest:redemption-exceptions": "npm run build:server",
     "test:redemption-exceptions": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-delivery-exceptions.integration.test.ts",
     "preverify:redemption-exceptions:ui": "npm run build:server",
-    "verify:redemption-exceptions:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-exceptions.mjs"
+    "verify:redemption-exceptions:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-exceptions.mjs",
+    "pretest:redemption-resolutions": "npm run build:server",
+    "test:redemption-resolutions": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-delivery-resolutions.integration.test.ts",
+    "preverify:redemption-resolutions:ui": "npm run build:server",
+    "verify:redemption-resolutions:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-resolutions.mjs"
   },
   "pnpm": {
     "overrides": {

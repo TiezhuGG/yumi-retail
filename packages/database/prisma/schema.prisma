@@ -69,6 +69,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionDeliveryResolutions RedemptionDeliveryResolution[]
  redemptionDeliveryExceptions RedemptionDeliveryException[]
  redemptionAssignedRider RedemptionAssignment[] @relation("redemptionAssignedRider")
  redemptionAssignmentActor RedemptionAssignment[] @relation("redemptionAssignmentActor")
@@ -1625,7 +1626,7 @@ model RedemptionAssignment {
  @@map("redemption_assignments")
 }
 model RedemptionHandoff {
- exception RedemptionDeliveryException?
+ exceptions RedemptionDeliveryException[]
  journey RedemptionJourneyFact[]
  id String @id @db.Uuid
  assignmentId String @unique @map("assignment_id") @db.Uuid
@@ -1673,9 +1674,11 @@ model RedemptionJourneyFact {
 }
 
 model RedemptionDeliveryException {
- @@unique([handoffId,orderId])
+ resolution RedemptionDeliveryResolution?
+ @@index([handoffId],map:"redemption_delivery_exceptions_handoff_idx")
+
  id String @id @db.Uuid
- handoffId String @unique @map("handoff_id") @db.Uuid
+ handoffId String @map("handoff_id") @db.Uuid
  orderId String @map("order_id") @db.Uuid
  kind String @db.VarChar(24)
  reason String @db.VarChar(300)
@@ -1685,4 +1688,17 @@ model RedemptionDeliveryException {
  handoff RedemptionHandoff @relation(fields:[handoffId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@map("redemption_delivery_exceptions")
+}
+
+model RedemptionDeliveryResolution {
+ id String @id @db.Uuid
+ exceptionId String @unique @map("exception_id") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ actorName String @map("actor_name") @db.VarChar(80)
+ reason String @db.VarChar(300)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ exception RedemptionDeliveryException @relation(fields:[exceptionId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_delivery_resolutions")
 }

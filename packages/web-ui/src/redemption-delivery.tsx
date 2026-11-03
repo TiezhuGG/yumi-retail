@@ -30,7 +30,7 @@ const blockers: Record<string, string> = {
 };
 type Intent = {
   id: string;
-  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception';
+  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception' | 'resolve';
   key: string;
   body: Record<string, unknown>;
 };
@@ -121,7 +121,7 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['assign', 'accept', 'start', 'complete', 'exception'].includes(v.action) ||
+      !['assign', 'accept', 'start', 'complete', 'exception', 'resolve'].includes(v.action) ||
       !v.body ||
       typeof v.body !== 'object' ||
       Array.isArray(v.body)
@@ -306,7 +306,9 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
           <p className="delivery-state">
-            {detail.exception ? '配送异常待处理' : states[detail.state]}
+            {detail.exception && !detail.exception.resolution
+              ? '配送异常待处理'
+              : states[detail.state]}
           </p>
           <h3>按原出库实物核对</h3>
           {detail.lines.map((l) => (
@@ -346,6 +348,7 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                     start: '开始配送',
                     complete: '送达',
                     exception: '上报异常',
+                    resolve: '处置异常',
                   }[intent.action]}
             </button>
           ) : (
@@ -400,16 +403,16 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           {detail.state === 'ASSIGNED' && detail.assignment?.riderId !== profile.id && (
             <p className="notice">等待被分配骑手本人核对接货，管理人员不能代接。</p>
           )}
-          {detail.exception && (
+          {detail.exception && !detail.exception.resolution && (
             <div className="notice task-error" role="alert">
               配送异常待处理：{detail.exception.reason}（
               {new Date(detail.exception.createdAt).toLocaleString('zh-CN', {
                 timeZone: 'Asia/Shanghai',
               })}
-              ）。请联系负责人核查，当前不提供恢复或改派操作。
+              ）。请联系本仓负责人核查；恢复不改变原骑手或原收货地址。
             </div>
           )}
-          {!detail.exception &&
+          {(!detail.exception || !!detail.exception.resolution) &&
             detail.handoff &&
             !detail.journey.completion &&
             detail.assignment?.riderId === profile.id &&
@@ -421,6 +424,30 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           )}
           {!detail.exception && detail.state === 'DELIVERING' && (
             <p className="notice">骑手配送中，请按原收货地址交付全部包裹后确认送达。</p>
+          )}
+          {detail.exception && !detail.exception.resolution && manage && (
+            <DeliveryResolutionForm detail={detail} disabled={disabled} write={write} />
+          )}
+          {detail.exceptionHistory.some((e) => e.resolution) && (
+            <section className="picking-pack-proof">
+              <h3>配送异常处置记录</h3>
+              {detail.exceptionHistory.map((e) => (
+                <article key={e.id}>
+                  <p>原异常：{e.reason}</p>
+                  {e.resolution ? (
+                    <p>
+                      处置人：{e.resolution.actorName} · {e.resolution.reason} ·{' '}
+                      {new Date(e.resolution.createdAt).toLocaleString('zh-CN', {
+                        timeZone: 'Asia/Shanghai',
+                      })}
+                      （北京时间）。允许原骑手继续，仍须满足当前资格。
+                    </p>
+                  ) : (
+                    <p>待处置</p>
+                  )}
+                </article>
+              ))}
+            </section>
           )}
           {detail.state === 'DELIVERED' && (
             <p className="notice">
@@ -500,7 +527,7 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                 </p>
                 <p>
                   {states[v.state]}
-                  {v.exception ? ' · 配送异常待处理' : ''}
+                  {v.exception && !v.exception.resolution ? ' · 配送异常待处理' : ''}
                 </p>
                 {v.assignment && <p>骑手：{v.assignment.riderName}</p>}
                 <button
@@ -748,6 +775,61 @@ function DeliveryExceptionForm({
       <p>提交后暂停继续配送和确认送达，请联系负责人核查。</p>
       <button className="secondary-button" disabled={disabled || !reason.trim()}>
         提交配送异常
+      </button>
+    </form>
+  );
+}
+
+function DeliveryResolutionForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionDeliveryView;
+  disabled: boolean;
+  write: (action: Intent['action'], body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [reason, setReason] = useState(''),
+    [confirmed, setConfirmed] = useState(false);
+  const blocked = detail.readiness.blockers.some((x) => x !== 'DELIVERY_EXCEPTION_OPEN');
+  return (
+    <form
+      className="picking-check-form delivery-exception-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void write('resolve', {
+          exceptionId: detail.exception!.id,
+          reason,
+          continuationConfirmed: confirmed,
+        });
+      }}
+    >
+      <h3>处置异常并允许继续配送</h3>
+      <label>
+        处置说明
+        <textarea
+          aria-label="处置说明"
+          maxLength={300}
+          disabled={disabled}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          disabled={disabled}
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+        />
+        已核实异常已处理、包裹及原地址可由原骑手继续配送
+      </label>
+      <p>不改变原骑手、收货地址、库存或积分；原异常记录保留。</p>
+      <button
+        className="primary-button"
+        disabled={disabled || blocked || !reason.trim() || !confirmed}
+      >
+        确认处置并允许继续
       </button>
     </form>
   );

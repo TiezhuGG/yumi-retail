@@ -939,7 +939,8 @@ export interface RedemptionPickingPage {
 }
 
 export interface RedemptionDeliveryView {
-  exception: null | { id: string; kind: string; reason: string; createdAt: string };
+  exception: null | RedemptionDeliveryIncident;
+  exceptionHistory: RedemptionDeliveryIncident[];
   id: string;
   orderNo: string;
   title: string;
@@ -978,4 +979,12 @@ export interface RedemptionDeliveryPage {
   selfOnly: boolean;
   items: RedemptionDeliveryView[];
   nextCursor: string | null;
+}
+
+export interface RedemptionDeliveryIncident {
+  id: string;
+  kind: string;
+  reason: string;
+  createdAt: string;
+  resolution: null | { id: string; actorName: string; reason: string; createdAt: string };
 }

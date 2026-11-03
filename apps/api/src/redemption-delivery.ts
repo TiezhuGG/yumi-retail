@@ -15,9 +15,23 @@ import { Permissions } from './staff-guard.js';
 import { failure, success, type ApiRequest } from './http.js';
 import { object, text, ApiResult } from './api-result.js';
 type Tx = Prisma.TransactionClient;
+const incidentSchema = object({
+  id: text,
+  kind: text,
+  reason: text,
+  createdAt: text,
+  resolution: {
+    ...object({ id: text, actorName: text, reason: text, createdAt: text }),
+    nullable: true,
+  },
+});
 const include = {
   assignment: {
-    include: { handoff: { include: { lines: true, journey: true, exception: true } } },
+    include: {
+      handoff: {
+        include: { lines: true, journey: true, exceptions: { include: { resolution: true } } },
+      },
+    },
   },
   pack: { include: { task: true, lines: true } },
 } as const;
@@ -70,7 +84,28 @@ export class RedemptionDeliveryService {
     const { sh, o, blockers } = await this.source(tx, w, id, self),
       a = sh.assignment,
       start = a?.handoff?.journey.find((f) => f.kind === 'START'),
-      completion = a?.handoff?.journey.find((f) => f.kind === 'COMPLETE');
+      completion = a?.handoff?.journey.find((f) => f.kind === 'COMPLETE'),
+      incidents = [...(a?.handoff?.exceptions ?? [])].sort(
+        (x, y) => y.createdAt.getTime() - x.createdAt.getTime() || y.id.localeCompare(x.id),
+      ),
+      current = incidents.find((e) => !e.resolution) ?? incidents[0],
+      incidentDto = (e: typeof current) =>
+        e
+          ? {
+              id: e.id,
+              kind: e.kind,
+              reason: e.reason,
+              createdAt: e.createdAt.toISOString(),
+              resolution: e.resolution
+                ? {
+                    id: e.resolution.id,
+                    actorName: e.resolution.actorName,
+                    reason: e.resolution.reason,
+                    createdAt: e.resolution.createdAt.toISOString(),
+                  }
+                : null,
+            }
+          : null;
     if (
       o.status !== 'ACTIVE' ||
       o.pickingTask?.state !== 'CHECKED' ||
@@ -81,16 +116,10 @@ export class RedemptionDeliveryService {
       if (!(await this.person(tx, a.riderId, w))) blockers.push('RIDER_UNAVAILABLE');
       if (!(await this.person(tx, a.actorId, w, true))) blockers.push('ASSIGNER_UNAVAILABLE');
     }
-    if (a?.handoff?.exception) blockers.push('DELIVERY_EXCEPTION_OPEN');
+    if (incidents.some((e) => !e.resolution)) blockers.push('DELIVERY_EXCEPTION_OPEN');
     return {
-      exception: a?.handoff?.exception
-        ? {
-            id: a.handoff.exception.id,
-            kind: a.handoff.exception.kind,
-            reason: a.handoff.exception.reason,
-            createdAt: a.handoff.exception.createdAt.toISOString(),
-          }
-        : null,
+      exception: incidentDto(current),
+      exceptionHistory: incidents.map((e) => incidentDto(e)!),
       id: sh.id,
       orderNo: o.orderNo,
       title: o.title,
@@ -239,6 +268,71 @@ export class RedemptionDeliveryService {
       };
     });
   }
+
+  async resolve(r: ApiRequest, w: string, id: string, k: string, input: unknown) {
+    const b = fields(input, ['exceptionId', 'reason', 'continuationConfirmed']);
+    const exceptionId = uuid(b.exceptionId),
+      reason = str(b.reason, 300);
+    if (b.continuationConfirmed !== true)
+      throw failure(
+        400,
+        'PHYSICAL_CONFIRMATION_REQUIRED',
+        '须核实异常已处置、包裹和原地址可由原骑手继续配送',
+      );
+    await this.authorize(this.catalog.db, r, w, true);
+    await this.source(this.catalog.db, w, id);
+    if (!this.enabled) throw failure(503, 'REDEMPTION_DELIVERY_DISABLED', '兑换配送写入尚未启用');
+    return this.catalog.write(
+      r,
+      'REDEMPTION_DELIVERY_RESOLVE',
+      w + ':' + id,
+      k,
+      { exceptionId, reason, continuationConfirmed: true },
+      async (tx) => {
+        await this.authorize(tx, r, w, true);
+        const initial = await this.source(tx, w, id);
+        if (!initial.sh.assignment?.handoff)
+          throw failure(409, 'DELIVERY_EXCEPTION_CHANGED', '须先有原骑手接货及未决异常');
+        if (
+          !(await this.person(tx, initial.sh.assignment!.riderId, w)) ||
+          !(await this.person(tx, initial.sh.assignment!.actorId, w, true))
+        )
+          throw failure(409, 'DELIVERY_PERSON_UNAVAILABLE', '原骑手或分配人资格已变化');
+        await metadataLocks(tx, [initial.o.skuId]);
+        await inventoryLocks(tx, w, [initial.o.skuId]);
+        await tx.$queryRaw`SELECT id FROM redemption_orders WHERE id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_picking_tasks WHERE order_id=${initial.o.id}::uuid FOR UPDATE`;
+        await tx.$queryRaw`SELECT id FROM redemption_shipments WHERE id=${id}::uuid FOR UPDATE`;
+        const v = await this.view(tx, w, id);
+        if (
+          !v.exception ||
+          v.exception.id !== exceptionId ||
+          v.exception.resolution ||
+          v.journey.completion
+        )
+          throw failure(409, 'DELIVERY_EXCEPTION_CHANGED', '异常已处置或来源变化，请刷新');
+        if (v.readiness.blockers.some((x) => x !== 'DELIVERY_EXCEPTION_OPEN'))
+          throw failure(409, 'DELIVERY_BLOCKED', '原出库、库存或人员资格尚不允许继续配送');
+        const actorName = await this.person(tx, r.staffContext!.staffId, w, true);
+        if (!actorName) throw failure(403, 'FORBIDDEN', '当前人员无本仓处置资格');
+        await tx.redemptionDeliveryResolution.create({
+          data: {
+            id: randomUUID(),
+            exceptionId,
+            actorId: r.staffContext!.staffId,
+            actorName,
+            reason,
+            requestId: r.requestId,
+          },
+        });
+        await this.catalog.audit(tx, r, 'REDEMPTION_DELIVERY_RESOLVE', initial.o.id, w);
+        await this.authorize(tx, r, w, true);
+        if ((await this.view(tx, w, id)).readiness.blockers.length)
+          throw failure(409, 'DELIVERY_BLOCKED', '处理期间来源资格失效，本次处置回滚');
+        return { id };
+      },
+    );
+  }
   async progress(
     r: ApiRequest,
     w: string,
@@ -303,7 +397,7 @@ export class RedemptionDeliveryService {
         if (sourceId !== (action !== 'complete' ? h.id : v.journey.start!.id))
           throw failure(409, 'JOURNEY_SOURCE_CHANGED', '请刷新并使用本单原阶段凭据');
         if (action === 'exception') {
-          if (v.exception || v.journey.completion)
+          if ((v.exception && !v.exception.resolution) || v.journey.completion)
             throw failure(
               409,
               'DELIVERY_EXCEPTION_NOT_ALLOWED',
@@ -508,10 +602,8 @@ const task = object(
       nullable: true,
     },
     handoff: { ...object({ id: text, packageCount: n, createdAt: text }), nullable: true },
-    exception: {
-      ...object({ id: text, kind: text, reason: text, createdAt: text }),
-      nullable: true,
-    },
+    exception: { ...incidentSchema, nullable: true },
+    exceptionHistory: { type: 'array', items: incidentSchema },
     journey: object({
       start: { ...object({ id: text, createdAt: text }), nullable: true },
       completion: { ...object({ id: text, createdAt: text }), nullable: true },
@@ -652,6 +744,28 @@ export class RedemptionDeliveryController {
   ) {
     fields(q, []);
     return success(r, await this.service.write(r, uuid(w), uuid(id), 'accept', key(r), b));
+  }
+  @Post(':id/resolve')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.assign')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object({
+      exceptionId: text,
+      reason: text,
+      continuationConfirmed: { type: 'boolean', enum: [true] },
+    }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async resolve(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.resolve(r, uuid(w), uuid(id), key(r), b));
   }
   @Post(':id/exception')
   @HttpCode(200)

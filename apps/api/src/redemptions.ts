@@ -511,7 +511,11 @@ export class RedemptionService {
                 shipment: {
                   include: {
                     assignment: {
-                      include: { handoff: { include: { journey: true; exception: true } } };
+                      include: {
+                        handoff: {
+                          include: { journey: true; exceptions: { include: { resolution: true } } };
+                        };
+                      };
                     };
                   };
                 };
@@ -537,7 +541,10 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
-      deliveryExceptionReported: !!row.pickingTask?.pack?.shipment?.assignment?.handoff?.exception,
+      deliveryExceptionReported:
+        !!row.pickingTask?.pack?.shipment?.assignment?.handoff?.exceptions.some(
+          (e) => !e.resolution,
+        ),
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
@@ -614,7 +621,14 @@ export class RedemptionService {
                   shipment: {
                     include: {
                       assignment: {
-                        include: { handoff: { include: { journey: true, exception: true } } },
+                        include: {
+                          handoff: {
+                            include: {
+                              journey: true,
+                              exceptions: { include: { resolution: true } },
+                            },
+                          },
+                        },
                       },
                     },
                   },
@@ -644,7 +658,14 @@ export class RedemptionService {
                   shipment: {
                     include: {
                       assignment: {
-                        include: { handoff: { include: { journey: true, exception: true } } },
+                        include: {
+                          handoff: {
+                            include: {
+                              journey: true,
+                              exceptions: { include: { resolution: true } },
+                            },
+                          },
+                        },
                       },
                     },
                   },
