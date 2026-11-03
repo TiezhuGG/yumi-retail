@@ -16,7 +16,9 @@ import { failure, success, type ApiRequest } from './http.js';
 import { object, text, ApiResult } from './api-result.js';
 type Tx = Prisma.TransactionClient;
 const include = {
-  assignment: { include: { handoff: { include: { lines: true, journey: true } } } },
+  assignment: {
+    include: { handoff: { include: { lines: true, journey: true, exception: true } } },
+  },
   pack: { include: { task: true, lines: true } },
 } as const;
 export class RedemptionDeliveryService {
@@ -79,7 +81,16 @@ export class RedemptionDeliveryService {
       if (!(await this.person(tx, a.riderId, w))) blockers.push('RIDER_UNAVAILABLE');
       if (!(await this.person(tx, a.actorId, w, true))) blockers.push('ASSIGNER_UNAVAILABLE');
     }
+    if (a?.handoff?.exception) blockers.push('DELIVERY_EXCEPTION_OPEN');
     return {
+      exception: a?.handoff?.exception
+        ? {
+            id: a.handoff.exception.id,
+            kind: a.handoff.exception.kind,
+            reason: a.handoff.exception.reason,
+            createdAt: a.handoff.exception.createdAt.toISOString(),
+          }
+        : null,
       id: sh.id,
       orderNo: o.orderNo,
       title: o.title,
@@ -232,17 +243,28 @@ export class RedemptionDeliveryService {
     r: ApiRequest,
     w: string,
     id: string,
-    action: 'start' | 'complete',
+    action: 'start' | 'complete' | 'exception',
     k: string,
     input: unknown,
   ) {
     const b = fields(
       input,
-      action === 'start' ? ['handoffId', 'departureConfirmed'] : ['startId', 'deliveryConfirmed'],
+      action === 'exception'
+        ? ['handoffId', 'kind', 'reason']
+        : action === 'start'
+          ? ['handoffId', 'departureConfirmed']
+          : ['startId', 'deliveryConfirmed'],
     );
-    const sourceId = uuid(action === 'start' ? b.handoffId : b.startId),
+    const sourceId = uuid(action !== 'complete' ? b.handoffId : b.startId),
       riderId = r.staffContext!.staffId;
-    if ((action === 'start' ? b.departureConfirmed : b.deliveryConfirmed) !== true)
+    const kind = action === 'exception' ? str(b.kind, 24) : null,
+      reason = action === 'exception' ? str(b.reason, 300) : null;
+    if (kind && !['CONTACT_FAILED', 'ADDRESS_ISSUE', 'DAMAGED', 'REFUSED', 'OTHER'].includes(kind))
+      throw failure(400, 'VALIDATION_ERROR', '配送异常类型无效');
+    if (
+      action !== 'exception' &&
+      (action === 'start' ? b.departureConfirmed : b.deliveryConfirmed) !== true
+    )
       throw failure(
         400,
         'PHYSICAL_CONFIRMATION_REQUIRED',
@@ -258,13 +280,14 @@ export class RedemptionDeliveryService {
       'REDEMPTION_DELIVERY_' + action,
       w + ':' + id,
       k,
-      { sourceId, confirmed: true },
+      { sourceId, confirmed: true, kind, reason },
       async (tx) => {
         await this.authorize(tx, r, w);
         const initial = await this.source(tx, w, id, riderId);
         if (
           !(await this.person(tx, riderId, w)) ||
-          !(await this.person(tx, initial.sh.assignment!.actorId, w, true))
+          (action !== 'exception' &&
+            !(await this.person(tx, initial.sh.assignment!.actorId, w, true)))
         )
           throw failure(409, 'DELIVERY_PERSON_UNAVAILABLE', '骑手或原分配人权限已变化，请核查');
         await metadataLocks(tx, [initial.o.skuId]);
@@ -277,23 +300,47 @@ export class RedemptionDeliveryService {
         const h = sh.assignment?.handoff;
         if (!h || (action === 'complete' && !v.journey.start))
           throw failure(409, 'JOURNEY_SEQUENCE_REQUIRED', '须先由本人接货并按顺序开始配送');
-        if (sourceId !== (action === 'start' ? h.id : v.journey.start!.id))
+        if (sourceId !== (action !== 'complete' ? h.id : v.journey.start!.id))
           throw failure(409, 'JOURNEY_SOURCE_CHANGED', '请刷新并使用本单原阶段凭据');
-        if (action === 'start' ? !!v.journey.start : !!v.journey.completion)
+        if (action === 'exception') {
+          if (v.exception || v.journey.completion)
+            throw failure(
+              409,
+              'DELIVERY_EXCEPTION_NOT_ALLOWED',
+              '已有未决异常或已确认送达，不能重复上报',
+            );
+        }
+        if (
+          action !== 'exception' &&
+          (action === 'start' ? !!v.journey.start : !!v.journey.completion)
+        )
           throw failure(409, 'JOURNEY_ALREADY_RECORDED', '本阶段已记录，请查看配送记录');
-        if (v.readiness.blockers.length)
+        if (action !== 'exception' && v.readiness.blockers.length)
           throw failure(409, 'DELIVERY_BLOCKED', '原出库或人员资格变化，请先核查');
-        await tx.redemptionJourneyFact.create({
-          data: {
-            id: randomUUID(),
-            handoffId: h.id,
-            orderId: sh.orderId,
-            kind: action === 'start' ? 'START' : 'COMPLETE',
-            startId: action === 'complete' ? sourceId : null,
-            actorId: riderId,
-            requestId: r.requestId,
-          },
-        });
+        if (action === 'exception')
+          await tx.redemptionDeliveryException.create({
+            data: {
+              id: randomUUID(),
+              handoffId: h.id,
+              orderId: sh.orderId,
+              kind: kind!,
+              reason: reason!,
+              actorId: riderId,
+              requestId: r.requestId,
+            },
+          });
+        else
+          await tx.redemptionJourneyFact.create({
+            data: {
+              id: randomUUID(),
+              handoffId: h.id,
+              orderId: sh.orderId,
+              kind: action === 'start' ? 'START' : 'COMPLETE',
+              startId: action === 'complete' ? sourceId : null,
+              actorId: riderId,
+              requestId: r.requestId,
+            },
+          });
         await this.catalog.audit(
           tx,
           r,
@@ -303,7 +350,7 @@ export class RedemptionDeliveryService {
         );
         await this.authorize(tx, r, w);
         const final = await this.view(tx, w, id, riderId);
-        if (final.readiness.blockers.length)
+        if (action !== 'exception' && final.readiness.blockers.length)
           throw failure(409, 'DELIVERY_BLOCKED', '处理期间效期或配送人员资格失效，本次操作回滚');
         return { id };
       },
@@ -461,6 +508,10 @@ const task = object(
       nullable: true,
     },
     handoff: { ...object({ id: text, packageCount: n, createdAt: text }), nullable: true },
+    exception: {
+      ...object({ id: text, kind: text, reason: text, createdAt: text }),
+      nullable: true,
+    },
     journey: object({
       start: { ...object({ id: text, createdAt: text }), nullable: true },
       completion: { ...object({ id: text, createdAt: text }), nullable: true },
@@ -601,6 +652,31 @@ export class RedemptionDeliveryController {
   ) {
     fields(q, []);
     return success(r, await this.service.write(r, uuid(w), uuid(id), 'accept', key(r), b));
+  }
+  @Post(':id/exception')
+  @HttpCode(200)
+  @Permissions('redemption-delivery.work')
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object({
+      handoffId: text,
+      kind: {
+        type: 'string',
+        enum: ['CONTACT_FAILED', 'ADDRESS_ISSUE', 'DAMAGED', 'REFUSED', 'OTHER'],
+      },
+      reason: { type: 'string', maxLength: 300 },
+    }),
+  })
+  @ApiResult(object({ id: text }), [400, 401, 403, 404, 409, 500, 503])
+  async exception(
+    @Req() r: ApiRequest,
+    @Param('warehouseId') w: string,
+    @Param('id') id: string,
+    @Body() b: unknown,
+    @Query() q: unknown,
+  ) {
+    fields(q, []);
+    return success(r, await this.service.progress(r, uuid(w), uuid(id), 'exception', key(r), b));
   }
   @Post(':id/start')
   @HttpCode(200)

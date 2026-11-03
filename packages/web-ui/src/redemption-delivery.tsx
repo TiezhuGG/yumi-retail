@@ -25,11 +25,12 @@ const blockers: Record<string, string> = {
   SHIPMENT_UNVERIFIED: '原出库凭据不完整',
   CONSUMPTION_UNVERIFIED: '出库消费需核查',
   RIDER_UNAVAILABLE: '被分配骑手已停用、撤权或移出本仓',
+  DELIVERY_EXCEPTION_OPEN: '配送异常待处理，已暂停继续配送/送达',
   ASSIGNER_UNAVAILABLE: '原分配人已停用、撤权或移出本仓',
 };
 type Intent = {
   id: string;
-  action: 'assign' | 'accept' | 'start' | 'complete';
+  action: 'assign' | 'accept' | 'start' | 'complete' | 'exception';
   key: string;
   body: Record<string, unknown>;
 };
@@ -120,7 +121,7 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
     if (
       !/^[a-f0-9-]{36}$/i.test(v.id) ||
       !/^[a-f0-9-]{36}$/i.test(v.key) ||
-      !['assign', 'accept', 'start', 'complete'].includes(v.action) ||
+      !['assign', 'accept', 'start', 'complete', 'exception'].includes(v.action) ||
       !v.body ||
       typeof v.body !== 'object' ||
       Array.isArray(v.body)
@@ -304,7 +305,9 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
             {detail.spec} · {detail.quantity} 件 · {detail.packageCount} 个包裹
           </p>
           <p className="redemption-order-no">兑换单号：{detail.orderNo}</p>
-          <p className="delivery-state">{states[detail.state]}</p>
+          <p className="delivery-state">
+            {detail.exception ? '配送异常待处理' : states[detail.state]}
+          </p>
           <h3>按原出库实物核对</h3>
           {detail.lines.map((l) => (
             <article className="picking-allocation" key={l.allocationId}>
@@ -337,9 +340,13 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
               {busy
                 ? '正在核实…'
                 : '使用原请求核实' +
-                  { assign: '分配', accept: '接货', start: '开始配送', complete: '送达' }[
-                    intent.action
-                  ]}
+                  {
+                    assign: '分配',
+                    accept: '接货',
+                    start: '开始配送',
+                    complete: '送达',
+                    exception: '上报异常',
+                  }[intent.action]}
             </button>
           ) : (
             <>
@@ -393,10 +400,26 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           {detail.state === 'ASSIGNED' && detail.assignment?.riderId !== profile.id && (
             <p className="notice">等待被分配骑手本人核对接货，管理人员不能代接。</p>
           )}
-          {detail.state === 'HANDED_OVER' && (
+          {detail.exception && (
+            <div className="notice task-error" role="alert">
+              配送异常待处理：{detail.exception.reason}（
+              {new Date(detail.exception.createdAt).toLocaleString('zh-CN', {
+                timeZone: 'Asia/Shanghai',
+              })}
+              ）。请联系负责人核查，当前不提供恢复或改派操作。
+            </div>
+          )}
+          {!detail.exception &&
+            detail.handoff &&
+            !detail.journey.completion &&
+            detail.assignment?.riderId === profile.id &&
+            profile.permissions.includes('redemption-delivery.work') && (
+              <DeliveryExceptionForm detail={detail} disabled={disabled} write={write} />
+            )}
+          {!detail.exception && detail.state === 'HANDED_OVER' && (
             <p className="notice">骑手已核对接货，等待开始配送。本次接货没有再次扣减库存或积分。</p>
           )}
-          {detail.state === 'DELIVERING' && (
+          {!detail.exception && detail.state === 'DELIVERING' && (
             <p className="notice">骑手配送中，请按原收货地址交付全部包裹后确认送达。</p>
           )}
           {detail.state === 'DELIVERED' && (
@@ -475,7 +498,10 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
                 <p>
                   {v.spec} · {v.quantity} 件 · {v.packageCount} 个包裹
                 </p>
-                <p>{states[v.state]}</p>
+                <p>
+                  {states[v.state]}
+                  {v.exception ? ' · 配送异常待处理' : ''}
+                </p>
                 {v.assignment && <p>骑手：{v.assignment.riderName}</p>}
                 <button
                   className="secondary-button"
@@ -669,6 +695,59 @@ function JourneyForm({
       </p>
       <button className="primary-button" disabled={disabled || !confirmed}>
         {start ? '确认开始配送' : '确认全部送达'}
+      </button>
+    </form>
+  );
+}
+
+function DeliveryExceptionForm({
+  detail,
+  disabled,
+  write,
+}: {
+  detail: RedemptionDeliveryView;
+  disabled: boolean;
+  write: (action: Intent['action'], body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [kind, setKind] = useState('CONTACT_FAILED'),
+    [reason, setReason] = useState('');
+  return (
+    <form
+      className="picking-check-form delivery-exception-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void write('exception', { handoffId: detail.handoff!.id, kind, reason });
+      }}
+    >
+      <h3>上报配送异常</h3>
+      <label>
+        异常类型
+        <select
+          aria-label="异常类型"
+          value={kind}
+          disabled={disabled}
+          onChange={(e) => setKind(e.target.value)}
+        >
+          <option value="CONTACT_FAILED">无法联系</option>
+          <option value="ADDRESS_ISSUE">地址异常</option>
+          <option value="DAMAGED">包裹破损</option>
+          <option value="REFUSED">收货人拒收</option>
+          <option value="OTHER">其他</option>
+        </select>
+      </label>
+      <label>
+        异常说明
+        <textarea
+          aria-label="异常说明"
+          maxLength={300}
+          value={reason}
+          disabled={disabled}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <p>提交后暂停继续配送和确认送达，请联系负责人核查。</p>
+      <button className="secondary-button" disabled={disabled || !reason.trim()}>
+        提交配送异常
       </button>
     </form>
   );

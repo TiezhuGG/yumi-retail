@@ -509,7 +509,11 @@ export class RedemptionService {
             pack: {
               include: {
                 shipment: {
-                  include: { assignment: { include: { handoff: { include: { journey: true } } } } };
+                  include: {
+                    assignment: {
+                      include: { handoff: { include: { journey: true; exception: true } } };
+                    };
+                  };
                 };
               };
             };
@@ -533,6 +537,7 @@ export class RedemptionService {
       createdAt: row.createdAt.toISOString(),
       canceledAt: row.canceledAt?.toISOString() ?? null,
       version: row.version,
+      deliveryExceptionReported: !!row.pickingTask?.pack?.shipment?.assignment?.handoff?.exception,
       fulfillmentState:
         row.status === 'CANCELED'
           ? 'CANCELED'
@@ -608,7 +613,9 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
-                      assignment: { include: { handoff: { include: { journey: true } } } },
+                      assignment: {
+                        include: { handoff: { include: { journey: true, exception: true } } },
+                      },
                     },
                   },
                 },
@@ -636,7 +643,9 @@ export class RedemptionService {
                 include: {
                   shipment: {
                     include: {
-                      assignment: { include: { handoff: { include: { journey: true } } } },
+                      assignment: {
+                        include: { handoff: { include: { journey: true, exception: true } } },
+                      },
                     },
                   },
                 },

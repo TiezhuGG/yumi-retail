@@ -69,6 +69,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionDeliveryExceptions RedemptionDeliveryException[]
  redemptionAssignedRider RedemptionAssignment[] @relation("redemptionAssignedRider")
  redemptionAssignmentActor RedemptionAssignment[] @relation("redemptionAssignmentActor")
  redemptionHandoffs RedemptionHandoff[]
@@ -1624,6 +1625,7 @@ model RedemptionAssignment {
  @@map("redemption_assignments")
 }
 model RedemptionHandoff {
+ exception RedemptionDeliveryException?
  journey RedemptionJourneyFact[]
  id String @id @db.Uuid
  assignmentId String @unique @map("assignment_id") @db.Uuid
@@ -1668,4 +1670,19 @@ model RedemptionJourneyFact {
  @@unique([handoffId,kind])
  @@unique([id,handoffId,orderId])
  @@map("redemption_journey_facts")
+}
+
+model RedemptionDeliveryException {
+ @@unique([handoffId,orderId])
+ id String @id @db.Uuid
+ handoffId String @unique @map("handoff_id") @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ kind String @db.VarChar(24)
+ reason String @db.VarChar(300)
+ actorId String @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ handoff RedemptionHandoff @relation(fields:[handoffId,orderId],references:[id,orderId],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_delivery_exceptions")
 }

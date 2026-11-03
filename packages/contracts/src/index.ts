@@ -826,6 +826,7 @@ export interface RedemptionQuoteView {
   };
 }
 export interface RedemptionOrderView {
+  deliveryExceptionReported?: boolean;
   id: string;
   orderNo: string;
   status: 'ACTIVE' | 'CANCELED';
@@ -938,6 +939,7 @@ export interface RedemptionPickingPage {
 }
 
 export interface RedemptionDeliveryView {
+  exception: null | { id: string; kind: string; reason: string; createdAt: string };
   id: string;
   orderNo: string;
   title: string;

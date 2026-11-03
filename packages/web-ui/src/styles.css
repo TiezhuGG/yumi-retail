@@ -3136,3 +3136,36 @@ small {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.delivery-exception-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #e3d8c8;
+  border-radius: 12px;
+  margin: 20px 0;
+  background: #fffdf8;
+}
+.delivery-exception-form h3,
+.delivery-exception-form p {
+  margin: 0;
+}
+.delivery-exception-form label {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: none;
+}
+.delivery-exception-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 96px;
+  padding: 12px;
+  font: inherit;
+  border: 1px solid #dce6df;
+  border-radius: 8px;
+}
+.delivery-exception-form button {
+  min-height: 44px;
+  justify-self: start;
+}

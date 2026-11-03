@@ -836,3 +836,8 @@ OpenAPI0.46.0，基路径 `/api/v1/warehouse/warehouses/:warehouseId/redemption-
 列表/详情新增`journey:{start:{id,createdAt}|null,completion:{id,createdAt}|null}`、`canStart`和`canComplete`。readiness.ready仍只表示分配/接货资格，保留既有语义；readiness.blockers给出当前源资格告警，不覆盖历史阶段。state及status筛选新增DELIVERING、DELIVERED；HANDED_OVER仅接货且尚无START，DELIVERING有START无COMPLETE，DELIVERED有COMPLETE，五种状态互斥。20条UUID升序、游标本筛选及本仓/本人归属限制不变；列表仍不含地址，只有授权详情才解密原快照。
 
 消费者/后台兑换订单fulfillmentState新增DELIVERING/DELIVERED，仓库出库凭据deliveryState同步。DELIVERED仅表示骑手确认送达，不代表收货人独立确认。兑换主status不增加COMPLETED，仍ACTIVE用于累计有效额度，后续完整结案/售后另交付。所有已开始履约阶段继续禁止消费者直接取消。新旧端须协同部署，旧枚举客户端不得误报等待出库或开放取消。详见[P4e验证](../verification/P4E-REDEMPTION-JOURNEY-2026-11-03.md)。
+
+
+## 2026-11-03 P4f真实兑换配送异常（本地）
+
+原骑手接货后/送达前可上报类型及说明，独立不可变异常绑定原handoff/order；未决阻断开始与送达，允许在货品冻结/效期异常时本人留证。无退款/回库/改派/恢复动作。新增迁移202611030003、RedemptionDeliveryException及SQL阶段门禁，POST兑换配送/:id/exception，员工详情exception、消费者deliveryExceptionReported，OpenAPI0.48.0；16项PG及24张双端浏览器截图通过。仅临时schema验证，微信/真机与生产未验，下一项P4g本仓异常处置凭据与恢复。详见P4F-REDEMPTION-EXCEPTIONS-2026-11-03验证记录。

@@ -38,6 +38,7 @@ const quote = object({
   snapshot,
 });
 const orderProperties = {
+  deliveryExceptionReported: { type: 'boolean' as const },
   id: text,
   orderNo: text,
   status: { type: 'string' as const, enum: ['ACTIVE', 'CANCELED'] },
