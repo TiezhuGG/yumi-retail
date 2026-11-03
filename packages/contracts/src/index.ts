@@ -1156,3 +1156,24 @@ export interface RedemptionAfterSalesPage {
   }>;
   nextCursor: string | null;
 }
+
+export interface ExpressReadiness {
+  checkedAt: string;
+  canLaunch: false;
+  warehouseName: string;
+  metrics: {
+    waiting: number;
+    shipped: number;
+    openFeedback: number;
+    oldestWaitingAt: string | null;
+    inconsistentOrders: number;
+    inconsistentFeedback: number;
+    inconsistentWaybills: number;
+  };
+  checks: Array<{
+    code: string;
+    title: string;
+    status: 'CONFIGURED' | 'BLOCKED' | 'UNVERIFIED';
+    detail: string;
+  }>;
+}

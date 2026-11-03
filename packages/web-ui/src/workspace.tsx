@@ -1,5 +1,6 @@
 import { RedemptionDeliveryWorkbench } from './redemption-delivery.js';
 import { RedemptionPickingWorkbench } from './redemption-picking.js';
+import { ExpressReadinessWorkbench } from './express-readiness.js';
 import { RedemptionsWorkbench } from './redemptions.js';
 import { RedemptionAfterSalesWorkbench } from './redemption-after-sales.js';
 import { RewardsWorkbench } from './rewards.js';
@@ -27,6 +28,7 @@ import { Brand } from './brand.js';
 export type WorkspaceView =
   | 'redemption-delivery'
   | 'redemption-picking'
+  | 'express-readiness'
   | 'redemptions'
   | 'redemption-after-sales'
   | 'rewards'
@@ -62,6 +64,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'express-readiness',
+    name: '积分快递首发检查',
+    glyph: '◇',
+    hint: '查看配置、待办与首发阻断项',
+    permission: 'points.read',
+  },
   {
     id: 'redemption-after-sales',
     name: '兑换售后反馈',
@@ -515,6 +524,8 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'express-readiness' ? (
+            <ExpressReadinessWorkbench />
           ) : activeView === 'redemption-after-sales' ? (
             <RedemptionAfterSalesWorkbench profile={profile} />
           ) : activeView === 'redemptions' ? (

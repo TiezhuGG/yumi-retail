@@ -3312,3 +3312,27 @@ small {
 .after-sales-table {
   overflow-x: auto;
 }
+.express-readiness-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+.express-readiness-metrics article {
+  background: white;
+  border: 1px solid #dce8df;
+  border-radius: 16px;
+  padding: 20px;
+}
+.express-readiness-metrics strong {
+  display: block;
+  font-size: 30px;
+  color: #078348;
+  margin-top: 8px;
+}
+.express-readiness-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
