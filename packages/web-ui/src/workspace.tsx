@@ -11,7 +11,7 @@ import { PickingLabWorkbench } from './picking-lab.js';
 import { PickingReadinessWorkbench } from './picking-readiness.js';
 import type { PaymentReviewDestination, OpenPaymentReview } from './payment-navigation.js';
 import { PaymentAdapterLabWorkbench } from './payment-adapter-lab.js';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
 import { CheckoutPolicyWorkbench } from './checkout-policy.js';
@@ -282,6 +282,22 @@ const routes: Array<{
     permission: 'stock.read',
   },
 ];
+
+const operationsNavigation: { label: string; views: WorkspaceView[] }[] = [
+  { label: '经营', views: ['overview', 'products', 'categories', 'orders', 'service-area', 'checkout-policy'] },
+  {
+    label: '积分与快递',
+    views: ['points', 'points-grants', 'points-corrections', 'rewards', 'redemptions', 'redemption-after-sales', 'express-readiness'],
+  },
+  {
+    label: '仓储与履约',
+    views: ['stock', 'receipts', 'locations', 'counts', 'dispositions', 'reversals', 'redemption-picking', 'redemption-delivery', 'picking-readiness', 'picking-lab', 'delivery-lab'],
+  },
+  {
+    label: '支付与核查',
+    views: ['payment-readiness', 'notification-records', 'payment-review-lab', 'payment-attempt-lab', 'payment-close-lab', 'payment-adapter-lab', 'notification-lab'],
+  },
+];
 type WorkspaceProps = { profile: StaffProfile; sessionControl: ReactNode; mobile?: boolean };
 export function Workspace(props: WorkspaceProps) {
   const p = props.profile;
@@ -412,6 +428,12 @@ function WorkspaceSession({
     return () => cancelAnimationFrame(frame);
   }, [activeView]);
   const route = allowed.find((r) => r.id === activeView);
+  const navigation = mobile
+    ? [{ label: '', items: allowed }]
+    : operationsNavigation.map(({ label, views }) => ({
+        label,
+        items: views.flatMap((id) => allowed.filter((entry) => entry.id === id)),
+      }));
   return (
     <div className={`workspace ${mobile ? 'mobile-workspace' : ''}`}>
       <aside className="sidebar">
@@ -420,7 +442,10 @@ function WorkspaceSession({
           {mobile ? (pickerOnly ? '拣货作业' : '仓库作业') : '运营管理'}
         </div>
         <nav aria-label="主导航">
-          {allowed.map((r) => (
+          {navigation.filter(({ items }) => items.length).map(({ label, items }) => (
+            <Fragment key={label}>
+              {label && <span className="workspace-nav-group">{label}</span>}
+              {items.map((r) => (
             <button
               key={r.id}
               ref={activeView === r.id ? activeNav : undefined}
@@ -432,6 +457,8 @@ function WorkspaceSession({
               {r.name}
               {activeView === r.id && <i />}
             </button>
+              ))}
+            </Fragment>
           ))}
         </nav>
         <div className="sidebar-note">

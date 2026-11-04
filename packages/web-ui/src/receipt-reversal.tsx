@@ -312,23 +312,44 @@ export function ReceiptReversalWorkbench({
             {!rows.some((d) => !statusFilter || d.status === statusFilter) && (
               <div className="empty-state">暂无符合条件的纠错申请，请调整筛选或新建申请。</div>
             )}
-            {rows
-              .filter((d) => !statusFilter || d.status === statusFilter)
-              .map((d) => (
-                <article key={d.id} className="task-card">
-                  <strong>
-                    收货纠错 {d.quantity} 件 · {states[d.status]}
-                  </strong>
-                  <p>
-                    {positions.find((p) => p.id === d.positionId)?.name ?? '商品位置资料未载入'} ·{' '}
-                    {d.reason}
-                  </p>
-                  <p>单号尾号 {d.id.slice(-8)}</p>
-                  <button style={button} onClick={() => void work(() => open(d.id))}>
-                    查看逆向单
-                  </button>
-                </article>
-              ))}
+            {rows.some((d) => !statusFilter || d.status === statusFilter) && (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>商品</th>
+                      <th>冲回件数</th>
+                      <th>原因</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows
+                      .filter((d) => !statusFilter || d.status === statusFilter)
+                      .map((d) => (
+                        <tr key={d.id}>
+                          <td>
+                            {positions.find((p) => p.id === d.positionId)?.name ??
+                              '商品位置资料未载入'}
+                            <small>单号尾号 {d.id.slice(-8)}</small>
+                          </td>
+                          <td>{d.quantity} 件</td>
+                          <td>{d.reason}</td>
+                          <td>
+                            <span className="badge">{states[d.status]}</span>
+                          </td>
+                          <td>
+                            <button style={button} onClick={() => void work(() => open(d.id))}>
+                              查看逆向单
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {cursor && (
               <button style={button} onClick={() => void work(() => load(cursor))}>
                 更多逆向单

@@ -183,14 +183,28 @@ export function PointsWorkbench() {
           </table>
         </div>
       )}
-      {selected && (
-        <div className="points-ledger">
+      {selected && entries.length > 0 && (
+        <div className="points-table-wrap">
+          <table className="points-table">
+          <thead><tr><th>时间（北京时间）</th><th>积分变动</th><th>说明</th></tr></thead>
+          <tbody>
           {entries.map((e) => (
-            <article className="points-entry" key={e.id}>
+            <tr key={e.id}>
+              <td>
+                <time>
+                  {new Date(e.createdAt).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    hour12: false,
+                  })}
+                </time>
+              </td>
+              <td>
               <strong className={e.delta.startsWith('-') ? 'points-debit' : 'points-credit'}>
                 {e.delta.startsWith('-') ? '' : '+'}
                 {e.delta} 积分
               </strong>
+              </td>
+              <td>
               <p>{e.reason}</p>
               {e.entryKind === 'GRANT_REVERSAL' && (
                 <p>
@@ -203,15 +217,11 @@ export function PointsWorkbench() {
                     : ''}
                 </p>
               )}
-              <time>
-                {new Date(e.createdAt).toLocaleString('zh-CN', {
-                  timeZone: 'Asia/Shanghai',
-                  hour12: false,
-                })}
-                （北京时间）
-              </time>
-            </article>
+              </td>
+            </tr>
           ))}
+          </tbody>
+          </table>
         </div>
       )}
       {cursor && !error && (

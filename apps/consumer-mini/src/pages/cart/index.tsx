@@ -375,18 +375,20 @@ export default function Cart() {
         </View>
       )}
       {!!items.length && (
-        <View className="cart-summary">
-          <Text>已勾选可用项参考小计</Text>
-          <Text className="cart-total">¥{(summary.totalCents / 100).toFixed(2)}</Text>
-          <Text>
-            {summary.units}件已计入{summary.excluded ? ` · ${summary.excluded}项待处理未计入` : ''}
-          </Text>
+        <View className="cart-summary cart-checkout-dock">
+          <View className="cart-checkout-price">
+            <Text>已选商品小计</Text>
+            <Text className="cart-total">¥{(summary.totalCents / 100).toFixed(2)}</Text>
+            <Text>
+              {summary.units}件已计入{summary.excluded ? ` · ${summary.excluded}项待处理未计入` : ''}
+            </Text>
+          </View>
           {accountMode ? (
             <Button
               disabled={busy || uncertain || pending || !items.some((i) => i.selected)}
               onClick={() => void Taro.navigateTo({ url: '/pages/checkout/index' })}
             >
-              结算前核验
+              去结算
             </Button>
           ) : (
             <Button disabled>登录账号后可核验费用</Button>

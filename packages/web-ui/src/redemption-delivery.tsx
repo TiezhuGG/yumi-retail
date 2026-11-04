@@ -601,27 +601,45 @@ function DeliveryPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           {!loading && !error && !items.length && (
             <div className="points-empty">暂无匹配的兑换交接单</div>
           )}
-          <div className="picking-cards">
-            {items.map((v) => (
-              <article className="reward-card" key={v.id}>
-                <h3>{v.title}</h3>
-                <p>
-                  {v.spec} · {v.quantity} 件 · {v.packageCount} 个包裹
-                </p>
-                <p>
-                  {states[v.state]}
-                  {v.exception && !v.exception.resolution ? ' · 配送异常待处理' : ''}
-                </p>
-                {v.assignment && <p>骑手：{v.assignment.riderName}</p>}
-                <button
-                  className="secondary-button"
-                  disabled={busy || !!intent}
-                  onClick={() => void load({ id: v.id })}
-                >
-                  查看交接详情
-                </button>
-              </article>
-            ))}
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>兑换商品 / 规格</th>
+                  <th>件数</th>
+                  <th>包裹</th>
+                  <th>骑手</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((v) => (
+                  <tr key={v.id}>
+                    <td>
+                      <strong>{v.title}</strong>
+                      <small>{v.spec}</small>
+                    </td>
+                    <td>{v.quantity}</td>
+                    <td>{v.packageCount}</td>
+                    <td>{v.assignment?.riderName ?? '—'}</td>
+                    <td>
+                      <span className="badge amber">{states[v.state]}</span>
+                      {v.exception && !v.exception.resolution && <small>配送异常待处理</small>}
+                    </td>
+                    <td>
+                      <button
+                        className="secondary-button"
+                        disabled={busy || !!intent}
+                        onClick={() => void load({ id: v.id })}
+                      >
+                        查看交接详情
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           {cursor && !error && (
             <button

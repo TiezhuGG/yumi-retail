@@ -351,16 +351,14 @@ export default function Addresses() {
               </View>
             )}
             {book.items.map((row) => (
-              <View key={row.id} className="address-card">
+              <View key={row.id} className="address-card address-book-card">
                 <View className="address-card-heading">
-                  <Text>
-                    {row.province} · {row.city} · {row.district}
-                  </Text>
-                  {row.isDefault && <Text className="address-default-tag">默认</Text>}
+                  <Text className="address-recipient">{row.contactName}</Text>
+                  {row.isDefault && <Text className="address-default-tag">默认地址</Text>}
                 </View>
-                <Text className="address-room">{row.detailAddress}</Text>
-                <Text className="address-contact">
-                  {row.contactName} {row.phone}
+                <Text className="address-contact">{row.phone}</Text>
+                <Text className="address-room">
+                  {row.province} · {row.city} · {row.district} · {row.detailAddress}
                 </Text>
                 {row.note && <Text className="address-hint">{row.note}</Text>}
                 {!row.available && (
@@ -388,20 +386,22 @@ export default function Addresses() {
                 </View>
               </View>
             ))}
-            <Button
-              className="account-primary address-add"
-              disabled={busy || unknown || book.items.length >= 20}
-              onClick={() => edit()}
-            >
-              ＋ 新增快递地址
-            </Button>
-            <Button
-              className="address-cancel"
-              disabled={busy || unknown}
-              onClick={() => void load()}
-            >
-              刷新寄送范围
-            </Button>
+            <View className="address-action-dock">
+              <Button
+                className="account-primary address-add"
+                disabled={busy || unknown || book.items.length >= 20}
+                onClick={() => edit()}
+              >
+                ＋ 新增快递地址
+              </Button>
+              <Button
+                className="address-cancel"
+                disabled={busy || unknown}
+                onClick={() => void load()}
+              >
+                刷新寄送范围
+              </Button>
+            </View>
           </>
         )}
       </View>

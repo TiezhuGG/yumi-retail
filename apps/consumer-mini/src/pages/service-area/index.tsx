@@ -54,14 +54,10 @@ export default function ServiceArea() {
     <View className="range-page">
       <View className="range-hero">
         <Text className="account-eyebrow">YUMI · NEIGHBORHOOD</Text>
-        <Text className="range-title">好物，送到邻里</Text>
-        <Text className="range-subtitle">当前服务小区与楼栋</Text>
-        <Text className="range-mark">⌂</Text>
+        <Text className="range-title">小区配送范围</Text>
+        <Text className="range-subtitle">查询已开通服务的小区与楼栋</Text>
       </View>
       <View className="range-content">
-        <View className="range-notice">
-          仅展示当前有效范围，下单及地址保存尚未开放。范围可能调整，请以实际下单时的核验为准。
-        </View>
         {loading ? (
           <View className="range-state">
             <Text>正在读取配送范围…</Text>
@@ -101,11 +97,11 @@ export default function ServiceArea() {
                 placeholder="输入楼栋名称查找"
                 onInput={(e) => setFilter(e.detail.value)}
               />
-              <View className="range-grid">
+              <View className="range-building-list">
                 {items.map((b) => (
                   <View key={b.id} className="range-building">
-                    <Text>⌂</Text>
                     <Text>{b.name}</Text>
+                    <Text className="range-building-tag">已开通</Text>
                   </View>
                 ))}
               </View>

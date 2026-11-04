@@ -305,31 +305,47 @@ function RecordsPanel({
             {!data.items.length ? (
               <div className="empty-state">暂无合成通知记录</div>
             ) : (
-              <div className="readiness-checks">
-                {data.items.map((row) => (
-                  <article className="readiness-check" key={row.id}>
-                    <div>
-                      <h3>合成通知 · {row.notificationId.slice(-8)}</h3>
-                      <span className="badge amber">
-                        {row.application ? '已关联合成证据' : '仅记录'}
-                      </span>
-                    </div>
-                    <p>
-                      {new Date(row.createdAt).toLocaleString('zh-CN', {
-                        timeZone: 'Asia/Shanghai',
-                        hour12: false,
-                      })}{' '}
-                      · ¥{(row.amountCents / 100).toFixed(2)}
-                    </p>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => setSelected(row)}
-                    >
-                      查看记录
-                    </button>
-                  </article>
-                ))}
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>记录</th>
+                      <th>关联状态</th>
+                      <th>接收时间与金额</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>合成通知 · {row.notificationId.slice(-8)}</strong>
+                        </td>
+                        <td>
+                          <span className="badge amber">
+                            {row.application ? '已关联合成证据' : '仅记录'}
+                          </span>
+                        </td>
+                        <td>
+                          {new Date(row.createdAt).toLocaleString('zh-CN', {
+                            timeZone: 'Asia/Shanghai',
+                            hour12: false,
+                          })}{' '}
+                          · ¥{(row.amountCents / 100).toFixed(2)}
+                        </td>
+                        <td>
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => setSelected(row)}
+                          >
+                            查看记录
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
             {data.nextCursor && (

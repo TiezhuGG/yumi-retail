@@ -164,8 +164,8 @@ export default function Checkout() {
     <View className="checkout-page">
       <View className="address-hero">
         <Text className="account-eyebrow">YUMI · CHECK BEFORE ORDER</Text>
-        <Text className="address-title">结算核验</Text>
-        <Text className="address-subtitle">核对商品、地址与费用，放心准备下一步</Text>
+        <Text className="address-title">确认订单</Text>
+        <Text className="address-subtitle">请核对商品、地址与配送费用</Text>
       </View>
       <View className="address-content">
         <View className="checkout-notice">
@@ -293,8 +293,9 @@ export default function Checkout() {
               {busy ? '正在核验…' : '核验商品与费用'}
             </Button>
             {preview && (
+              <>
               <View className="address-card checkout-result">
-                <Text className="address-section-title">{quote ? '本次报价' : '核验结果'}</Text>
+                <Text className="address-section-title">商品核验结果</Text>
                 {preview.issues.map((i) => (
                   <View className="address-alert checkout-issue" key={i.code}>
                     {i.message}
@@ -330,6 +331,9 @@ export default function Checkout() {
                     </View>
                   </View>
                 ))}
+              </View>
+              <View className="address-card checkout-result">
+                <Text className="address-section-title">{quote ? '本次报价' : '金额明细'}</Text>
                 <View className="checkout-amount">
                   <Text>商品金额</Text>
                   <Text>{money(preview.goodsCents)}</Text>
@@ -379,6 +383,7 @@ export default function Checkout() {
                   )
                 )}
               </View>
+              </>
             )}
             <Button
               className="checkout-refresh address-cancel"

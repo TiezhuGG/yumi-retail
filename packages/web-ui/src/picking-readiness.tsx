@@ -175,28 +175,45 @@ function PickingList({ url, onOpen }: { url: string; onOpen: (id: string) => voi
           <p>可调整查询或稍后刷新；本页不会生成示例订单。</p>
         </div>
       ) : (
-        <div className="picking-order-grid">
-          {page.items.map((row) => (
-            <article className="readiness-check picking-order-card" key={row.id}>
-              <div>
-                <h3>{row.orderNo}</h3>
-                <span className="badge amber">
-                  {row.status === 'CANCELED' ? '已取消' : '待付款'}
-                </span>
-              </div>
-              <p>
-                {row.itemCount} 种规格 · 合计 {row.totalQuantity} 件
-              </p>
-              <p>{time(row.createdAt)}</p>
-              <button
-                className="text-button"
-                disabled={page.loading}
-                onClick={() => onOpen(row.id)}
-              >
-                查看资格与备货清单
-              </button>
-            </article>
-          ))}
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>订单号</th>
+                <th>规格数</th>
+                <th>件数</th>
+                <th>创建时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {page.items.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <strong>{row.orderNo}</strong>
+                  </td>
+                  <td>{row.itemCount}</td>
+                  <td>{row.totalQuantity}</td>
+                  <td>{time(row.createdAt)}</td>
+                  <td>
+                    <span className="badge amber">
+                      {row.status === 'CANCELED' ? '已取消' : '待付款'}
+                    </span>
+                  </td>
+                  <td>
+                    <button
+                      className="text-button"
+                      disabled={page.loading}
+                      onClick={() => onOpen(row.id)}
+                    >
+                      查看资格与备货清单
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
       {page.cursor && (

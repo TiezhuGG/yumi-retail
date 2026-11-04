@@ -28,8 +28,8 @@ export default {
     selectedColor: '#087342',
     backgroundColor: '#ffffff',
     list: [
-      { pagePath: 'pages/index/index', text: '首页' },
-      { pagePath: 'pages/rewards/index', text: '积分商城' },
+      { pagePath: 'pages/index/index', text: '商城' },
+      { pagePath: 'pages/redemptions/index', text: '兑换订单' },
       { pagePath: 'pages/account/index', text: '我的' },
     ],
   },

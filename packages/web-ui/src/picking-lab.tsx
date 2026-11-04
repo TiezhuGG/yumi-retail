@@ -308,30 +308,53 @@ function LabPanel({
           ) : !list?.items.length ? (
             <div className="empty-state">暂无合成拣货任务</div>
           ) : (
-            <div className="picking-order-grid">
-              {list.items.map((t) => (
-                <article className="readiness-check picking-order-card" key={t.id}>
-                  <h3>{t.label}</h3>
-                  <span className="badge amber">
-                    {t.shortages.some((s) => s.state === 'OPEN')
-                      ? '有未决缺货，暂停核对'
-                      : t.state === 'PICKING'
-                        ? '已领取，核对中'
-                        : t.pack?.dispatch
-                          ? '合成出库已记录'
-                          : t.pack
-                            ? '合成打包已记录'
-                            : states[t.state]}
-                  </span>
-                  <p>
-                    领取人：{t.ownerName ?? '尚未领取'} · 已核对{' '}
-                    {t.lines.filter((i) => i.checked).length}/2 行
-                  </p>
-                  <button className="text-button" disabled={busy} onClick={() => void open(t.id)}>
-                    查看演练任务
-                  </button>
-                </article>
-              ))}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>任务</th>
+                    <th>领取人</th>
+                    <th>核对进度</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <strong>{t.label}</strong>
+                      </td>
+                      <td>{t.ownerName ?? '尚未领取'}</td>
+                      <td>
+                        {t.lines.filter((i) => i.checked).length}/{t.lines.length} 行
+                      </td>
+                      <td>
+                        <span className="badge amber">
+                          {t.shortages.some((s) => s.state === 'OPEN')
+                            ? '有未决缺货，暂停核对'
+                            : t.state === 'PICKING'
+                              ? '已领取，核对中'
+                              : t.pack?.dispatch
+                                ? '合成出库已记录'
+                                : t.pack
+                                  ? '合成打包已记录'
+                                  : states[t.state]}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() => void open(t.id)}
+                        >
+                          查看演练任务
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {list?.nextCursor && (

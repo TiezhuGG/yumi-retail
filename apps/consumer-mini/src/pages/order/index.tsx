@@ -69,7 +69,7 @@ export default function OrderDetail() {
     }
   }
   return (
-    <View className="orders-page">
+    <View className="orders-page retail-order-detail">
       <View className="address-hero">
         <Text className="account-eyebrow">YUMI · ORDER DETAIL</Text>
         <Text className="address-title">订单详情</Text>
@@ -94,7 +94,8 @@ export default function OrderDetail() {
           </View>
         ) : (
           <>
-            <View className="address-card order-state">
+            <View className="address-card order-state redemption-progress">
+              <Text className="points-store-tag">零售订单</Text>
               <Text className="address-section-title">
                 {order.status === 'CANCELED' ? '订单已取消' : '待支付 · 尚未开始支付'}
               </Text>
@@ -110,6 +111,10 @@ export default function OrderDetail() {
                 {new Date(order.paymentDeadline).toLocaleString('zh-CN', { hour12: false })}
               </Text>
               <Text className="order-number">{order.orderNo}</Text>
+              <View className="retail-order-status-price">
+                <Text>订单金额</Text>
+                <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
+              </View>
             </View>
             <View className="address-card">
               <Text className="address-section-title">收货信息</Text>
@@ -149,10 +154,6 @@ export default function OrderDetail() {
               <View className="checkout-amount">
                 <Text>配送费</Text>
                 <Text>¥{(order.deliveryFeeCents / 100).toFixed(2)}</Text>
-              </View>
-              <View className="checkout-total">
-                <Text>订单金额</Text>
-                <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
               </View>
             </View>
             <PaymentPreparationCard

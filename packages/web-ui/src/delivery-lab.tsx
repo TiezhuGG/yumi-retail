@@ -355,57 +355,75 @@ function DeliveryPanel({
                   : '暂无分配给你的合成任务'}
             </div>
           ) : (
-            <div className="picking-order-grid">
-              {list.items.map((t) => (
-                <article className="readiness-check picking-order-card" key={t.id}>
-                  <h3>{t.label}</h3>
-                  <span className={'badge ' + (t.assignment ? 'green' : 'amber')}>
-                    {t.journey.completion
-                      ? '合成送达已记录'
-                      : t.journey.start
-                        ? '合成配送中'
-                        : t.handoff
-                          ? '合成接货已记录'
-                          : t.assignment
-                            ? '已分配 · 尚未交接'
-                            : '待分配骑手'}
-                  </span>
-                  {t.exception && (
-                    <p className="badge amber">
-                      {t.exception.resolution ? '已处置异常' : '待处置异常'} ·{' '}
-                      {exceptionNames[t.exception.reason]}
-                    </p>
-                  )}
-                  <p>
-                    {t.packageCount} 个合成包裹 · {t.assignment?.riderName ?? '尚无骑手'}
-                  </p>
-                  <button
-                    id={'delivery-source-' + t.id + '-detail'}
-                    className="text-button"
-                    disabled={busy}
-                    onClick={() => void open(t.id)}
-                  >
-                    查看合成配送
-                  </button>
-                  {t.exception && (
-                    <button
-                      id={
-                        'delivery-source-' +
-                        t.id +
-                        '-' +
-                        (t.exception.resolution ? 'RESOLVE' : 'EXCEPTION')
-                      }
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() =>
-                        void open(t.id, t.exception!.resolution ? 'RESOLVE' : 'EXCEPTION')
-                      }
-                    >
-                      追溯当前异常凭据
-                    </button>
-                  )}
-                </article>
-              ))}
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>任务</th>
+                    <th>包裹</th>
+                    <th>骑手</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.items.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <strong>{t.label}</strong>
+                      </td>
+                      <td>{t.packageCount} 个</td>
+                      <td>{t.assignment?.riderName ?? '尚无骑手'}</td>
+                      <td>
+                        <span className={'badge ' + (t.assignment ? 'green' : 'amber')}>
+                          {t.journey.completion
+                            ? '合成送达已记录'
+                            : t.journey.start
+                              ? '合成配送中'
+                              : t.handoff
+                                ? '合成接货已记录'
+                                : t.assignment
+                                  ? '已分配 · 尚未交接'
+                                  : '待分配骑手'}
+                        </span>
+                        {t.exception && (
+                          <p className="badge amber">
+                            {t.exception.resolution ? '已处置异常' : '待处置异常'} ·{' '}
+                            {exceptionNames[t.exception.reason]}
+                          </p>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          id={'delivery-source-' + t.id + '-detail'}
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() => void open(t.id)}
+                        >
+                          查看合成配送
+                        </button>
+                        {t.exception && (
+                          <button
+                            id={
+                              'delivery-source-' +
+                              t.id +
+                              '-' +
+                              (t.exception.resolution ? 'RESOLVE' : 'EXCEPTION')
+                            }
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() =>
+                              void open(t.id, t.exception!.resolution ? 'RESOLVE' : 'EXCEPTION')
+                            }
+                          >
+                            追溯当前异常凭据
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
           {list?.nextCursor && (

@@ -47,7 +47,7 @@ export default function RewardDetail() {
   const valid = !!item && count >= 1 && count <= item.available;
   // Values are bounded to 1e9 points and 1e5 pieces, within JS safe integer range.
   return (
-    <View className="account-page reward-detail-page">
+    <View className="account-page reward-detail-page reward-product-page">
       <View className="account-content">
         {loading && <Text className="account-copy">正在读取商品详情…</Text>}
         {error && (
@@ -58,7 +58,7 @@ export default function RewardDetail() {
             </Button>
             <Button
               className="points-action"
-              onClick={() => void Taro.switchTab({ url: '/pages/rewards/index' })}
+              onClick={() => void Taro.navigateTo({ url: '/pages/rewards/index' })}
             >
               返回积分商城
             </Button>
@@ -67,13 +67,18 @@ export default function RewardDetail() {
         {item && (
           <>
             <ProductVisual name={item.name} imageUrl={item.imageUrl} large />
+            <View className="reward-product-heading">
+              <View>
+                <Text className="points-store-tag">积分兑换</Text>
+                <Text className="reward-product-name">{item.title}</Text>
+              </View>
+              <Text className="reward-price">{item.pointsPrice} 积分 / 件</Text>
+            </View>
             <View className="account-card">
-              <Text className="account-eyebrow">积分兑换好物</Text>
-              <Text className="account-card-title">{item.title}</Text>
+              <Text className="account-card-title">商品规格</Text>
               <Text className="account-copy">
                 {item.name} · {item.spec} / {item.unit}
               </Text>
-              <Text className="reward-price">{item.pointsPrice} 积分 / 件</Text>
               <Text className="account-copy">{item.description || '暂无更多商品说明'}</Text>
             </View>
             <View className="account-card">
@@ -126,6 +131,8 @@ export default function RewardDetail() {
               >
                 查看配送范围 →
               </Button>
+            </View>
+            <View className="reward-action-dock">
               <Button
                 className="points-action"
                 disabled={!item.redemptionEnabled || !valid}

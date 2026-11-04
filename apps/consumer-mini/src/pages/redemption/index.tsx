@@ -84,7 +84,7 @@ export default function RedemptionDetail() {
     }
   }
   return (
-    <View className="account-page reward-detail-page">
+    <View className="account-page reward-detail-page redemption-order-page">
       <View className="account-hero">
         <Text className="account-eyebrow">YUMI · 兑换详情</Text>
         <Text className="account-name">
@@ -100,16 +100,11 @@ export default function RedemptionDetail() {
         )}
         {order && (
           <>
-            <View className="account-card">
-              <Text className="account-card-title">{order.title}</Text>
-              <Text className="account-copy">
-                {order.spec} / {order.unit} · {order.quantity} 件
-              </Text>
-              <Text className="reward-price">{order.totalPoints} 积分</Text>
-              <Text className="account-copy">
+            <View className="account-card redemption-progress">
+              <Text className="points-store-tag">
                 {order.deliveryMode === 'EXPRESS' ? '积分快递订单' : '积分兑换订单'}
               </Text>
-              <Text className="account-copy">
+              <Text className="redemption-progress-title">
                 {order.status === 'CANCELED'
                   ? '积分已退还，库存和限兑配额已释放。'
                   : order.deliveryMode === 'EXPRESS'
@@ -203,9 +198,14 @@ export default function RedemptionDetail() {
                 </Button>
               </View>
             )}
-            {order.deliveryMode === 'EXPRESS' && order.expressShipment && (
-              <RedemptionAfterSales key={order.id} orderId={order.id} />
-            )}
+            <View className="account-card">
+              <Text className="account-eyebrow">兑换商品</Text>
+              <Text className="account-card-title">{order.title}</Text>
+              <Text className="account-copy">
+                {order.spec} / {order.unit} · {order.quantity} 件
+              </Text>
+              <Text className="reward-price">{order.totalPoints} 积分</Text>
+            </View>
             {order.address && (
               <View className="account-card">
                 <Text className="account-card-title">收货地址快照</Text>
@@ -214,6 +214,9 @@ export default function RedemptionDetail() {
                   {order.address.contactName} · {order.address.phone}
                 </Text>
               </View>
+            )}
+            {order.deliveryMode === 'EXPRESS' && order.expressShipment && (
+              <RedemptionAfterSales key={order.id} orderId={order.id} />
             )}
             {order.status === 'ACTIVE' &&
               ![
@@ -249,7 +252,7 @@ export default function RedemptionDetail() {
         </Button>
         <Button
           className="account-link"
-          onClick={() => void Taro.navigateTo({ url: '/pages/redemptions/index' })}
+          onClick={() => void Taro.switchTab({ url: '/pages/redemptions/index' })}
         >
           查看全部兑换单 →
         </Button>

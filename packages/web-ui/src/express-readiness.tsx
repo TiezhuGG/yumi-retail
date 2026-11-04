@@ -29,11 +29,15 @@ export function ExpressReadinessWorkbench() {
   }, []);
   return (
     <section aria-label="积分快递首发检查">
-      <div className="notice">
-        <strong>当前未具备上线条件</strong>
-        <p>
-          本页只读取当前配置与本仓待办。已配置不代表经营验收完成，刷新不会开放交易或发布小程序。
-        </p>
+      <div className="surface express-release-heading">
+        <div>
+          <span className="badge amber">待验收</span>
+          <h2>当前未具备上线条件</h2>
+          <p>查看当前配置、仓库待办及需要单独验收的项目。</p>
+        </div>
+        <button className="primary-button" disabled={loading} onClick={() => void load()}>
+          刷新首发检查
+        </button>
       </div>
       {loading && <p role="status">正在核对首发条件…</p>}
       {error && (
@@ -84,25 +88,34 @@ export function ExpressReadinessWorkbench() {
             {view.metrics.inconsistentFeedback} · 运单归属差异 {view.metrics.inconsistentWaybills}
             。数字来自本次快照，未接外部告警。
           </p>
-          <div className="express-readiness-checks">
-            {view.checks.map((c) => (
-              <article key={c.code} className="picking-pack-proof">
-                <h3>{c.title}</h3>
-                <p className={c.status === 'BLOCKED' ? 'notice task-error' : 'notice'}>
-                  {labels[c.status]}
-                </p>
-                <p>{c.detail}</p>
-              </article>
-            ))}
-          </div>
+          <section aria-label="发布条件">
+            <h2 className="express-release-section-title">发布条件</h2>
+            <div className="express-readiness-checks">
+              {view.checks.map((c) => (
+                <article key={c.code} className="picking-pack-proof">
+                  <h3>{c.title}</h3>
+                  <p
+                    className={
+                      'badge ' +
+                      (c.status === 'BLOCKED'
+                        ? 'red'
+                        : c.status === 'CONFIGURED'
+                          ? 'green'
+                          : 'amber')
+                    }
+                  >
+                    {labels[c.status]}
+                  </p>
+                  <p>{c.detail}</p>
+                </article>
+              ))}
+            </div>
+          </section>
           <p>
             首发仅积分兑换及人工快递发货；现金支付、电子面单和骑手配送不属于本次必经流程。原配送方案保留。
           </p>
         </>
       )}
-      <button className="primary-button" disabled={loading} onClick={() => void load()}>
-        刷新首发检查
-      </button>
     </section>
   );
 }

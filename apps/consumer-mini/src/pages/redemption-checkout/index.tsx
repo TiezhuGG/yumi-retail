@@ -263,10 +263,7 @@ export default function RedemptionCheckout() {
         {!pending && reward && book && (
           <>
             <View className="account-card">
-              <Text className="account-card-title">{reward.title}</Text>
-              <Text className="account-copy">
-                {reward.spec} / {reward.unit} · {params.quantity ?? '1'} 件
-              </Text>
+              <Text className="account-card-title">快递收货地址</Text>
               <Text className="account-copy">
                 {policy?.enabled
                   ? '可寄送：' + policy.provinces.join('、') + ' · 商家承担运费'
@@ -305,6 +302,13 @@ export default function RedemptionCheckout() {
               >
                 管理快递地址 →
               </Button>
+            </View>
+            <View className="account-card">
+              <Text className="account-card-title">兑换商品</Text>
+              <Text className="account-copy">{reward.title}</Text>
+              <Text className="account-copy">
+                {reward.spec} / {reward.unit} · {params.quantity ?? '1'} 件
+              </Text>
             </View>
             {access && (
               <Text className="account-copy">
@@ -365,7 +369,7 @@ export default function RedemptionCheckout() {
         </Button>
         <Button
           className="account-link"
-          onClick={() => void Taro.navigateTo({ url: '/pages/redemptions/index' })}
+          onClick={() => void Taro.switchTab({ url: '/pages/redemptions/index' })}
         >
           我的兑换订单 →
         </Button>

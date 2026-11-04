@@ -157,15 +157,21 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
           </button>
           {view?.ticket && (
             <>
+              <div className="redemption-detail-summary">
+              <div>
               <h2>{view.title}</h2>
               <p>
                 {view.spec} · {view.quantity} 件
               </p>
               <p className="redemption-order-no">兑换单号：{view.orderNo}</p>
-              <p className="notice">
+              </div>
+              <p className="badge amber">
                 {statuses[view.ticket.status]} · {categories[view.ticket.category]}
               </p>
+              </div>
+              <div className="after-sales-detail-columns">
               <div className="after-sales-timeline">
+                <h3>沟通记录</h3>
                 {view.ticket.events.map((e) => (
                   <article key={e.version} className="picking-pack-proof">
                     <h3>
@@ -257,6 +263,7 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
                   </button>
                 </form>
               )}
+              </div>
             </>
           )}
         </>

@@ -433,34 +433,56 @@ export function StockDispositionWorkbench({
                 暂无符合条件的处置申请，请调整筛选或从隔离记录发起。
               </div>
             )}
-            {documents
-              .filter((d) => !statusFilter || d.status === statusFilter)
-              .map((d) => (
-                <article key={d.id} className="task-card">
-                  <strong>
-                    {d.kind === 'DAMAGE' ? '报损' : '解除隔离'} · {d.quantity} 件 ·{' '}
-                    {states[d.status]}
-                  </strong>
-                  <p>{name(d.positionId)}</p>
-                  <p>
-                    {d.reason} · 单号尾号 {d.id.slice(-8)}
-                  </p>
-                  <button
-                    style={button}
-                    onClick={() =>
-                      void work(async () =>
-                        setDocument(
-                          await staffRequest<StockDisposition>(
-                            `${root}/stock-dispositions/${d.id}`,
-                          ),
-                        ),
-                      )
-                    }
-                  >
-                    查看处置单
-                  </button>
-                </article>
-              ))}
+            {documents.some((d) => !statusFilter || d.status === statusFilter) && (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>商品位置</th>
+                      <th>处置类型</th>
+                      <th>数量</th>
+                      <th>原因</th>
+                      <th>状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documents
+                      .filter((d) => !statusFilter || d.status === statusFilter)
+                      .map((d) => (
+                        <tr key={d.id}>
+                          <td>
+                            {name(d.positionId)}
+                            <small>单号尾号 {d.id.slice(-8)}</small>
+                          </td>
+                          <td>{d.kind === 'DAMAGE' ? '报损' : '解除隔离'}</td>
+                          <td>{d.quantity} 件</td>
+                          <td>{d.reason}</td>
+                          <td>
+                            <span className="badge">{states[d.status]}</span>
+                          </td>
+                          <td>
+                            <button
+                              style={button}
+                              onClick={() =>
+                                void work(async () =>
+                                  setDocument(
+                                    await staffRequest<StockDisposition>(
+                                      `${root}/stock-dispositions/${d.id}`,
+                                    ),
+                                  ),
+                                )
+                              }
+                            >
+                              查看处置单
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {docCursor && (
               <button style={button} onClick={() => void work(() => loadDocuments(docCursor))}>
                 更多处置申请

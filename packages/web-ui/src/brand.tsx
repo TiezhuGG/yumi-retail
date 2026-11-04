@@ -19,11 +19,17 @@ export function Brand() {
   return (
     <span className="brand">
       <span className="brand-mark">
-        <CornMark />
+        <svg viewBox="0 0 35 35" fill="none" aria-hidden="true">
+          <rect width="35" height="35" rx="11" fill="#F9DA61" />
+          <rect x="11" y="9" width="5" height="7" rx="2.5" fill="#282C23" />
+          <rect x="19" y="9" width="5" height="7" rx="2.5" fill="#282C23" />
+          <rect x="11" y="18" width="5" height="7" rx="2.5" fill="#282C23" />
+          <rect x="19" y="18" width="5" height="7" rx="2.5" fill="#282C23" />
+        </svg>
       </span>
       <span>
         <strong>玉米百货</strong>
-        <small>社区好生活</small>
+        <small>YUMI WORKSPACE</small>
       </span>
     </span>
   );

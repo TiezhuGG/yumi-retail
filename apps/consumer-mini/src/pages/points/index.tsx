@@ -79,9 +79,9 @@ export default function Points() {
     [],
   );
   return (
-    <View className="account-page points-page">
-      <View className="account-hero">
-        <Text className="account-eyebrow">YUMI · 积分账户</Text>
+    <View className="account-page points-page points-ledger-page">
+      <View className="points-ledger-balance">
+        <Text className="points-ledger-label">可用积分</Text>
         <Text className="account-name">
           {loading
             ? '正在读取…'
@@ -91,6 +91,7 @@ export default function Points() {
                 ? '积分暂不可用'
                 : balance + ' 积分'}
         </Text>
+        <Text className="points-ledger-label">YUMI DAILY · 积分账户</Text>
       </View>
       <View className="account-content">
         {guest ? (
@@ -121,12 +122,14 @@ export default function Points() {
                 {items.length === 0 && <Text>暂无积分记录</Text>}
               </View>
               {items.map((e) => (
-                <View className="account-card" key={e.id}>
-                  <Text className="account-card-title">
+                <View className="account-card points-ledger-entry" key={e.id}>
+                  <View className="points-ledger-entry-heading">
+                  <Text className="account-card-title">{e.reason}</Text>
+                  <Text className="points-ledger-delta">
                     {e.delta.startsWith('-') ? '' : '+'}
                     {e.delta} 积分
                   </Text>
-                  <Text className="account-copy">{e.reason}</Text>
+                  </View>
                   {e.redemptionId && (
                     <Button
                       className="account-link redemption-order-no"

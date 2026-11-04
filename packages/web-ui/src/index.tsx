@@ -136,46 +136,10 @@ export function StaffSessionPanel({
           <Brand />
           <span>用心服务，近在身边</span>
         </header>
-        <main className="login-layout">
-          <section className="login-story">
-            <span className="eyebrow">YOUR NEIGHBORHOOD, OUR CARE</span>
-            <h1>
-              让社区生活
-              <br />
-              更简单<span>。</span>
-            </h1>
-            <p>
-              好物触手可及，经营井然有序。
-              <br />
-              每一份日常，都值得用心对待。
-            </p>
-            <div className="shop-illustration" aria-hidden="true">
-              <div className="shop-sun" />
-              <div className="shop-tree left" />
-              <div className="shop-tree right" />
-              <div className="shop-building">
-                <div className="shop-sign">🌽 玉米百货</div>
-                <div className="shop-awning" />
-                <div className="shop-windows">
-                  <i />
-                  <b />
-                  <i />
-                </div>
-                <div className="shop-step" />
-              </div>
-              <div className="shop-parcel one">好物</div>
-              <div className="shop-parcel two">日常</div>
-              <div className="shop-ground" />
-            </div>
-            <div className="story-benefits">
-              <span>✧ 品质好物</span>
-              <span>⌂ 社区配送</span>
-              <span>✓ 放心经营</span>
-            </div>
-          </section>
+        <main className="login-layout staff-login-layout">
           <section className="login-card">
-            <span className="login-kicker">欢迎回来</span>
-            <h2>登录工作空间</h2>
+            <div className="staff-login-brand"><Brand /></div>
+            <h1>员工登录</h1>
             <p>玉米百货 · 运营与仓库作业</p>
             <form onSubmit={(e) => void login(e)}>
               <label>

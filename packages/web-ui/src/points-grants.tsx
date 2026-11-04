@@ -186,6 +186,7 @@ export function PointsGrants({
         {!correction && '· 按北京时间核算每日预算。'}
       </div>
       <div className="points-toolbar">
+        <h2 className="points-queue-heading">{correction ? '冲正申请队列' : '积分审批队列'}</h2>
         <button
           className="primary-button"
           onClick={() => {
@@ -228,14 +229,20 @@ export function PointsGrants({
       {!loading && data.items.length === 0 && (
         <div className="points-empty">{correction ? '暂无冲正申请' : '暂无发放申请'}</div>
       )}
-      <div className="points-ledger">
-        {data.items.map((g) => (
-          <article className="points-entry" key={g.id}>
-            <strong>
-              {g.displayName} · {g.amount} 积分
-            </strong>
-            <p>{statusLabel(g.status)}</p>
-            <p>{g.reason}</p>
+      {data.items.length > 0 && (
+      <div className="points-table-wrap">
+        <table className="points-table">
+          <thead>
+            <tr><th>用户</th><th>积分</th><th>申请原因</th><th>状态</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+          {data.items.map((g) => (
+          <tr key={g.id}>
+            <td><strong>{g.displayName}</strong></td>
+            <td>{correction ? '−' : '+'}{g.amount} 积分</td>
+            <td>{g.reason}</td>
+            <td><span className="badge">{statusLabel(g.status)}</span></td>
+            <td>
             <button
               className="secondary-button"
               onClick={() => {
@@ -246,9 +253,13 @@ export function PointsGrants({
             >
               查看申请
             </button>
-          </article>
+            </td>
+          </tr>
         ))}
+          </tbody>
+        </table>
       </div>
+      )}
       {data.nextCursor && (
         <button
           className="secondary-button"

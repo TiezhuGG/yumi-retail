@@ -1,1 +1,1 @@
-export default { navigationBarTitleText: '玉米百货' };
+export default { navigationBarTitleText: '积分商城' };

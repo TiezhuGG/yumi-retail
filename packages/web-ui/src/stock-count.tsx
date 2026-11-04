@@ -250,28 +250,50 @@ export function StockCountWorkbench({
             </p>
           </div>
         )}
-        <div className="count-list">
-          {!loading &&
-            !loadError &&
-            shown.map((row) => (
-              <article key={row.id} className="count-card">
-                <div>
-                  <span className={`count-state count-state-${row.status}`}>
-                    {states[row.status]}
-                  </span>
-                  <h3>{positions.find((p) => p.skuId === row.skuId)?.name ?? '商品资料未载入'}</h3>
-                  <p>
-                    {row.lines.length} 个位置 · {new Date(row.createdAt).toLocaleString('zh-CN')}
-                  </p>
-                  <p>{row.reason}</p>
-                  <small>单号尾号 {row.id.slice(-8)}</small>
-                </div>
-                <button className="secondary-button" onClick={() => void work(() => open(row.id))}>
-                  查看详情 →
-                </button>
-              </article>
-            ))}
-        </div>
+        {!loading && !loadError && shown.length > 0 && (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>商品</th>
+                  <th>位置数</th>
+                  <th>发起时间</th>
+                  <th>原因</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <strong>
+                        {positions.find((p) => p.skuId === row.skuId)?.name ?? '商品资料未载入'}
+                      </strong>
+                      <small>单号尾号 {row.id.slice(-8)}</small>
+                    </td>
+                    <td>{row.lines.length}</td>
+                    <td>{new Date(row.createdAt).toLocaleString('zh-CN')}</td>
+                    <td>{row.reason}</td>
+                    <td>
+                      <span className={`count-state count-state-${row.status}`}>
+                        {states[row.status]}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="secondary-button"
+                        onClick={() => void work(() => open(row.id))}
+                      >
+                        查看详情 →
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         {cursor && (
           <button className="secondary-button" onClick={() => void work(() => load(cursor))}>
             加载更多盘点单

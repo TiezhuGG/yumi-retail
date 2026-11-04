@@ -265,10 +265,6 @@ export function CatalogWorkbench({
       )}
       {view === 'overview' && (
         <>
-          <section className="welcome-banner">
-            <h2>你好，{profile.displayName}。今天也一起用心经营。</h2>
-            <p>从整理商品到核对每一份收货，让邻里需要的好物都准备妥当。</p>
-          </section>
           <div className="stat-grid">
             {[
               {
@@ -334,6 +330,11 @@ export function CatalogWorkbench({
                 </button>
               ))}
           </div>
+          <section className="workspace-overview-note">
+            <small>YUMI WORKSPACE / 01</small>
+            <h2>关注待办与异常</h2>
+            <p>先核对待处理收货和库存异常，再进入对应工作队列。</p>
+          </section>
           <div className="overview-columns">
             <section className="surface">
               <div className="surface-head">
@@ -759,6 +760,7 @@ export function CatalogWorkbench({
                   <th>实物库存</th>
                   <th>预占</th>
                   <th>不可售</th>
+                  <th>安全库存</th>
                   <th>状态</th>
                   <th>操作</th>
                 </tr>
@@ -783,6 +785,7 @@ export function CatalogWorkbench({
                       </td>
                       <td data-label="预占">{s.reserved}</td>
                       <td data-label="不可售">{s.blocked}</td>
+                      <td data-label="安全库存">{s.safety}</td>
                       <td>
                         <span
                           className={`badge ${s.inventoryHold ? 'red' : s.activeCountId ? 'amber' : 'green'}`}

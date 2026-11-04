@@ -304,107 +304,188 @@ export function LocationWorkbench({
             }[pane]
           }
         >
-          {pane === 'positions' &&
-            positions.items.map((p) => (
-              <article className="task-card" key={p.id}>
-                <strong>
-                  {p.name} · {p.spec}
-                </strong>
-                <p>
-                  {p.locationCode} · 批次 {p.batchNo}
-                </p>
-                <p>
-                  实物 {p.onHand} / 预占 {p.reserved} / 不可售 {p.blocked} ·{' '}
-                  {p.expired ? '已过期，不可售' : p.locationEnabled ? '库位启用' : '库位停用'}
-                </p>
-                <div className="location-row-actions">
-                  <button
-                    className="secondary-button"
-                    onClick={() => {
-                      clear();
-                      setPosition(p);
-                    }}
-                  >
-                    查看位置与流水
-                  </button>
-                  {can('stock.transfer') && (
-                    <button
-                      className="secondary-button"
-                      disabled={p.reserved > 0 || p.onHand <= p.blocked}
-                      onClick={() => startTransfer(p.id)}
-                    >
-                      移位
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          {pane === 'locations' &&
-            locations.items.map((l) => (
-              <article className="task-card" key={l.id}>
-                <strong>
-                  {l.code} · {l.name}
-                </strong>
-                <p>
-                  {l.enabled ? '启用' : '停用'}
-                  {l.code === 'DEFAULT' ? ' · 默认收货位' : ''}
-                </p>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    clear();
-                    setLocation(l);
-                  }}
-                >
-                  查看库位详情
-                </button>
-              </article>
-            ))}
-          {pane === 'transfers' &&
-            transfers.items.map((t) => (
-              <article className="task-card" key={t.id}>
-                <strong>已移位 {t.quantity} 件</strong>
-                <p>{positionName(positions.items.find((p) => p.id === t.sourcePositionId))}</p>
-                <p>
-                  {date(t.createdAt)} · {t.reason}
-                </p>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    clear();
-                    setTransfer(t);
-                  }}
-                >
-                  查看移位详情
-                </button>
-              </article>
-            ))}
-          {pane === 'checks' &&
-            checks.items.map((r) => (
-              <article className="task-card" key={r.id}>
-                <strong>
-                  <span
-                    className={`count-state ${r.status === 'CONSISTENT' ? 'count-state-POSTED' : ''}`}
-                  >
-                    {r.status === 'CONSISTENT' ? '账本一致' : '发现差异'}
-                  </span>
-                </strong>
-                <p>
-                  {skuOptions.find((p) => p.skuId === r.skuId)?.name ?? '商品资料未载入'} ·{' '}
-                  {r.issueCount} 项差异
-                </p>
-                <p>{date(r.createdAt)}</p>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    clear();
-                    setReport(r);
-                  }}
-                >
-                  查看核对报告
-                </button>
-              </article>
-            ))}
+          {pane === 'positions' && positions.items.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>商品 / 规格</th>
+                    <th>批次</th>
+                    <th>库位</th>
+                    <th>实物</th>
+                    <th>预占</th>
+                    <th>不可售</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positions.items.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <strong>{p.name}</strong>
+                        <small>{p.spec}</small>
+                      </td>
+                      <td>{p.batchNo}</td>
+                      <td>{p.locationCode}</td>
+                      <td>{p.onHand}</td>
+                      <td>{p.reserved}</td>
+                      <td>{p.blocked}</td>
+                      <td>
+                        {p.expired ? '已过期，不可售' : p.locationEnabled ? '库位启用' : '库位停用'}
+                      </td>
+                      <td>
+                        <div className="location-row-actions">
+                          <button
+                            className="secondary-button"
+                            onClick={() => {
+                              clear();
+                              setPosition(p);
+                            }}
+                          >
+                            查看位置与流水
+                          </button>
+                          {can('stock.transfer') && (
+                            <button
+                              className="secondary-button"
+                              disabled={p.reserved > 0 || p.onHand <= p.blocked}
+                              onClick={() => startTransfer(p.id)}
+                            >
+                              移位
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pane === 'locations' && locations.items.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>库位</th>
+                    <th>名称</th>
+                    <th>用途</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {locations.items.map((l) => (
+                    <tr key={l.id}>
+                      <td>
+                        <strong>{l.code}</strong>
+                      </td>
+                      <td>{l.name}</td>
+                      <td>{l.code === 'DEFAULT' ? '默认收货位' : '存储库位'}</td>
+                      <td>
+                        <span className={'badge ' + (l.enabled ? 'green' : '')}>
+                          {l.enabled ? '启用' : '停用'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            clear();
+                            setLocation(l);
+                          }}
+                        >
+                          查看库位详情
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pane === 'transfers' && transfers.items.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>来源位置</th>
+                    <th>移位件数</th>
+                    <th>过账时间</th>
+                    <th>原因</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transfers.items.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        {positionName(positions.items.find((p) => p.id === t.sourcePositionId))}
+                      </td>
+                      <td>{t.quantity} 件</td>
+                      <td>{date(t.createdAt)}</td>
+                      <td>{t.reason}</td>
+                      <td>
+                        <button
+                          className="secondary-button"
+                          onClick={() => {
+                            clear();
+                            setTransfer(t);
+                          }}
+                        >
+                          查看移位详情
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {pane === 'checks' && checks.items.length > 0 && (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>商品</th>
+                    <th>差异</th>
+                    <th>核对时间</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checks.items.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        {skuOptions.find((p) => p.skuId === r.skuId)?.name ?? '商品资料未载入'}
+                      </td>
+                      <td>{r.issueCount} 项</td>
+                      <td>{date(r.createdAt)}</td>
+                      <td>
+                        <span
+                          className={`count-state ${r.status === 'CONSISTENT' ? 'count-state-POSTED' : ''}`}
+                        >
+                          {r.status === 'CONSISTENT' ? '账本一致' : '发现差异'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          className="secondary-button"
+                          onClick={() => {
+                            clear();
+                            setReport(r);
+                          }}
+                        >
+                          查看核对报告
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </PageState>
         {current.cursor && (
           <button

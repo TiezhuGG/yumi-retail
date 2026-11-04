@@ -77,18 +77,22 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
   return (
     <section aria-label="兑换商品管理" className="rewards-workbench">
       <div className="notice">
-        维护兑换商品和展示规则。商城目前仅供浏览，兑换下单尚未开放；配额不代表实物库存。
+        维护兑换商品、积分价格与展示规则。可兑换数量以库存和兑换配额核验结果为准。
       </div>
       {selected ? (
         <div className="account-card reward-detail">
           <button className="secondary-button" onClick={() => setSelected(null)}>
             返回兑换商品列表
           </button>
+          <div className="redemption-detail-summary">
+          <div>
           <h2>{selected.title}</h2>
           <p>
             {selected.name} · {selected.spec} / {selected.unit}
           </p>
+          </div>
           <p className="reward-price">{selected.pointsPrice} 积分 / 件</p>
+          </div>
           <p>
             {statuses[selected.status]} · 当前最多可选 {selected.available} 件
           </p>
@@ -105,6 +109,15 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
         </div>
       ) : (
         <>
+          <div className="reward-list-header">
+            <div>
+              <h2>兑换商品</h2>
+              <p>按商品规格管理积分价格和上架状态</p>
+            </div>
+            <button type="button" className="primary-button" onClick={() => setEditing(null)}>
+              新增兑换商品
+            </button>
+          </div>
           <form
             className="points-toolbar"
             onSubmit={(e) => {
@@ -130,9 +143,6 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
             </label>
             <button className="secondary-button" disabled={loading}>
               查询商品
-            </button>
-            <button type="button" className="primary-button" onClick={() => setEditing(null)}>
-              新增兑换商品
             </button>
           </form>
           {items.length > 0 && (

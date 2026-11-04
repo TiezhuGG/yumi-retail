@@ -390,6 +390,7 @@ export default function Addresses() {
                 </View>
               </View>
             ))}
+            <View className="address-action-dock">
             <Button
               className="account-primary address-add"
               disabled={busy || unknown || !range?.items.length || book.items.length >= 20}
@@ -404,6 +405,7 @@ export default function Addresses() {
             >
               查看配送范围
             </Button>
+            </View>
           </>
         )}
       </View>

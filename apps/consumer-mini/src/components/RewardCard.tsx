@@ -25,12 +25,14 @@ export function RewardCard({ reward }: { reward: Reward }) {
         </Text>
         <Button
           className="points-action"
+          aria-label={'查看详情：' + reward.title}
           onClick={(event) => {
             event.stopPropagation();
             open();
           }}
         >
-          查看详情
+          <Text className="reward-open-label">查看详情</Text>
+          <Text className="reward-open-arrow" aria-hidden="true">↗</Text>
         </Button>
       </View>
     </View>

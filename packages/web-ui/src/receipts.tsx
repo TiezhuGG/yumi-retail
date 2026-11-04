@@ -69,7 +69,7 @@ export function ReceiptWorkbench({
     <section className="surface receipt-workbench">
       <div className="surface-head">
         <div>
-          <h2>收货入库</h2>
+          <h2>收货记录</h2>
           <p>一张单据一次核验，先审核，再确认入库。</p>
         </div>
         <div className="surface-head-actions">

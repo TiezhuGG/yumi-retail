@@ -49,7 +49,7 @@ export default function ProductDetail() {
   }
   const back = () => void Taro.reLaunch({ url: '/pages/index/index' });
   return (
-    <View className="detail-page">
+    <View className="detail-page retail-product-page">
       {busy && <View className="store-feedback">正在为你准备好物…</View>}
       {error && (
         <View className="store-feedback">
@@ -97,13 +97,19 @@ export default function ProductDetail() {
             )}
             <View className="detail-caption">日常好物 / YUMI ESSENTIALS</View>
           </View>
-          <View className="detail-card">
+          <View className="reward-product-heading retail-product-heading">
+            <View>
+              <Text className="points-store-tag">社区零售</Text>
+              <Text className="reward-product-name">{product.name}</Text>
+            </View>
             <View className="detail-price">
               <Text>¥</Text>
               {(product.priceCents / 100).toFixed(2)}
               <Text className="detail-unit"> / {product.unit}</Text>
             </View>
-            <Text className="detail-name">{product.name}</Text>
+          </View>
+          <View className="detail-card">
+            <Text className="detail-heading">当前规格</Text>
             <Text className="detail-spec">{product.spec}</Text>
             <View className="detail-promises">
               <Text>✓ 按规格售卖</Text>
@@ -145,6 +151,8 @@ export default function ProductDetail() {
             >
               刷新当前规格
             </Button>
+          </View>
+          <View className="detail-card">
             <Text className="detail-heading">商品介绍</Text>
             <Text className="detail-description">
               {product.description || '用心挑选日常好物，更多商品信息整理中。'}

@@ -12,7 +12,7 @@ const config = JSON.parse(readFileSync(dist + '/app.json', 'utf8'));
 assert.notEqual(config.tabBar.custom, true, 'Only the native tab bar may be enabled');
 assert.deepEqual(
   config.tabBar.list.map((entry) => entry.pagePath),
-  ['pages/index/index', 'pages/rewards/index', 'pages/account/index'],
+  ['pages/index/index', 'pages/redemptions/index', 'pages/account/index'],
 );
 let app, page;
 globalThis.App = (value) => {
@@ -65,8 +65,8 @@ require(dist + '/app.js');
 assert.ok(app, 'WeChat application did not register');
 app.onLaunch?.({});
 for (const [route, expected] of [
-  ['pages/index/index', ['精选兑换', '运行检查纸巾', '运行检查分类']],
-  ['pages/rewards/index', ['运行检查纸巾', '运行检查分类']],
+  ['pages/index/index', ['精选可兑换', '运行检查纸巾', 'points-balance-strip']],
+  ['pages/redemptions/index', ['兑换订单', '登录后查看']],
   ['pages/account/index', ['会员中心', '可用积分', '兑换订单', '常用服务']],
 ]) {
   page = undefined;
@@ -97,4 +97,4 @@ for (const [route, expected] of [
   page.onHide?.();
   page.onUnload?.();
 }
-console.log('WeChat bundle rendered all three tabs with its compiled React runtime.');
+console.log('WeChat bundle rendered all three native tab pages with its compiled React runtime.');

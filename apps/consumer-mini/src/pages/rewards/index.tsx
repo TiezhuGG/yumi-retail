@@ -92,6 +92,11 @@ export default function Rewards() {
   return (
     <View className="account-page rewards-page">
       <View className="account-content">
+        <View className="reward-catalog-heading">
+          <Text className="account-eyebrow">YUMI DAILY</Text>
+          <Text className="account-name">兑换好物</Text>
+          <Text className="account-copy">按名称或分类查找可兑换商品</Text>
+        </View>
         <View className="reward-search">
           <Input
             value={keyword}

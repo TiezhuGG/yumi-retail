@@ -341,30 +341,48 @@ function AttemptsPanel({
             {!data.items.length ? (
               <div className="empty-state">暂无合成支付尝试</div>
             ) : (
-              <div className="readiness-checks">
-                {data.items.map((row) => (
-                  <article className="readiness-check" key={row.id}>
-                    <div>
-                      <h3>合成尝试 · {row.id.slice(-8)}</h3>
-                      <span className={'badge ' + (row.evidence === 'CONFLICT' ? 'red' : 'amber')}>
-                        {evidenceLabel[row.evidence]}
-                      </span>
-                    </div>
-                    <p>
-                      {new Date(row.createdAt).toLocaleString('zh-CN', {
-                        timeZone: 'Asia/Shanghai',
-                        hour12: false,
-                      })}
-                    </p>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => void select(row.id)}
-                    >
-                      查看尝试
-                    </button>
-                  </article>
-                ))}
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>记录</th>
+                      <th>状态</th>
+                      <th>创建时间</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>合成尝试 · {row.id.slice(-8)}</strong>
+                        </td>
+                        <td>
+                          <span
+                            className={'badge ' + (row.evidence === 'CONFLICT' ? 'red' : 'amber')}
+                          >
+                            {evidenceLabel[row.evidence]}
+                          </span>
+                        </td>
+                        <td>
+                          {new Date(row.createdAt).toLocaleString('zh-CN', {
+                            timeZone: 'Asia/Shanghai',
+                            hour12: false,
+                          })}
+                        </td>
+                        <td>
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => void select(row.id)}
+                          >
+                            查看尝试
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
             {data.nextCursor && (

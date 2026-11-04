@@ -405,28 +405,46 @@ function ReviewsPanel({
               <small>合成材料 · 非真实支付</small>
             </div>
             {data.items.length ? (
-              <div className="readiness-checks">
-                {data.items.map((row) => (
-                  <article className="readiness-check" key={row.id}>
-                    <div>
-                      <h3>合成尝试 · {row.id.slice(-8)}</h3>
-                      <span className={'badge ' + (row.evidence === 'CONFLICT' ? 'red' : 'amber')}>
-                        {evidenceLabel[row.evidence]}
-                      </span>
-                    </div>
-                    <p>
-                      {row.taskState ? taskLabel[row.taskState] : '暂无查询任务'} · 核查备注{' '}
-                      {row.noteCount} 条
-                    </p>
-                    <button
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => void open(row.id)}
-                    >
-                      查看核查详情
-                    </button>
-                  </article>
-                ))}
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>记录</th>
+                      <th>证据状态</th>
+                      <th>查询与备注</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.items.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <strong>合成尝试 · {row.id.slice(-8)}</strong>
+                        </td>
+                        <td>
+                          <span
+                            className={'badge ' + (row.evidence === 'CONFLICT' ? 'red' : 'amber')}
+                          >
+                            {evidenceLabel[row.evidence]}
+                          </span>
+                        </td>
+                        <td>
+                          {row.taskState ? taskLabel[row.taskState] : '暂无查询任务'} · 核查备注{' '}
+                          {row.noteCount} 条
+                        </td>
+                        <td>
+                          <button
+                            className="text-button"
+                            disabled={busy}
+                            onClick={() => void open(row.id)}
+                          >
+                            查看核查详情
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : (
               <div className="empty-state">当前筛选下暂无待核查记录</div>
@@ -477,55 +495,58 @@ function ReviewsPanel({
                   ? '当前仍需核查。保存备注不会停止查询、恢复订单、记账或退款。'
                   : '当前已离开待核查范围，保留既有备注，只读查看。'}
               </p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void save();
-                }}
-              >
-                <label className="review-note-field">
-                  合成核查备注
-                  <textarea
-                    aria-label="合成核查备注"
-                    rows={4}
-                    maxLength={500}
-                    value={draft}
-                    disabled={busy || !data.enabled || !detail.item.needsReview}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="记录合成核查过程；不要填写密钥、商户凭据或顾客联系资料"
-                  />
-                </label>
-                <p>{draft.length} / 500 字；备注保存后不可修改，补充说明请新增备注。</p>
-                <button
-                  className="primary-button"
-                  type="submit"
-                  disabled={
-                    busy || !data.enabled || !detail.item.needsReview || !draft.trim() || stale
+              <div className="payment-review-columns">
+                <PaymentEvidenceTimelinePanel
+                  key={
+                    detail.item.id +
+                    ':' +
+                    detail.item.attemptVersion +
+                    ':' +
+                    detail.item.jobVersion +
+                    ':' +
+                    detail.item.noteCount +
+                    ':' +
+                    openNonce
                   }
+                  warehouseId={warehouseId}
+                  snapshot={detail.item}
+                  refresh={() => void open(detail.item.id)}
+                  disabled={busy}
+                  active={visible}
+                  initialFocus={initialFocus}
+                  onFocusHandled={() => setInitialFocus(undefined)}
+                />
+                <form
+                  className="payment-review-note"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void save();
+                  }}
                 >
-                  {busy ? '正在处理…' : '保存核查备注'}
-                </button>
-              </form>
-              <PaymentEvidenceTimelinePanel
-                key={
-                  detail.item.id +
-                  ':' +
-                  detail.item.attemptVersion +
-                  ':' +
-                  detail.item.jobVersion +
-                  ':' +
-                  detail.item.noteCount +
-                  ':' +
-                  openNonce
-                }
-                warehouseId={warehouseId}
-                snapshot={detail.item}
-                refresh={() => void open(detail.item.id)}
-                disabled={busy}
-                active={visible}
-                initialFocus={initialFocus}
-                onFocusHandled={() => setInitialFocus(undefined)}
-              />
+                  <label className="review-note-field">
+                    合成核查备注
+                    <textarea
+                      aria-label="合成核查备注"
+                      rows={4}
+                      maxLength={500}
+                      value={draft}
+                      disabled={busy || !data.enabled || !detail.item.needsReview}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="记录合成核查过程；不要填写密钥、商户凭据或顾客联系资料"
+                    />
+                  </label>
+                  <p>{draft.length} / 500 字；备注保存后不可修改，补充说明请新增备注。</p>
+                  <button
+                    className="primary-button"
+                    type="submit"
+                    disabled={
+                      busy || !data.enabled || !detail.item.needsReview || !draft.trim() || stale
+                    }
+                  >
+                    {busy ? '正在处理…' : '保存核查备注'}
+                  </button>
+                </form>
+              </div>
             </section>
           )}
         </>

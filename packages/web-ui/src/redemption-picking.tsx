@@ -523,26 +523,42 @@ function PickingPanel({ profile, w }: { profile: StaffProfile; w: string }) {
           {!loading && !error && !items.length && (
             <div className="points-empty">暂无匹配兑换拣货任务</div>
           )}
-          <div className="picking-cards">
-            {items.map((t) => (
-              <article className="picking-allocation" key={t.id}>
-                <strong>
-                  {t.title} · {t.quantity} 件
-                </strong>
-                <p>{t.spec}</p>
-                <p>
-                  {states[t.state] ?? t.state}
-                  {t.task?.ownerName ? ' · ' + t.task.ownerName : ''}
-                </p>
-                <button
-                  className="secondary-button"
-                  disabled={loading || busy}
-                  onClick={() => void load({ id: t.id })}
-                >
-                  查看拣货详情
-                </button>
-              </article>
-            ))}
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>兑换商品 / 规格</th>
+                  <th>件数</th>
+                  <th>领取人</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((t) => (
+                  <tr key={t.id}>
+                    <td>
+                      <strong>{t.title}</strong>
+                      <small>{t.spec}</small>
+                    </td>
+                    <td>{t.quantity}</td>
+                    <td>{t.task?.ownerName ?? '—'}</td>
+                    <td>
+                      <span className="badge amber">{states[t.state] ?? t.state}</span>
+                    </td>
+                    <td>
+                      <button
+                        className="secondary-button"
+                        disabled={loading || busy}
+                        onClick={() => void load({ id: t.id })}
+                      >
+                        查看拣货详情
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           {cursor && !error && (
             <button

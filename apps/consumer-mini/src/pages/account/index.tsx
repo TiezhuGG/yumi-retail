@@ -6,6 +6,7 @@ import { initialSessionState, parseSession } from '../../consumer-session';
 import { consumerSession, sessionStorageKey } from '../../session-storage';
 import { addressRequest } from '../../address-api';
 import { request } from '../../api';
+import { openRedemptions } from '../../reward-navigation';
 
 export default function Account() {
   const [state, setState] = useState(initialSessionState);
@@ -94,9 +95,9 @@ export default function Account() {
 
   const orders = [
     ['全部订单', '', 'all'],
-    ['待发货', '?fulfillment=EXPRESS_WAIT_SHIP', 'waiting'],
-    ['已发货', '?fulfillment=EXPRESS_SHIPPED', 'shipped'],
-    ['已取消', '?status=CANCELED', 'canceled'],
+    ['待发货', 'EXPRESS_WAIT_SHIP', 'waiting'],
+    ['已发货', 'EXPRESS_SHIPPED', 'shipped'],
+    ['已取消', 'CANCELED', 'canceled'],
   ];
   return (
     <View className="account-page account-center">
@@ -107,6 +108,7 @@ export default function Account() {
             {settings ? '收起设置' : '设置 ›'}
           </Button>
         </View>
+        <View className="member-identity-card">
         <View className="member-profile">
           <Text className="member-avatar">玉</Text>
           <View className="member-profile-copy">
@@ -115,20 +117,23 @@ export default function Account() {
             </Text>
             <Text className="member-note">{profile ? '玉米百货会员' : '登录后查看积分和订单'}</Text>
           </View>
-          {!profile && !busy && phase === 'guest' && (
-            <Button className="member-login" onClick={() => open('login/index')}>
-              微信登录
-            </Button>
-          )}
         </View>
-        <View className="member-points member-points-integrated">
+        {!profile && !busy && phase === 'guest' && (
+          <Button className="member-login" onClick={() => open('login/index')}>
+            微信登录
+          </Button>
+        )}
+        </View>
+      </View>
+      <View className="member-content">
+        <View className="member-wallet">
           <View className="member-points-main">
-            <Text className="member-points-label">可用积分</Text>
+            <Text className="member-wallet-label">我的积分</Text>
             <Text
               className={
                 balance !== null && profile && !balanceFailed
-                  ? 'member-points-value'
-                  : 'member-points-status'
+                  ? 'member-wallet-value'
+                  : 'member-wallet-status'
               }
             >
               {profile
@@ -141,14 +146,12 @@ export default function Account() {
             </Text>
           </View>
           <Button
-            className="member-points-link"
+            className="member-wallet-link"
             onClick={() => (balanceFailed ? void session.current!.restore() : open('points/index'))}
           >
             {profile && balanceFailed ? '重试' : '积分明细 ›'}
           </Button>
         </View>
-      </View>
-      <View className="member-content">
         {settings && (
           <View className="member-section member-settings-panel">
             <Button className="member-service-row" onClick={privacy}>
@@ -184,11 +187,11 @@ export default function Account() {
         <View className="member-section member-orders">
           <Text className="member-section-title">兑换订单</Text>
           <View className="member-order-grid">
-            {orders.map(([label, query, icon]) => (
+            {orders.map(([label, status, icon]) => (
               <Button
                 key={label}
                 className="member-order-link"
-                onClick={() => open('redemptions/index' + query)}
+                onClick={() => void openRedemptions({ status: status || undefined })}
               >
                 <View className={'member-order-icon member-order-icon-' + icon} />
                 <Text>{label}</Text>
@@ -204,7 +207,7 @@ export default function Account() {
           </Button>
           <Button
             className="member-service-row"
-            onClick={() => open('redemptions/index?service=after-sales')}
+            onClick={() => void openRedemptions({ service: 'after-sales' })}
           >
             <Text>兑换售后</Text>
             <Text className="member-chevron">›</Text>

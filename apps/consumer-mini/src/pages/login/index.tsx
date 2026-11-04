@@ -57,13 +57,20 @@ export default function Login() {
   }, [state.phase]);
 
   return (
-    <View className="account-page points-page">
-      <View className="account-hero">
-        <Text className="account-name">微信登录</Text>
-        <Text className="account-copy">登录后可查看积分、兑换商品和查询订单。</Text>
-      </View>
+    <View className="account-page points-page consumer-login-page">
       <View className="account-content">
         <View className="account-card">
+          <View className="consumer-login-brand">
+            <View className="points-brand-mark" aria-hidden="true">
+              <View />
+              <View />
+              <View />
+              <View />
+            </View>
+            <Text>玉米百货</Text>
+          </View>
+          <Text className="account-name">微信登录</Text>
+          <Text className="account-copy">登录后可查看积分、兑换商品和查询订单。</Text>
           {state.error && <Text className="account-error">{state.error}</Text>}
           {methodsFailed && (
             <Button onClick={() => void loadMethods()}>登录方式加载失败，点击重试</Button>

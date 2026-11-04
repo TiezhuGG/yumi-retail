@@ -1,6 +1,6 @@
 page {
-  background: #f6f8f5;
-  color: #253a2c;
+  background: #faf9f4;
+  color: #282a23;
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 button {
@@ -2201,7 +2201,6 @@ button[disabled] {
   border-radius: 0 0 25px 25px;
 }
 .member-heading,
-.member-profile,
 .member-points,
 .member-service-row {
   display: flex;
@@ -2222,10 +2221,17 @@ button[disabled] {
   border-radius: 20px;
 }
 .member-profile {
-  gap: 11px;
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding-left: 57px;
 }
 .member-avatar {
-  flex: none;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 46px;
   line-height: 46px;
   text-align: center;
@@ -2236,8 +2242,8 @@ button[disabled] {
   font-weight: 700;
 }
 .member-profile-copy {
-  min-width: 0;
-  flex: 1;
+  display: block;
+  padding-top: 2px;
 }
 .member-name,
 .member-note,
@@ -2249,7 +2255,8 @@ button[disabled] {
 .member-name {
   font-size: 17px;
   font-weight: 700;
-  overflow-wrap: anywhere;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 .member-note {
   color: #d5ebdb;
@@ -2257,12 +2264,19 @@ button[disabled] {
   margin-top: 4px;
 }
 .member-login {
-  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 16px;
   background: #e9f7e8;
   color: #174b32;
-  min-height: 42px;
-  padding: 0 13px;
-  border-radius: 22px;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 12px;
+  text-align: center;
+  line-height: 1.4;
 }
 .member-content {
   padding: 0 14px;
@@ -2320,11 +2334,12 @@ button[disabled] {
   font-size: 16px;
   font-weight: 700;
   color: #213c2d;
+  margin-bottom: 9px;
 }
 .member-order-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin-top: 8px;
+  margin-top: 0;
 }
 .member-order-link {
   min-height: 63px;
@@ -2396,3 +2411,595 @@ button[disabled] {
   padding: 8px 10px;
   border-radius: 9px;
 }
+
+/* Yumi UI atlas: warm retail palette and restrained editorial spacing. */
+.store-page,
+.account-page { background: #faf9f4; color: #282a23; }
+.store-header { background: #faf9f4; padding-top: 20px; }
+.store-name { color: #282a23; font-size: 20px; }
+.store-tagline { color: #77796c; letter-spacing: 1.5px; }
+.corn { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #f9da61; font-size: 23px; }
+.community { color: #53564b; }
+.community-note { color: #554719; background: #fff2c3; }
+.store-search { border-color: #e8e8e0; box-shadow: none; }
+.store-search button { background: #282c23; }
+.store-content { padding: 0 16px; }
+.points-home .category-panel {
+  border-color: #e8e8e0;
+  margin: 12px 0;
+}
+.points-store-hero {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  min-height: 172px;
+  margin: 6px 0 16px;
+  padding: 23px 18px;
+  border-radius: 14px;
+  background: #ffe8a1;
+}
+.points-hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.points-hero-kicker,
+.points-hero-title,
+.points-hero-copy {
+  position: relative;
+  display: block;
+  color: #4f4523;
+}
+.points-hero-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+.points-hero-title {
+  max-width: 150px;
+  margin: 8px 0;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.24;
+  color: #28271e;
+}
+.points-hero-copy { font-size: 12px; }
+.points-home-heading { margin: 19px 2px 11px; font-size: 17px; }
+.points-home-heading text { font-weight: 700; }
+.points-home-heading .category-refresh { background: transparent; color: #69705e; }
+.reward-grid { gap: 10px; }
+.reward-card { padding: 0; border: 1px solid #e8e8e0; border-radius: 12px; }
+.reward-card .product-visual { height: 132px; border-radius: 0; }
+.reward-card .visual-package { background: #eee8d8; }
+.reward-card-copy { padding: 10px; }
+.reward-title { color: #292a24; font-size: 13px; }
+.reward-price { color: #66500d; margin: 7px 0 4px; font-size: 15px; }
+.reward-stock { color: #73756a; margin-bottom: 8px; }
+.rewards-page .account-content { padding: 14px 16px 26px; }
+.reward-search input { border-color: #e8e8e0; border-radius: 10px; }
+.reward-search button { min-height: 44px; line-height: 1.4; border-radius: 9px; background: #282c23; }
+.reward-category-track > button { border-radius: 18px; min-height: 37px; line-height: 1.3; padding: 7px 14px; }
+.reward-category-track > button.active { background: #fff0b6; color: #413715; }
+.points-page .points-action,
+.points-home .points-action,
+.rewards-page .points-action,
+.reward-detail-page .points-action { background: #f9da61; color: #28271e; border-radius: 10px; }
+.points-page .points-action[disabled],
+.rewards-page .points-action[disabled],
+.reward-detail-page .points-action[disabled] { background: #eeeee7; color: #77786e; }
+.reward-balance { background: #303328; color: white; border-radius: 12px; }
+.reward-detail-page .account-link,
+.points-page .account-link { background: #f0f0e8; color: #3d5140; }
+.redemption-address { border-color: #e8e8e0; border-radius: 12px; background: white; }
+.reward-detail-page .account-hero,
+.points-page .account-hero {
+  background: #faf9f4;
+  color: #282a23;
+}
+.reward-detail-page .account-hero .account-name,
+.points-page .account-hero .account-name { color: #282a23; }
+.reward-detail-page .account-hero .account-eyebrow,
+.points-page .account-hero .account-eyebrow { color: #62665a; }
+.reward-detail-page .account-card,
+.points-page .account-card { border-color: #e8e8e0; }
+
+.points-home .store-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px 8px;
+}
+.points-brand-mark {
+  display: grid;
+  grid-template-columns: repeat(2, 5px);
+  grid-auto-rows: 7px;
+  place-content: center;
+  gap: 2px;
+  width: 35px;
+  height: 35px;
+  border-radius: 11px;
+  background: #f9da61;
+}
+.points-brand-mark > view { border-radius: 5px; background: #282a23; }
+.points-store-tag {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #edf0e5;
+  color: #425440;
+  font-size: 11px;
+}
+.points-home .points-store-hero { margin-bottom: 10px; }
+.points-balance-strip {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 13px;
+  border-radius: 11px;
+  background: #303328;
+  color: #fff;
+  font-size: 12px;
+}
+.points-balance-value { color: #ffe080; font-size: 19px; font-weight: 700; }
+.points-balance-link { margin-left: auto; }
+.reward-open-arrow { display: none; }
+.points-home .reward-card .product-visual { height: 110px; }
+.points-home .reward-card-copy { position: relative; padding-right: 35px; }
+.points-home .reward-card .points-action {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  line-height: 32px;
+  border-radius: 50%;
+  background: #fff1be;
+}
+.points-home .reward-open-label { display: none; }
+.points-home .reward-open-arrow { display: inline; }
+
+.detail-page,
+.cart-page,
+.range-page,
+.address-page,
+.checkout-page,
+.orders-page {
+  background: #faf9f4;
+  color: #282a23;
+}
+.account-hero,
+.range-hero,
+.address-hero {
+  background: #faf9f4;
+  color: #282a23;
+}
+.cart-title,
+.range-title,
+.address-title,
+.account-name,
+.detail-name,
+.detail-heading { color: #282a23; }
+.account-copy,
+.cart-note,
+.cart-muted,
+.range-subtitle,
+.address-subtitle,
+.detail-description,
+.detail-spec { color: #62665a; }
+.account-card,
+.cart-row,
+.cart-summary,
+.detail-card,
+.address-state,
+.range-state,
+.range-community {
+  border: 1px solid #e8e8e0;
+  border-radius: 13px;
+  background: #fff;
+}
+.detail-visual { background: #f2f1e8; }
+.detail-price,
+.cart-price,
+.checkout-amount,
+.checkout-total { color: #66500d; }
+.account-primary,
+.address-add,
+.checkout-generate,
+.detail-buy,
+.range-back {
+  background: #f9da61;
+  color: #28271e;
+  border-radius: 10px;
+}
+.account-primary[disabled],
+.detail-buy[disabled],
+.address-add[disabled],
+.checkout-generate[disabled] {
+  background: #eeeee7;
+  color: #62665a;
+}
+.address-input,
+.address-picker,
+.range-search,
+.checkout-draft,
+.after-sales-input {
+  background: #f8f8f3;
+  border-color: #e8e8e0;
+  color: #282a23;
+}
+.member-header {
+  background: #34372c;
+  margin: 14px 14px 0;
+  border-radius: 15px;
+  padding-bottom: 18px;
+}
+.member-header .member-name,
+.member-header .member-points-value { color: #ffe080; }
+.member-header .member-note,
+.member-header .member-points-label { color: #e1e2d1; }
+.member-header .member-avatar,
+.member-header .member-login { background: #f9da61; color: #28271e; }
+.member-content { margin-top: 14px; }
+.member-section { border-color: #e8e8e0; }
+
+.consumer-login-page .account-content { padding-top: 44px; }
+.consumer-login-page .account-card { padding: 28px 20px; text-align: center; }
+.consumer-login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 18px;
+  font-weight: 700;
+}
+.reward-product-page .account-content {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom));
+}
+.reward-product-page .product-visual.large { height: 218px; border-radius: 14px; }
+.reward-product-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 12px;
+  padding: 16px 0;
+}
+.reward-product-name {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+.reward-product-heading .reward-price { flex-shrink: 0; }
+.reward-action-dock {
+  position: fixed;
+  z-index: 2;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1px solid #e8e8e0;
+}
+.reward-action-dock .points-action { margin: 0; }
+
+.points-ledger-balance {
+  margin: 16px;
+  padding: 22px;
+  border-radius: 15px;
+  background: #34372c;
+}
+.points-ledger-balance .account-name {
+  color: #ffe080;
+  font-size: 34px;
+  margin: 12px 0;
+}
+.points-ledger-label { display: block; color: #e1e2d1; font-size: 12px; }
+.points-ledger-entry-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 14px;
+}
+.points-ledger-entry-heading .account-card-title { flex: 1; font-size: 15px; }
+.points-ledger-delta { font-weight: 700; color: #66500d; flex-shrink: 0; }
+.redemption-list-page .reward-categories {
+  gap: 0;
+  flex-wrap: nowrap;
+  border-bottom: 1px solid #e8e8e0;
+}
+.redemption-list-page .reward-categories button {
+  flex: 1;
+  padding: 8px 4px;
+  line-height: 1.5;
+  min-height: 42px;
+  font-size: 12px;
+  background: transparent;
+  border-radius: 0;
+}
+.redemption-list-page .reward-categories button.active {
+  color: #282a23;
+  border-bottom: 3px solid #ddbd42;
+}
+.redemption-list-number {
+  display: block;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #e8e8e0;
+  color: #62665a;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.redemption-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.redemption-list-heading .redemption-list-number {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  text-align: right;
+  font-size: 10px;
+}
+.redemption-list-status {
+  color: #53635a;
+  font-size: 12px;
+  font-weight: 600;
+}
+.redemption-list-card .redemption-list-open {
+  width: auto;
+  margin-left: auto;
+  min-height: 36px;
+  padding: 4px 0 0 12px;
+  background: transparent;
+  color: #315d43;
+  font-size: 13px;
+}
+.redemption-list-note {
+  display: block;
+  margin-top: 7px;
+  color: #737466;
+  font-size: 11px;
+}
+.retail-order-list .order-card { border-color: #e8e8e0; }
+.retail-order-list .checkout-heading {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e8e8e0;
+}
+.retail-order-list .order-status {
+  background: #fff3cf;
+  color: #6b4c05;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.retail-order-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.retail-order-footer .checkout-total { margin: 0; gap: 8px; flex: 1; }
+.retail-order-open {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff1be;
+  color: #28271e;
+  white-space: nowrap;
+}
+.cart-page .cart-checkout-dock,
+.address-action-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  border: 1px solid #e8e8e0;
+  border-radius: 12px;
+  background: #fff;
+}
+.cart-checkout-price { flex: 1; min-width: 0; }
+.cart-checkout-price text { display: block; }
+.cart-page .cart-checkout-dock button,
+.address-action-dock .address-add {
+  width: auto;
+  margin: 0;
+  padding: 8px 13px;
+  min-height: 42px;
+  border-radius: 9px;
+  background: #f9da61;
+  color: #28271e;
+}
+.cart-page .cart-checkout-dock button[disabled],
+.address-action-dock .address-add[disabled] {
+  background: #eeeee7;
+  color: #62665a;
+}
+.address-action-dock .address-add { flex: 1; }
+.address-action-dock .address-cancel { flex-shrink: 0; margin: 0; }
+.redemption-order-page .redemption-progress {
+  padding: 18px 16px;
+  background: #fff9e5;
+  border-color: #efe6c7;
+}
+.redemption-progress-title {
+  display: block;
+  margin-top: 10px;
+  color: #282a23;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+.retail-product-page .detail-visual { padding: 14px 16px; }
+.retail-product-page .product-visual.large,
+.retail-product-page .detail-gallery { height: 218px; border-radius: 14px; }
+.retail-product-heading { padding: 14px 16px 4px; }
+.retail-product-heading .detail-price {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 23px;
+}
+.reward-catalog-heading { padding: 6px 0 0; }
+.reward-catalog-heading .account-name { margin: 6px 0; }
+.range-building-list .range-building {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-top: 8px;
+  border-color: #e8e8e0;
+  background: #fff;
+}
+.range-building-list .range-building text:first-child { font-size: 14px; color: #282a23; }
+.range-building-tag {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #edf0e5;
+  color: #425440;
+  font-size: 11px;
+}
+.retail-order-detail .redemption-progress {
+  padding: 18px 16px;
+  background: #fff9e5;
+  border-color: #efe6c7;
+}
+.retail-order-detail .redemption-progress .address-section-title { margin-top: 10px; }
+.retail-order-status-price {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #efe6c7;
+  font-weight: 700;
+}
+.account-center .member-header {
+  background: #faf9f4;
+  padding: 12px 2px 3px;
+}
+.account-center .member-heading,
+.account-center .member-header .member-name { color: #282a23; }
+.account-center .member-header .member-note { color: #62665a; }
+.account-center .member-settings { color: #385748; border-color: #e8e8e0; background: #fff; }
+.member-balance-card { background: #34372c; }
+.account-center .member-balance-card .member-points-label,
+.account-center .member-balance-card .member-points-status { color: #e1e2d1; }
+.member-balance-card .member-points-value { color: #ffe080; }
+.address-book-card .address-recipient { color: #282a23; font-size: 16px; font-weight: 700; }
+.address-book-card .address-room {
+  color: #282a23;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.address-book-card .address-actions { border-top: 1px solid #e8e8e0; padding-top: 10px; }
+
+/* Member page: independent cards keep layout and contrast predictable. */
+.account-center .member-header {
+  margin: 0;
+  padding: 22px 16px 0;
+  border-radius: 0;
+}
+.account-center .member-heading {
+  margin-bottom: 18px;
+  font-size: 23px;
+}
+.account-center .member-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+.member-identity-card {
+  display: block;
+  padding: 20px;
+  border: 1px solid #eee5c8;
+  border-radius: 18px;
+  background: #fff4cf;
+}
+.member-identity-card .member-profile {
+  min-height: 48px;
+  padding-left: 60px;
+}
+.member-identity-card .member-avatar {
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  border-radius: 14px;
+}
+.member-identity-card .member-name {
+  line-height: 1.5;
+  font-size: 17px;
+}
+.member-identity-card .member-note { line-height: 1.5; }
+.member-identity-card .member-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  margin: 18px 0 0;
+  padding: 0 16px;
+  font-weight: 600;
+  background: #f9da61;
+  color: #28271e;
+}
+.account-center .member-content { margin-top: 14px; padding: 0 16px 24px; }
+.member-wallet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 88px;
+  box-sizing: border-box;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: #34372c;
+  color: #fff;
+}
+.member-wallet-label { display: block; color: #d9ddcb; font-size: 12px; }
+.member-wallet-value { display: block; margin-top: 6px; color: #ffe080; font-size: 28px; font-weight: 700; }
+.member-wallet-status { display: block; margin-top: 8px; color: #fff; font-size: 16px; }
+.member-wallet-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 18px;
+  background: #4b4f40;
+  color: #fff;
+  font-size: 12px;
+}
+.account-center .member-section { padding: 18px 16px; margin-bottom: 14px; border-radius: 16px; }
+.account-center .member-section-title { color: #282a23; margin-bottom: 14px; }
+.account-center .member-order-grid { gap: 6px; }
+.account-center .member-order-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: #53594b;
+}
+.account-center .member-order-icon { margin: 0; background: #f2f3e9; border-color: #778269; }
+.account-center .member-service-row { min-height: 50px; color: #343c30; }

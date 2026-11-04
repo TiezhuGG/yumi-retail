@@ -58,16 +58,13 @@ export default function Orders() {
     writing.current = false;
   });
   return (
-    <View className="orders-page">
+    <View className="orders-page retail-order-list">
       <View className="address-hero">
         <Text className="account-eyebrow">YUMI · YOUR ORDERS</Text>
-        <Text className="address-title">我的订单</Text>
-        <Text className="address-subtitle">订单状态与库存预占，以服务端记录为准</Text>
+        <Text className="address-title">零售订单</Text>
+        <Text className="address-subtitle">查看购买商品和订单进度</Text>
       </View>
       <View className="address-content">
-        <View className="checkout-notice">
-          这里可查看你的购买订单。
-        </View>
         {error && (
           <View className="address-alert">
             {error}
@@ -119,16 +116,18 @@ export default function Orders() {
                 {order.items.length > 3 && (
                   <Text className="address-hint">另有 {order.items.length - 3} 种规格</Text>
                 )}
+                <View className="retail-order-footer">
                 <View className="checkout-total">
                   <Text>订单金额</Text>
                   <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
                 </View>
                 <Button
-                  className="account-primary"
+                  className="retail-order-open"
                   onClick={() => void Taro.navigateTo({ url: '/pages/order/index?id=' + order.id })}
                 >
-                  查看订单详情
+                  查看详情 ›
                 </Button>
+                </View>
               </View>
             ))}
             {more && (

@@ -4,6 +4,12 @@ import { staffRequest, StaffRequestError } from './index.js';
 import { ExpressShippingPanel } from './express-shipping.js';
 import { ExpressPolicyWorkbench } from './express-policy.js';
 import { RedemptionPrintDialog } from './redemption-print.js';
+
+const fulfillmentTabs = [
+  { value: '', label: '全部兑换订单' },
+  { value: 'EXPRESS_WAIT_SHIP', label: '待发货' },
+  { value: 'EXPRESS_SHIPPED', label: '已发货' },
+];
 export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
   const [selected, setSelected] = useState<string[]>([]),
     [printIds, setPrintIds] = useState<string[] | null>(null);
@@ -65,17 +71,25 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
       <div className="notice">
         兑换订单支持单张或批量打印配货单，用于备货核对。打印不改变发货状态，配送方式以订单记录为准；积分兑换不计现金销售额。
       </div>
-      <ExpressPolicyWorkbench profile={profile} />
+      <details className="express-policy-disclosure">
+        <summary>快递范围与运费配置</summary>
+        <ExpressPolicyWorkbench profile={profile} />
+      </details>
       {detail ? (
         <div className="reward-detail">
           <button className="secondary-button" disabled={loading} onClick={() => void load()}>
             返回兑换订单列表
           </button>
+          <div className="redemption-detail-summary">
+          <div>
+          <small>兑换商品</small>
           <h2>{detail.title}</h2>
           <p>
             {detail.spec} · {detail.quantity} 件
           </p>
+          </div>
           <p className="reward-price">{detail.totalPoints} 积分</p>
+          </div>
           <p>
             {detail.executionMode === 'CONTROLLED'
               ? '受控测试订单'
@@ -155,6 +169,25 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
         </div>
       ) : (
         <>
+          <div className="express-queue-tabs" aria-label="快递订单阶段">
+            {fulfillmentTabs.map(({ value, label }) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={applied.current.fulfillment === value}
+                disabled={loading}
+                onClick={() => {
+                  setFulfillment(value);
+                  applied.current = { keyword: keyword.trim(), status, fulfillment: value };
+                  setItems([]);
+                  setCursor(null);
+                  void load();
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <form
             className="points-toolbar"
             onSubmit={(e) => {

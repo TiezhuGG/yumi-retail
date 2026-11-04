@@ -283,7 +283,7 @@ function OrderDetail({
     };
   }, [id, warehouseId]);
   return (
-    <div className="order-workbench">
+    <div className="order-workbench order-detail-workbench">
       <div className="order-detail-toolbar">
         <button className="secondary-button" onClick={onBack}>
           返回订单列表
