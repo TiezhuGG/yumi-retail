@@ -1,4 +1,4 @@
-/* global document, innerWidth, window, localStorage */
+/* global document, innerWidth, window */
 // Actual React pages + real API + disposable PG schema. Browser mini adapter is not native WeChat.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -15,7 +15,7 @@ const { createServer, build } =
 const react = (await import('../../apps/admin-web/node_modules/@vitejs/plugin-react/dist/index.js'))
   .default;
 const { chromium } = require(process.env.YUMI_PLAYWRIGHT_PATH || 'playwright');
-const fixture = await controlledExpressFixture();
+const fixture = await controlledExpressFixture({ browserLogin: true });
 const f = { ...fixture, base: fixture.controlledBase };
 let server, browser;
 const shots = [],
@@ -43,15 +43,15 @@ try {
   );
   await writeFile(
     dir + '/components.tsx',
-    `import React from 'react';export const View=({children,...p})=><div {...p}>{children}</div>;export const Text=({children,...p})=><span {...p}>{children}</span>;export const Button=({children,...p})=><button {...p}>{children}</button>;export const Input=({onInput,onConfirm,maxlength,...p})=><input {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})} onKeyDown={e=>{if(e.key==='Enter')onConfirm?.()}}/>;export const Picker=({range,onChange,value,disabled})=><select aria-label="收货地址" disabled={disabled} value={value} onChange={e=>onChange({detail:{value:e.target.value}})}>{range.map((v,i)=><option key={i} value={i}>{v}</option>)}</select>;export const Textarea=({onInput,maxlength,...p})=><textarea {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})}/>;export const Switch=({onChange,checked,disabled})=><input role="switch" type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange?.({detail:{value:e.target.checked}})}/>;export const Image=({src,mode,...p})=><img src={src} {...p}/>;`,
+    `import React from 'react';export const ScrollView=({scrollX,children,...p})=><div style={{overflowX:scrollX?'auto':undefined}} {...p}>{children}</div>;export const View=({children,...p})=><div {...p}>{children}</div>;export const Text=({children,...p})=><span {...p}>{children}</span>;export const Button=({children,...p})=><button {...p}>{children}</button>;export const Input=({onInput,onConfirm,maxlength,...p})=><input {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})} onKeyDown={e=>{if(e.key==='Enter')onConfirm?.()}}/>;export const Picker=({range,onChange,value,disabled})=><select aria-label="收货地址" disabled={disabled} value={value} onChange={e=>onChange({detail:{value:e.target.value}})}>{range.map((v,i)=><option key={i} value={i}>{v}</option>)}</select>;export const Textarea=({onInput,maxlength,...p})=><textarea {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})}/>;export const Switch=({onChange,checked,disabled})=><input role="switch" type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange?.({detail:{value:e.target.checked}})}/>;export const Image=({src,mode,...p})=><img src={src} {...p}/>;`,
   );
   await writeFile(
     dir + '/taro.ts',
-    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
+    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={login:async()=>({code:'synthetic_launch_browser_code'}),navigateBack:async()=>{window.__loginReturned=true},getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
   );
   await writeFile(
     dir + '/main.tsx',
-    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 独立门禁 · 合成受控账号 · 非真实微信/TLS/生产验收</div>{mini?(location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Home from '${root}/apps/consumer-mini/src/pages/index/index';import Login from '${root}/apps/consumer-mini/src/pages/login/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 独立门禁 · 合成受控账号 · 非真实微信/TLS/生产验收</div>{mini?(location.search.includes("view=home")?<Home/>:location.search.includes("view=login")?<Login/>:location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
   );
   const config = {
     configFile: false,
@@ -90,7 +90,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   async function shot(name, p = page) {
-    const path = `docs/verification/UI-E4E-GATE-${name}-2026-11-03.png`;
+    const path = `docs/verification/UI-POINTS-LAUNCH-${name}-2026-11-04.png`;
     if (!name.startsWith('MINI-') && !name.endsWith('MOBILE'))
       await p.evaluate(() => {
         window.scrollTo(0, 0);
@@ -116,16 +116,28 @@ try {
   const mini = await context.newPage();
   mini.on('pageerror', (e) => errors.push(e.message));
   await mini.setViewportSize({ width: 390, height: 844 });
-  await mini.addInitScript(
-    (identity) =>
-      localStorage.setItem(
-        'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1',
-        JSON.stringify(identity),
-      ),
-    { token: f.a.token, expiresAt: f.a.expiresAt },
+  const miniBase = 'http://127.0.0.1:5188/?mini';
+  const url = miniBase + '&view=checkout&id=' + f.quoteInput.rewardId + '&quantity=1';
+  await mini.goto(miniBase + '&view=home');
+  await mini.getByText('精选兑换', { exact: true }).waitFor();
+  await mini.getByRole('button', { name: '查看详情', exact: true }).click();
+  await shot('MINI-LAUNCH-HOME', mini);
+  const detailRoute = await mini.evaluate(() => window.__lastNavigation);
+  assert.equal(detailRoute, '/pages/reward/index?id=' + f.quoteInput.rewardId);
+  await mini.goto(miniBase + '&' + detailRoute.split('?')[1]);
+  await mini.getByRole('button', { name: '立即兑换', exact: true }).click();
+  assert.equal(
+    await mini.evaluate(() => window.__lastNavigation),
+    '/pages/redemption-checkout/index?id=' + f.quoteInput.rewardId + '&quantity=1',
   );
-  const url =
-    'http://127.0.0.1:5188/?mini&view=checkout&id=' + f.quoteInput.rewardId + '&quantity=1';
+  await mini.goto(url);
+  await mini.getByRole('button', { name: '前往登录', exact: true }).click();
+  assert.equal(await mini.evaluate(() => window.__lastNavigation), '/pages/login/index');
+  await mini.goto(miniBase + '&view=login');
+  await mini.getByRole('button', { name: '使用微信登录', exact: true }).waitFor();
+  await shot('MINI-LAUNCH-LOGIN', mini);
+  await mini.getByRole('button', { name: '使用微信登录', exact: true }).click();
+  await mini.waitForFunction(() => window.__loginReturned);
   f.config.pointsExpress.submit = false;
   await mini.goto(url);
   await mini.getByText(/新兑换已暂停/).waitFor();
@@ -140,7 +152,7 @@ try {
   f.config.pointsExpress.submit = true;
   f.config.pointsExpress.allowedUsers = [f.b.id];
   await mini.reload();
-  await mini.getByText(/当前仅向受控测试账号开放兑换/).waitFor();
+  await mini.getByText('当前账号暂不可兑换', { exact: true }).waitFor();
   await mini
     .getByRole('button', { name: '核验并生成兑换报价', exact: true })
     .scrollIntoViewIfNeeded();
@@ -161,7 +173,7 @@ try {
   await shot('MINI-ACCESS-ERROR', mini);
   failAccess = false;
   await mini.getByRole('button', { name: '重新读取商品与地址', exact: true }).click();
-  await mini.getByText(/受控测试兑换 · 可继续核验商品、地址与积分/).waitFor();
+  await mini.getByText('可继续核验商品、地址与积分', { exact: true }).waitFor();
   await mini.getByRole('button', { name: '核验并生成兑换报价', exact: true }).click();
   await mini.getByRole('button', { name: '确认扣除 120 积分兑换', exact: true }).waitFor();
   await mini
@@ -174,13 +186,30 @@ try {
   await mini.getByRole('button', { name: '核实原兑换操作', exact: true }).waitFor();
   await shot('MINI-PAUSED-AFTER-QUOTE', mini);
   f.config.pointsExpress.submit = true;
+  let droppedCreate = false;
+  await mini.route('**/api/v1/consumer/redemptions', async (route) => {
+    if (route.request().method() !== 'POST' || droppedCreate) return route.continue();
+    const response = await route.fetch();
+    assert.equal(response.status(), 200);
+    droppedCreate = true;
+    await route.abort('failed');
+  });
+  await Promise.all([
+    mini.waitForEvent('requestfailed', {
+      predicate: (request) =>
+        request.url().endsWith('/consumer/redemptions') && request.method() === 'POST',
+    }),
+    mini.getByRole('button', { name: '核实原兑换操作', exact: true }).click(),
+  ]);
+  assert.equal(droppedCreate, true);
+  await mini.reload();
   await mini.getByRole('button', { name: '核实原兑换操作', exact: true }).click();
   await mini.waitForFunction(() => !!window.__lastNavigation);
   const order = await f.controlled.db.redemptionOrder.findFirstOrThrow({
     where: { executionMode: 'CONTROLLED' },
   });
   await mini.goto('http://127.0.0.1:5188/?mini&view=order&id=' + order.id);
-  await mini.getByText('受控测试订单', { exact: true }).waitFor();
+  await mini.getByText('积分快递订单', { exact: true }).waitFor();
   await shot('MINI-CONTROLLED-ORDER', mini);
   f.config.pointsExpress.operations = false;
   await page.getByRole('button', { name: '积分兑换订单', exact: true }).click();
@@ -193,6 +222,13 @@ try {
   await shot('ADMIN-OPERATIONS-PAUSED');
   f.config.pointsExpress.operations = true;
   await page.getByRole('button', { name: '刷新发货资料', exact: true }).click();
+  await page.getByRole('button', { name: '打印本单', exact: true }).click();
+  await page
+    .frameLocator('iframe[title="订单配货单预览"]')
+    .getByText('受控测试订单', { exact: true })
+    .waitFor();
+  await shot('ADMIN-LAUNCH-PRINT-BEFORE-SHIP');
+  await page.getByRole('button', { name: '关闭打印预览', exact: true }).click();
   await page.getByLabel('快递公司', { exact: true }).selectOption('SF');
   await page.getByLabel('快递运单号', { exact: true }).fill('SF-CONTROLLED-UI-001');
   await page
@@ -212,9 +248,32 @@ try {
   await frame.getByText('受控测试订单', { exact: true }).waitFor();
   await shot('ADMIN-CONTROLLED-PRINT');
   await page.getByRole('button', { name: '关闭打印预览', exact: true }).click();
+  await mini.reload();
+  await mini.getByText('运单号：SF-CONTROLLED-UI-001', { exact: true }).waitFor();
+  await mini
+    .getByPlaceholder('请描述商品或配送问题（最多500字）')
+    .fill('合成首发回归：外包装需要核实');
+  await mini.getByRole('button', { name: '提交售后反馈', exact: true }).click();
+  await mini.getByText('待门店处理', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '兑换售后反馈', exact: true }).click();
+  await page.getByRole('button', { name: '查看反馈详情', exact: true }).click();
+  await page.getByLabel('处理方式', { exact: true }).selectOption('close');
+  await page.getByLabel('回复内容', { exact: true }).fill('合成门店回复：已收到并核实');
+  await page.getByLabel('确认将此回复展示给用户，并结束本次反馈', { exact: true }).check();
+  await page.getByRole('button', { name: '回复并结束本次反馈', exact: true }).click();
+  await page.getByText('合成门店回复：已收到并核实', { exact: true }).waitFor();
+  await mini.getByRole('button', { name: '刷新反馈进度', exact: true }).click();
+  await mini.getByText('合成门店回复：已收到并核实', { exact: true }).waitFor();
+  await mini.getByText('本次反馈已结束', { exact: true }).scrollIntoViewIfNeeded();
+  await shot('MINI-LAUNCH-FEEDBACK-CLOSED', mini);
+  assert.equal(
+    (await f.controlled.db.pointsAccount.findUniqueOrThrow({ where: { userId: f.a.id } })).balance,
+    880n,
+  );
+  assert.equal(await f.controlled.db.redemptionOrder.count({ where: { userId: f.a.id } }), 1);
   const devId = await f.createExpress(),
     dev = await f.controlled.db.redemptionOrder.findUniqueOrThrow({ where: { id: devId } });
-  await page.getByRole('button', { name: '返回兑换订单列表', exact: true }).click();
+  await page.getByRole('button', { name: '积分兑换订单', exact: true }).click();
   const row = page.locator('tr').filter({ hasText: dev.orderNo });
   await row.getByRole('button', { name: '查看订单详情', exact: true }).click();
   await page.getByText('本地开发订单', { exact: true }).waitFor();
@@ -246,7 +305,10 @@ try {
       await Promise.all(
         (browser?.contexts()[0]?.pages() ?? []).map(async (p) => ({
           url: p.url(),
-          text: await p.locator('body').innerText(),
+          text: await p
+            .locator('body')
+            .innerText({ timeout: 1000 })
+            .catch(() => ''),
         })),
       ),
       null,

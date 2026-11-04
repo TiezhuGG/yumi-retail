@@ -107,11 +107,7 @@ export default function RedemptionDetail() {
               </Text>
               <Text className="reward-price">{order.totalPoints} 积分</Text>
               <Text className="account-copy">
-                {order.executionMode === 'CONTROLLED'
-                  ? '受控测试订单'
-                  : order.executionMode === 'PRODUCTION'
-                    ? '积分快递订单'
-                    : '本地开发订单'}
+                {order.deliveryMode === 'EXPRESS' ? '积分快递订单' : '积分兑换订单'}
               </Text>
               <Text className="account-copy">
                 {order.status === 'CANCELED'

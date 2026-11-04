@@ -4,6 +4,7 @@ export default {
     'pages/product/index',
     'pages/cart/index',
     'pages/account/index',
+    'pages/login/index',
     'pages/points/index',
     'pages/rewards/index',
     'pages/reward/index',
@@ -21,5 +22,15 @@ export default {
     navigationBarTitleText: '玉米百货',
     navigationBarBackgroundColor: '#ffffff',
     navigationBarTextStyle: 'black',
+  },
+  tabBar: {
+    color: '#53635a',
+    selectedColor: '#087342',
+    backgroundColor: '#ffffff',
+    list: [
+      { pagePath: 'pages/index/index', text: '首页' },
+      { pagePath: 'pages/rewards/index', text: '积分商城' },
+      { pagePath: 'pages/account/index', text: '我的' },
+    ],
   },
 };

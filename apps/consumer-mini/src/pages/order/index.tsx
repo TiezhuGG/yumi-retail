@@ -73,7 +73,7 @@ export default function OrderDetail() {
       <View className="address-hero">
         <Text className="account-eyebrow">YUMI · ORDER DETAIL</Text>
         <Text className="address-title">订单详情</Text>
-        <Text className="address-subtitle">本机开发订单 · 支付尚未开放</Text>
+        <Text className="address-subtitle">购买订单</Text>
       </View>
       <View className="address-content">
         {error && <View className="address-alert order-error">{error}</View>}
@@ -82,7 +82,7 @@ export default function OrderDetail() {
         ) : !identity ? (
           <View className="address-state">
             <Text>请核实本人登录状态</Text>
-            <Button onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}>
+            <Button onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}>
               前往我的
             </Button>
             <Button onClick={() => void load()}>重新读取</Button>
@@ -103,7 +103,7 @@ export default function OrderDetail() {
                   ? order.cancelReason === 'PAYMENT_TIMEOUT'
                     ? '未开始支付且已超时，预占已释放。'
                     : '你已取消订单，预占已释放。'
-                  : '测试库存已预占，实物尚未出库。支付、拣货和配送未开放。'}
+                  : '订单商品已预留，尚未出库。'}
               </Text>
               <Text className="address-hint">
                 预占截止：

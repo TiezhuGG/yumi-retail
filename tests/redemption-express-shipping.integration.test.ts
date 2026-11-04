@@ -48,6 +48,12 @@ test('one express shipment consumes original stock exactly once, keeps points/qu
     const before = await snapshot(f),
       key = randomUUID();
     assert.equal((await info(f, id)).data.canShip, true);
+    const waiting = await f.call('/consumer/redemptions?fulfillment=EXPRESS_WAIT_SHIP');
+    assert.equal(waiting.status, 200);
+    assert.deepEqual(
+      waiting.data.items.map((order) => order.id),
+      [id],
+    );
     assert.equal((await f.api(path(id), body, key)).status, 200);
     assert.equal(
       (await f.api(path(id), { ...body, trackingNo: body.trackingNo.toUpperCase() }, key)).status,
@@ -74,6 +80,25 @@ test('one express shipment consumes original stock exactly once, keeps points/qu
     assert.equal(read.data.fulfillmentState, 'EXPRESS_SHIPPED');
     assert.equal(read.data.expressShipment!.trackingNo, 'SF000000123456');
     assert.equal('actorId' in read.data.expressShipment!, false);
+    const sent = await f.call('/consumer/redemptions?fulfillment=EXPRESS_SHIPPED');
+    assert.equal(sent.status, 200);
+    assert.deepEqual(
+      sent.data.items.map((order) => order.id),
+      [id],
+    );
+    const other = await f.call(
+      '/consumer/redemptions?fulfillment=EXPRESS_SHIPPED',
+      undefined,
+      randomUUID(),
+      f.identityB.token,
+    );
+    assert.equal(other.status, 200);
+    assert.deepEqual(other.data.items, []);
+    assert.equal((await f.call('/consumer/redemptions?fulfillment=LOCAL')).status, 400);
+    assert.deepEqual(
+      (await f.call('/consumer/redemptions?fulfillment=EXPRESS_WAIT_SHIP')).data.items,
+      [],
+    );
     assert.equal(
       (await f.call('/consumer/redemptions/' + id, undefined, randomUUID(), f.identityB.token))
         .status,

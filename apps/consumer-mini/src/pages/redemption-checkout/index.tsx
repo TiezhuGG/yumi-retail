@@ -228,15 +228,7 @@ export default function RedemptionCheckout() {
       <View className="account-content">
         <View className="reward-notice">
           <Text>确认后扣除积分并预占商品，订单进入待快递发货。</Text>
-          <Text>
-            {access?.executionMode === 'CONTROLLED'
-              ? '受控测试，仅向指定账号开放；不代表生产验收通过。'
-              : access?.executionMode === 'PRODUCTION'
-                ? '寄送范围和运费以本次核验为准。'
-                : access
-                  ? '本地开发验证；当前未启用生产交易。'
-                  : '正在核实当前开放范围。'}
-          </Text>
+          <Text>寄送范围和运费以本次核验为准。</Text>
         </View>
         {loading && <Text className="account-copy">正在读取兑换资料…</Text>}
         {error && (
@@ -247,7 +239,7 @@ export default function RedemptionCheckout() {
         {!loading && !identity && (
           <Button
             className="points-action"
-            onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}
+            onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}
           >
             前往登录
           </Button>
@@ -316,12 +308,11 @@ export default function RedemptionCheckout() {
             </View>
             {access && (
               <Text className="account-copy">
-                {access.executionMode === 'CONTROLLED'
-                  ? '受控测试兑换'
-                  : access.executionMode === 'PRODUCTION'
-                    ? '积分快递兑换'
-                    : '本地开发兑换'}{' '}
-                · {access.reason}
+                {access.canSubmit
+                  ? '可继续核验商品、地址与积分'
+                  : access.reason === '当前仅向受控测试账号开放兑换'
+                    ? '当前账号暂不可兑换'
+                    : access.reason}
               </Text>
             )}
             <Button

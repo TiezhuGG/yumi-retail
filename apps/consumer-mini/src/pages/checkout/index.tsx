@@ -169,7 +169,7 @@ export default function Checkout() {
       </View>
       <View className="address-content">
         <View className="checkout-notice">
-          报价不锁价、不占库存。订单提交仅限显式开启的本机开发验证，支付尚未开放。
+          报价仅供确认，商品和费用以提交结果为准。
         </View>
         {error && (
           <View className="address-alert checkout-error">
@@ -186,7 +186,7 @@ export default function Checkout() {
         ) : !identity ? (
           <View className="address-state">
             <Text>登录后可核验账号购物车</Text>
-            <Button onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}>
+            <Button onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}>
               前往我的
             </Button>
             <Button onClick={() => void load()}>重新读取</Button>
@@ -206,7 +206,7 @@ export default function Checkout() {
               </View>
             )}
             {mergePending && (
-              <View className="address-alert">请先回购物车处理待确认的本机草稿合并。</View>
+              <View className="address-alert">请先回购物车处理待确认的购物车合并。</View>
             )}
             <View className="checkout-address address-card">
               <Text className="address-section-title">收货地址</Text>

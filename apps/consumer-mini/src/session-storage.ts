@@ -17,7 +17,7 @@ export function consumerSession(publish: (state: SessionState) => void) {
         try {
           Taro.setStorageSync(sessionStorageKey, value);
         } catch {
-          throw Error('登录记录保存失败，请重试；购物车草稿已保留。');
+          throw Error('登录记录保存失败，请重试。');
         }
       },
       clear() {

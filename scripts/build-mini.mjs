@@ -34,6 +34,11 @@ try {
   });
   if (artifacts.error || artifacts.status !== 0)
     throw Error('微信工程入口或页面产物检查失败，未生成构建清单。');
+  const rendered = spawnSync(process.execPath, ['scripts/verify-weapp-render.mjs'], {
+    stdio: 'inherit',
+  });
+  if (rendered.error || rendered.status !== 0)
+    throw Error('微信产物运行检查失败，未生成构建清单。');
   const info = collectBuildInfo('apps/consumer-mini/dist', target, apiBase);
   info.consumerDevelopmentLogin = developmentLogin;
   verifyBuildInfo('apps/consumer-mini/dist', info, target);

@@ -138,7 +138,7 @@ export default function Cart() {
       ? { confirm: true }
       : await Taro.showModal({
           title: '合并到当前账号？',
-          content: `将本机草稿合并到${identity.profile.user.displayName}。相同规格数量相加，已有勾选状态保留；失效或缺货项也会保留。`,
+          content: `将本设备购物车合并到${identity.profile.user.displayName}。相同规格数量相加，已有勾选状态保留；失效或缺货项也会保留。`,
           confirmText: '确认合并',
         });
     if (!answer.confirm || operation.current) return;
@@ -175,8 +175,8 @@ export default function Cart() {
   async function reset() {
     const result = await Taro.showModal({
       title: '重置本机购物车？',
-      content: '将删除这台设备当前保存的购物车草稿，无法撤销。',
-      confirmText: '重置草稿',
+      content: '将删除这台设备当前保存的商品，无法撤销。',
+      confirmText: '清空购物车',
     });
     if (result.confirm) {
       sequence.current++;
@@ -196,7 +196,7 @@ export default function Cart() {
   return (
     <View className="cart-page">
       <View className="cart-heading">
-        <Text className="cart-title">{accountMode ? '账号购物车' : '本机购物车草稿'}</Text>
+        <Text className="cart-title">{accountMode ? '账号购物车' : '购物车'}</Text>
         <Button disabled={busy} onClick={() => void refresh()}>
           {busy ? '正在核验…' : '刷新价格与库存'}
         </Button>
@@ -204,7 +204,7 @@ export default function Cart() {
       <View className="cart-note">
         {accountMode
           ? `当前账号：${identity?.profile.user.displayName}。账号购物车保存到服务端。`
-          : '草稿仅保存在这台设备。'}
+          : '商品暂存在这台设备。'}
         购物车不占库存；参考小计不含配送费，不是下单报价，结算尚未开放。
       </View>
       {identity && (
@@ -212,14 +212,14 @@ export default function Cart() {
           <Text>
             {pending
               ? '有一笔合并待确认，原稿已冻结；请使用原账号重试，勿重复提交。'
-              : `本机草稿有${guestCount}种规格，可确认后合并到当前账号。`}
+              : `本设备购物车有${guestCount}种规格，可确认后合并到当前账号。`}
           </Text>
           <Button disabled={busy} onClick={() => void switchView()}>
-            {accountMode ? '查看本机草稿' : '返回账号购物车'}
+            {accountMode ? '查看本设备购物车' : '返回账号购物车'}
           </Button>
           {(guestCount > 0 || pending) && (
             <Button className="cart-merge-button" disabled={busy} onClick={() => void merge()}>
-              {pending ? '重试确认原合并' : '将本机草稿合并到当前账号'}
+              {pending ? '重试确认原合并' : '将本设备购物车合并到当前账号'}
             </Button>
           )}
         </View>
@@ -234,9 +234,9 @@ export default function Cart() {
       {!identity && (
         <Button
           className="cart-account-link"
-          onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}
+          onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}
         >
-          前往“我的”核验登录
+          前往登录
         </Button>
       )}
       {error && (
@@ -244,14 +244,14 @@ export default function Cart() {
           <Text>{error}</Text>
           <Button onClick={() => void refresh()}>重新读取购物车</Button>
           {!draft && !accountMode && !pending && (
-            <Button onClick={() => void reset()}>重置本机草稿</Button>
+            <Button onClick={() => void reset()}>重置本设备购物车</Button>
           )}
         </View>
       )}
       {draft && items.length === 0 && (
         <View className="store-feedback cart-empty">
           <Text>购物车还是空的</Text>
-          <Text className="feedback-copy">去商品详情选好规格，再加入草稿吧</Text>
+          <Text className="feedback-copy">去商品详情选好规格，再加入购物车吧</Text>
           <Button onClick={() => void Taro.reLaunch({ url: '/pages/index/index' })}>
             去逛好物
           </Button>

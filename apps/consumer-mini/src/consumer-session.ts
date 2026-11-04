@@ -129,7 +129,7 @@ export function createConsumerSession(
       if (error instanceof SessionRequestError && error.status === 401 && saved) {
         try {
           if (parseSession(io.read())?.token === saved.token) io.clear();
-          publish({ ...initialSessionState, error: '登录已失效，请重新登录；购物车草稿已保留。' });
+          publish({ ...initialSessionState, error: '登录已失效，请重新登录。' });
           return;
         } catch {
           message = '登录已失效，但本机记录清除失败，请重试或手动清除登录记录。';

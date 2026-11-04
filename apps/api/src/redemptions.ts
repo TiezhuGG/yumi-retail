@@ -721,14 +721,17 @@ export class RedemptionService {
   async list(r: ApiRequest, q: unknown, admin = false, id?: string) {
     const b = fields(
       q,
-      admin ? ['cursor', 'status', 'keyword', 'fulfillment'] : ['cursor', 'status'],
+      admin ? ['cursor', 'status', 'keyword', 'fulfillment'] : ['cursor', 'status', 'fulfillment'],
     );
     const cursor = b.cursor === undefined ? null : uuid(b.cursor),
       status = b.status === undefined ? null : str(b.status, 16);
     if (status && !['ACTIVE', 'CANCELED'].includes(status))
       throw failure(400, 'VALIDATION_ERROR', '兑换单状态无效');
     const fulfillment = b.fulfillment === undefined ? '' : str(b.fulfillment, 24);
-    if (fulfillment && !['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED', 'LOCAL'].includes(fulfillment))
+    if (
+      fulfillment &&
+      !['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED', ...(admin ? ['LOCAL'] : [])].includes(fulfillment)
+    )
       throw failure(400, 'VALIDATION_ERROR', '履约筛选无效');
     const keyword = b.keyword === undefined ? '' : str(b.keyword, 80);
     if (keyword.length > 80) throw failure(400, 'VALIDATION_ERROR', '搜索词过长');

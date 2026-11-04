@@ -58,7 +58,7 @@ export default function RewardDetail() {
             </Button>
             <Button
               className="points-action"
-              onClick={() => void Taro.navigateTo({ url: '/pages/rewards/index' })}
+              onClick={() => void Taro.switchTab({ url: '/pages/rewards/index' })}
             >
               返回积分商城
             </Button>
@@ -118,7 +118,7 @@ export default function RewardDetail() {
                 {item.endsAt ? '；结束：' + time(item.endsAt) + '（北京时间）' : '；结束时间不限'}
               </Text>
               <Text className="account-copy">
-                此处积分合计仅供预览。启用本机开发兑换后，需在确认页核验报价并明确确认，才会扣分预占；正式配送与售后规则待公布。
+                兑换所需积分以确认页为准，提交订单后才会扣除积分。
               </Text>
               <Button
                 className="account-link"
@@ -135,7 +135,7 @@ export default function RewardDetail() {
                   })
                 }
               >
-                {item.redemptionEnabled ? '核验开发兑换' : '兑换下单待开放'}
+                {item.redemptionEnabled ? '立即兑换' : '兑换暂未开放'}
               </Button>
             </View>
           </>

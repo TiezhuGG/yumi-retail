@@ -164,7 +164,7 @@ export default function ProductDetail() {
               className="detail-cart-link"
               onClick={() => void Taro.navigateTo({ url: '/pages/cart/index' })}
             >
-              购物车草稿
+              购物车
             </Button>
             <Button
               className="detail-buy"

@@ -66,7 +66,7 @@ export default function Orders() {
       </View>
       <View className="address-content">
         <View className="checkout-notice">
-          当前为本机开发订单基础，真实支付、拣货和配送尚未开放。
+          这里可查看你的购买订单。
         </View>
         {error && (
           <View className="address-alert">
@@ -81,7 +81,7 @@ export default function Orders() {
         ) : !identity ? (
           <View className="address-state">
             <Text>登录后查看本人订单</Text>
-            <Button onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}>
+            <Button onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}>
               前往我的
             </Button>
           </View>
@@ -92,7 +92,7 @@ export default function Orders() {
                 <Text className="address-empty-icon">▣</Text>
                 <Text>还没有订单</Text>
                 <Text className="address-hint">
-                  账号购物车核验报价后，可在开发模式创建测试订单。
+                  有订单后可在这里查看详情。
                 </Text>
               </View>
             )}

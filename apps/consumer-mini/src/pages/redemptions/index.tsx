@@ -1,13 +1,31 @@
 import { View, Text, Button } from '@tarojs/components';
-import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
+import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import type {
   RedemptionOrderView,
   RedemptionOrderPage,
 } from '../../../../../packages/contracts/src/index';
 import { cartIdentity } from '../../account-cart';
-import { addressRequest } from '../../address-api';
+import { addressRequest, AddressRequestError } from '../../address-api';
+import { CartRequestError } from '../../cart-merge';
 export default function Redemptions() {
+  const { params } = useRouter();
+  const afterSales = params.service === 'after-sales';
+  const filters = [
+    { label: '全部', query: '' },
+    { label: '待发货', query: 'fulfillment=EXPRESS_WAIT_SHIP' },
+    { label: '已发货', query: 'fulfillment=EXPRESS_SHIPPED' },
+    { label: '已取消', query: 'status=CANCELED' },
+  ];
+  const [filter, setFilter] = useState(() =>
+    afterSales || params.fulfillment === 'EXPRESS_SHIPPED'
+      ? 2
+      : params.fulfillment === 'EXPRESS_WAIT_SHIP'
+        ? 1
+        : params.status === 'CANCELED'
+          ? 3
+          : 0,
+  );
   const [items, setItems] = useState<RedemptionOrderView[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
@@ -16,11 +34,15 @@ export default function Redemptions() {
   const seq = useRef(0),
     pending = useRef<string | undefined>(undefined),
     owner = useRef('');
-  async function load(next?: string) {
+  async function load(next?: string, selected = filter) {
     const n = ++seq.current;
     pending.current = next;
     setLoading(true);
     setError('');
+    if (!next) {
+      setItems([]);
+      setCursor(null);
+    }
     try {
       const who = await cartIdentity();
       if (n !== seq.current) return;
@@ -32,15 +54,27 @@ export default function Redemptions() {
       }
       if (next && owner.current !== who.profile.user.id) throw Error('账号已变化，请重新读取');
       owner.current = who.profile.user.id;
+      const query = [filters[selected]?.query, next ? 'cursor=' + encodeURIComponent(next) : '']
+        .filter(Boolean)
+        .join('&');
       const p = await addressRequest<RedemptionOrderPage>(
         who,
-        '/consumer/redemptions' + (next ? '?cursor=' + next : ''),
+        '/consumer/redemptions' + (query ? '?' + query : ''),
       );
       if (n !== seq.current) return;
       setItems((old) => (next ? [...old, ...p.items] : p.items));
       setCursor(p.nextCursor);
     } catch (e) {
-      if (n === seq.current) setError(e instanceof Error ? e.message : '兑换单读取失败');
+      if (n === seq.current) {
+        if (
+          (e instanceof CartRequestError || e instanceof AddressRequestError) &&
+          e.status === 401
+        ) {
+          setGuest(true);
+          setItems([]);
+          setCursor(null);
+        } else setError(e instanceof Error ? e.message : '兑换单读取失败');
+      }
     } finally {
       if (n === seq.current) setLoading(false);
     }
@@ -65,15 +99,33 @@ export default function Redemptions() {
     <View className="account-page reward-detail-page">
       <View className="account-hero">
         <Text className="account-eyebrow">YUMI · 我的积分</Text>
-        <Text className="account-name">兑换订单</Text>
+        <Text className="account-name">{afterSales ? '兑换售后' : '兑换订单'}</Text>
       </View>
       <View className="account-content">
-        <Text className="account-copy">本机开发兑换，按真实预占进入拣货；出库与配送尚未开放。</Text>
+        {afterSales ? (
+          <Text className="account-copy">选择已发货的订单，在详情中提交反馈或查看处理进度。</Text>
+        ) : (
+          <View className="reward-categories">
+            {filters.map(({ label }, index) => (
+              <Button
+                key={label}
+                className={filter === index ? 'active' : ''}
+                onClick={() => {
+                  if (index === filter) return;
+                  setFilter(index);
+                  void load(undefined, index);
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+          </View>
+        )}
         {loading && <Text>正在读取兑换单…</Text>}
         {guest && (
           <Button
             className="points-action"
-            onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}
+            onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}
           >
             登录后查看
           </Button>

@@ -4,7 +4,7 @@ import { expressShippingFixture } from './express-shipping-fixture.ts';
 import { ExpressReadinessService } from '../../apps/api/dist/express-readiness.js';
 import { createApplication } from '../../apps/api/dist/app.js';
 import { tokenHash } from '../../apps/api/dist/staff-auth.js';
-export async function controlledExpressFixture() {
+export async function controlledExpressFixture(options: { browserLogin?: boolean } = {}) {
   const f = await expressShippingFixture();
   let runtime: Awaited<ReturnType<typeof createApplication>> | undefined;
   try {
@@ -23,7 +23,7 @@ export async function controlledExpressFixture() {
             id,
             provider: 'WECHAT',
             wechatAppId: appId,
-            subject: tokenHash('synthetic-controlled:' + label),
+            subject: tokenHash(appId + ':synthetic-controlled-browser-' + label),
             displayName: '合成受控顾客 ' + label,
           },
         });
@@ -71,7 +71,13 @@ export async function controlledExpressFixture() {
     };
     const u = new URL(process.env.TEST_DATABASE_URL!);
     u.searchParams.set('schema', schema);
-    runtime = await createApplication(u.toString(), { config, accessLog: () => {} });
+    runtime = await createApplication(u.toString(), {
+      config,
+      accessLog: () => {},
+      ...(options.browserLogin
+        ? { wechatExchange: async () => ({ openid: 'synthetic-controlled-browser-A' }) }
+        : {}),
+    });
     await runtime.app.listen(0, '127.0.0.1');
     const base = await runtime.app.getUrl();
     async function call(

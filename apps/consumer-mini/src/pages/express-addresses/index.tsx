@@ -215,7 +215,7 @@ export default function Addresses() {
         ) : !identity ? (
           <View className="address-state">
             <Text>{error ? '暂时无法核验身份' : '登录后管理本人收货地址'}</Text>
-            <Button onClick={() => void Taro.navigateTo({ url: '/pages/account/index' })}>
+            <Button onClick={() => void Taro.navigateTo({ url: '/pages/login/index' })}>
               前往我的
             </Button>
             <Button onClick={() => void load()}>重新读取</Button>

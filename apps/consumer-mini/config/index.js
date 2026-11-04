@@ -25,5 +25,19 @@ module.exports = defineConfig({
       process.env.TARO_APP_API_BASE_URL || 'http://127.0.0.1:3000/api/v1',
     ),
   },
-  mini: { postcss: { pxtransform: { enable: true }, cssModules: { enable: false } } },
+  mini: {
+    postcss: { pxtransform: { enable: true }, cssModules: { enable: false } },
+    webpackChain(chain) {
+      if (process.env.YUMI_MINI_BUILD_TARGET !== 'local') return;
+      for (const name of [
+        'terserPlugin',
+        'cssoWebpackPlugin',
+        'esBuildCssPlugin',
+        'lightningcssPlugin',
+      ]) {
+        if (chain.optimization.minimizers.has(name))
+          chain.optimization.minimizer(name).tap(([options]) => [{ ...options, parallel: false }]);
+      }
+    },
+  },
 });

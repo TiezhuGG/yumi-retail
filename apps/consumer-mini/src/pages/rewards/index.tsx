@@ -1,12 +1,11 @@
-import { View, Text, Button, Input } from '@tarojs/components';
-import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
+import { View, Text, Button, Input, ScrollView } from '@tarojs/components';
+import { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import { request } from '../../api';
 import type { PublicCategory } from '../../api';
 import type { Reward, RewardPage } from '../../rewards-api';
-import { ProductVisual } from '../../components/ProductVisual';
-import { cartIdentity } from '../../account-cart';
-import { addressRequest } from '../../address-api';
+import { RewardCard } from '../../components/RewardCard';
+import { takeRewardFilter } from '../../reward-navigation';
 export default function Rewards() {
   const [items, setItems] = useState<Reward[]>([]),
     [keyword, setKeyword] = useState(''),
@@ -17,10 +16,8 @@ export default function Rewards() {
     [categoryLoading, setCategoryLoading] = useState(false),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
-    [error, setError] = useState(''),
-    [balance, setBalance] = useState('登录查看积分');
+    [error, setError] = useState('');
   const seq = useRef(0),
-    accountSeq = useRef(0),
     categorySeq = useRef(0),
     applied = useRef({ keyword: '', category: '' }),
     pending = useRef<string | undefined>(undefined);
@@ -29,10 +26,15 @@ export default function Rewards() {
     pending.current = next;
     setLoading(true);
     setError('');
+    if (!next) {
+      setItems([]);
+      setCursor(null);
+    }
     const q = [];
     if (applied.current.keyword) q.push('keyword=' + encodeURIComponent(applied.current.keyword));
-    if (applied.current.category) q.push('categoryId=' + applied.current.category);
-    if (next) q.push('cursor=' + next);
+    if (applied.current.category)
+      q.push('categoryId=' + encodeURIComponent(applied.current.category));
+    if (next) q.push('cursor=' + encodeURIComponent(next));
     try {
       const p = await request<RewardPage>('/rewards?' + q.join('&'));
       if (n !== seq.current) return;
@@ -62,37 +64,23 @@ export default function Rewards() {
       if (n === categorySeq.current) setCategoryLoading(false);
     }
   }
-  async function account() {
-    const n = ++accountSeq.current;
-    setBalance('正在读取积分…');
-    try {
-      const identity = await cartIdentity();
-      if (n !== accountSeq.current) return;
-      if (!identity) {
-        setBalance('登录查看积分');
-        return;
-      }
-      const p = await addressRequest<{ balance: string }>(identity, '/consumer/points');
-      if (n === accountSeq.current) setBalance(p.balance + ' 积分');
-    } catch {
-      if (n === accountSeq.current) setBalance('积分读取失败，点击重试');
-    }
-  }
   useDidShow(() => {
+    const filter = takeRewardFilter();
+    if (filter) {
+      applied.current = filter;
+      setKeyword(filter.keyword);
+      setCategory(filter.category);
+    }
     void load();
     void loadCategories();
-    void account();
   });
   useDidHide(() => {
     seq.current++;
-    accountSeq.current++;
     categorySeq.current++;
-    setBalance('登录查看积分');
   });
   useEffect(
     () => () => {
       seq.current++;
-      accountSeq.current++;
       categorySeq.current++;
     },
     [],
@@ -103,69 +91,56 @@ export default function Rewards() {
   };
   return (
     <View className="account-page rewards-page">
-      <View className="account-hero">
-        <Text className="account-eyebrow">YUMI · 好物积分</Text>
-        <Text className="account-name">积分商城</Text>
-        <Text className="account-copy">把每一份心意，留给日常好生活</Text>
-        <Button
-          className="reward-balance"
-          onClick={() =>
-            balance.includes('失败')
-              ? void account()
-              : void Taro.navigateTo({ url: '/pages/points/index' })
-          }
-        >
-          {balance} ›
-        </Button>
-      </View>
       <View className="account-content">
-        <View className="reward-notice">
-          <Text>商城商品可浏览，正式兑换尚未开放；本机开发兑换仅用于隔离验证。</Text>
-          <Text>积分不兑换现金；具体兑换、配送与售后规则正式开放前公布。</Text>
-        </View>
         <View className="reward-search">
           <Input
             value={keyword}
             maxlength={80}
             placeholder="搜索兑换好物"
             onInput={(e) => setKeyword(e.detail.value)}
+            confirmType="search"
             onConfirm={query}
           />
           <Button disabled={loading} onClick={query}>
             搜索
           </Button>
         </View>
-        <View className="reward-categories">
-          <Button
-            className={category === '' ? 'active' : ''}
-            onClick={() => {
-              setCategory('');
-              applied.current = { keyword: keyword.trim(), category: '' };
-              void load();
-            }}
-          >
-            全部
-          </Button>
-          {categories.map((c) => (
+        <ScrollView scrollX className="reward-category-scroll">
+          <View className="reward-categories reward-category-track">
             <Button
-              key={c.id}
-              className={category === c.id ? 'active' : ''}
+              className={category === '' ? 'active' : ''}
               onClick={() => {
-                setCategory(c.id);
-                applied.current = { keyword: keyword.trim(), category: c.id };
+                setCategory('');
+                applied.current = { keyword: keyword.trim(), category: '' };
                 void load();
               }}
             >
-              {c.parentName ? c.parentName + ' / ' : ''}
-              {c.name}
+              全部
             </Button>
-          ))}
-          {categoryCursor && (
-            <Button disabled={categoryLoading} onClick={() => void loadCategories(categoryCursor)}>
-              更多分类
-            </Button>
-          )}
-        </View>
+            {categories.map((c) => (
+              <Button
+                key={c.id}
+                className={category === c.id ? 'active' : ''}
+                onClick={() => {
+                  setCategory(c.id);
+                  applied.current = { keyword: keyword.trim(), category: c.id };
+                  void load();
+                }}
+              >
+                {c.parentName ? c.parentName + ' / ' : ''}
+                {c.name}
+              </Button>
+            ))}
+            {categoryCursor && (
+              <Button
+                disabled={categoryLoading}
+                onClick={() => void loadCategories(categoryCursor)}
+              >
+                更多分类
+              </Button>
+            )}
+          </View>
+        </ScrollView>
         {categoryError && (
           <Button disabled={categoryLoading} onClick={() => void loadCategories()}>
             {categoryError}，重试
@@ -194,35 +169,8 @@ export default function Rewards() {
           </View>
         )}
         <View className="reward-grid">
-          {items.map((r) => (
-            <View
-              className="reward-card"
-              key={r.id}
-              onClick={() => void Taro.navigateTo({ url: '/pages/reward/index?id=' + r.id })}
-            >
-              <ProductVisual name={r.name} imageUrl={r.imageUrl} />
-              <View className="reward-card-copy">
-                <Text className="reward-title">{r.title}</Text>
-                <Text className="account-copy">
-                  {r.spec} / {r.unit}
-                </Text>
-                <Text className="reward-price">
-                  {r.pointsPrice} <Text>积分</Text>
-                </Text>
-                <Text className="reward-stock">
-                  {r.available > 0 ? '每人限兑 ' + r.perUserLimit + ' 件' : '暂时缺货'}
-                </Text>
-                <Button
-                  className="points-action"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void Taro.navigateTo({ url: '/pages/reward/index?id=' + r.id });
-                  }}
-                >
-                  查看详情
-                </Button>
-              </View>
-            </View>
+          {items.map((reward) => (
+            <RewardCard key={reward.id} reward={reward} />
           ))}
         </View>
         {cursor && !error && (

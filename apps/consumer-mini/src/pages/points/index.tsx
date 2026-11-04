@@ -2,6 +2,7 @@ import { View, Text, Button } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import { cartIdentity } from '../../account-cart';
+import { CartRequestError } from '../../cart-merge';
 import { addressRequest } from '../../address-api';
 type Entry = {
   id: string;
@@ -49,7 +50,14 @@ export default function Points() {
       setItems((old) => (next ? [...old, ...page.items] : page.items));
       setCursor(page.nextCursor);
     } catch (e) {
-      if (n === seq.current) setError(e instanceof Error ? e.message : '积分读取失败');
+      if (n === seq.current) {
+        if (e instanceof CartRequestError && e.status === 401) {
+          setGuest(true);
+          setItems([]);
+          setBalance('0');
+          setCursor(null);
+        } else setError(e instanceof Error ? e.message : '积分读取失败');
+      }
     } finally {
       if (n === seq.current) setLoading(false);
     }
@@ -90,7 +98,7 @@ export default function Points() {
             <Text>登录后可查看本人积分和明细。</Text>
             <Button
               className="points-action"
-              onClick={() => Taro.navigateTo({ url: '/pages/account/index' })}
+              onClick={() => Taro.navigateTo({ url: '/pages/login/index' })}
             >
               前往登录
             </Button>

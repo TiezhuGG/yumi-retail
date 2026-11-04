@@ -990,3 +990,7 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 ## 2026-11-04 E4f恢复验证边界
 
 本轮不修改API契约/版本。冷备恢复后使用现有受控门禁、订单/打印相关事实、运单更正、反馈和取消接口验证原键与归属；没有新增备份/恢复HTTP接口，也没有通过后台按钮停止数据库。工具仅限本机随机独立集群，见[记录](../verification/E4F-LOCAL-EXPRESS-RECOVERY-2026-11-04.md)。
+
+## 积分个人中心订单筛选
+
+消费者 GET /api/v1/consumer/redemptions 支持可选 fulfillment=EXPRESS_WAIT_SHIP 或 EXPRESS_SHIPPED。两者仅匹配当前本人有效快递单，并沿用原分页游标与筛选范围校验。已取消使用 status=CANCELED。未指定 fulfillment 时保留原列表语义。管理员专用 LOCAL 仍由消费者接口拒绝。没有数据库结构变化。

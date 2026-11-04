@@ -540,36 +540,8 @@ button[disabled] {
   padding: 16px;
 }
 .store-tabs {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  background: #fff;
-  border-top: 1px solid #edf1e8;
-  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
-  z-index: 10;
-}
-.store-tabs > button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #98a68e;
-  gap: 4px;
-  width: 25%;
-  font-size: 9px;
-  position: relative;
-}
-.store-tabs > button > text:first-child {
-  font-size: 23px;
-  height: 26px;
-  line-height: 25px;
-}
-.store-tabs > button.selected {
-  color: #148743;
-  font-weight: 600;
+  /* Guard against a cached page from before the native tab bar migration. */
+  display: none !important;
 }
 .coming-soon {
   font-size: 6px;
@@ -1882,6 +1854,7 @@ button[disabled] {
 }
 
 .points-page .points-action,
+.points-home .points-action,
 .rewards-page .points-action,
 .reward-detail-page .points-action {
   display: block;
@@ -2132,4 +2105,294 @@ button[disabled] {
 }
 .account-page .account-link {
   border: 0;
+}
+
+.points-home {
+  padding-bottom: 20px;
+}
+.points-login-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.account-center .account-order-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+.account-order-shortcuts button {
+  min-height: 44px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  background: #edf6ee;
+  color: #245b3b;
+}
+.account-center .account-link {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0;
+  font-size: 14px;
+}
+.account-center .account-services > .account-link + .account-link {
+  border-top: 1px solid #edf2eb;
+}
+.account-center .account-services > .account-rules {
+  display: block;
+  padding: 8px 10px;
+  background: #f4f8f2;
+  border-radius: 10px;
+}
+.points-home-categories {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.points-home-categories .category-chip {
+  justify-content: center;
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding: 9px 3px;
+  background: #eef6e9;
+}
+.points-home-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 16px 0 10px;
+  font-weight: 700;
+}
+.rewards-page .account-content {
+  padding-top: 12px;
+}
+.reward-category-scroll {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+  margin: 12px 0 14px;
+}
+.reward-category-track {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: max-content;
+  margin: 0;
+  padding-right: 2px;
+}
+.reward-category-track > button {
+  flex: none;
+  white-space: nowrap;
+}
+.account-center {
+  background: #f4f6f2;
+  padding-bottom: 24px;
+}
+.member-header {
+  padding: 18px 18px 29px;
+  color: #fff;
+  background: linear-gradient(145deg, #0e402b, #176244 75%, #24734e);
+  border-radius: 0 0 25px 25px;
+}
+.member-heading,
+.member-profile,
+.member-points,
+.member-service-row {
+  display: flex;
+  align-items: center;
+}
+.member-heading {
+  justify-content: space-between;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 16px;
+}
+.member-settings {
+  min-height: 36px;
+  padding: 0 12px;
+  color: #fff;
+  border: 1px solid #ffffff52;
+  border-radius: 20px;
+}
+.member-profile {
+  gap: 11px;
+}
+.member-avatar {
+  flex: none;
+  width: 46px;
+  line-height: 46px;
+  text-align: center;
+  background: #fff;
+  border-radius: 15px;
+  color: #17643f;
+  font-size: 23px;
+  font-weight: 700;
+}
+.member-profile-copy {
+  min-width: 0;
+  flex: 1;
+}
+.member-name,
+.member-note,
+.member-points-label,
+.member-points-value,
+.member-points-status {
+  display: block;
+}
+.member-name {
+  font-size: 17px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.member-note {
+  color: #d5ebdb;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.member-login {
+  flex: none;
+  background: #e9f7e8;
+  color: #174b32;
+  min-height: 42px;
+  padding: 0 13px;
+  border-radius: 22px;
+}
+.member-content {
+  padding: 0 14px;
+  margin-top: -12px;
+}
+.member-points {
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #fff;
+  background: linear-gradient(135deg, #124a32, #24744c);
+  padding: 15px 17px;
+  border-radius: 15px;
+  margin-bottom: 12px;
+}
+.member-points-label {
+  color: #dcf2e2;
+  font-size: 13px;
+}
+.member-points-value {
+  font-size: 26px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.member-points-status {
+  font-size: 16px;
+  margin-top: 6px;
+}
+.member-points-link {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  background: #ffffff24;
+  color: #fff;
+}
+.member-points-integrated {
+  margin: 17px 0 0;
+  padding: 12px 14px;
+  background: #ffffff17;
+  border: 1px solid #ffffff2e;
+}
+.member-points-main {
+  min-width: 0;
+  flex: 1;
+}
+.member-section {
+  background: white;
+  border: 1px solid #e4ebe0;
+  border-radius: 15px;
+  padding: 12px 15px;
+  margin-bottom: 12px;
+}
+.member-section-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #213c2d;
+}
+.member-order-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 8px;
+}
+.member-order-link {
+  min-height: 63px;
+  color: #274b36;
+  font-size: 12px;
+}
+.member-order-icon {
+  box-sizing: border-box;
+  width: 25px;
+  height: 24px;
+  position: relative;
+  margin: 0 auto 5px;
+  border: 1.5px solid #38855e;
+  border-radius: 5px;
+  background: #eaf6ec;
+}
+.member-order-icon::after {
+  content: '';
+  position: absolute;
+  inset: 7px 5px auto;
+  height: 2px;
+  background: #38855e;
+  box-shadow: 0 5px #38855e;
+}
+.member-order-icon-waiting::after {
+  inset: 4px 8px auto;
+  width: 6px;
+  height: 11px;
+  background: transparent;
+  border-right: 1.5px solid #38855e;
+  border-bottom: 1.5px solid #38855e;
+  box-shadow: none;
+}
+.member-order-icon-shipped::after {
+  inset: 5px 6px auto;
+  height: 6px;
+  background: transparent;
+  border-left: 1.5px solid #38855e;
+  border-bottom: 1.5px solid #38855e;
+  box-shadow: none;
+  transform: rotate(-45deg);
+}
+.member-order-icon-canceled {
+  background: #f0f2ef;
+  border-color: #79877d;
+}
+.member-order-icon-canceled::after {
+  inset: 10px 5px auto;
+  background: #79877d;
+  box-shadow: none;
+}
+.member-service-row {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 45px;
+  text-align: left;
+  font-size: 14px;
+  color: #293d32;
+}
+.member-service-row + .member-service-row {
+  border-top: 1px solid #edf1eb;
+}
+.member-chevron {
+  color: #637e6b;
+  font-size: 19px;
+}
+.member-rules {
+  background: #f1f7ef;
+  padding: 8px 10px;
+  border-radius: 9px;
 }

@@ -10,7 +10,14 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCookieAuth,
+  ApiHeader,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ExpressShippingService } from './express-shipping.js';
 import { RedemptionService } from './redemptions.js';
 import { Consumer, Permissions } from './staff-guard.js';
@@ -189,6 +196,11 @@ export class RedemptionController {
     return success(r, await this.service.create(r, key(r), b));
   }
   @Get('redemptions')
+  @ApiQuery({
+    name: 'fulfillment',
+    required: false,
+    enum: ['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED'],
+  })
   @ApiResult(paged(consumerOrder), errors)
   async list(@Req() r: ApiRequest, @Query() q: unknown) {
     return success(r, await this.service.list(r, q));
