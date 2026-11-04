@@ -46,3 +46,7 @@ POINTS_EXPRESS_MODE默认off；POINTS_EXPRESS_SUBMIT_ENABLED和POINTS_EXPRESS_OP
 需停止新兑换时关闭POINTS_EXPRESS_SUBMIT_ENABLED；需停止出库及新反馈处理时再关闭POINTS_EXPRESS_OPERATIONS_ENABLED。环境MODE保持与已受理订单一致以便后续继续处理，不删除订单模式、更正历史、运单归属或反馈事件，不回滚备份抹去新交易。模式不匹配时先回到正确隔离环境处理原单，不能改模式字段绕过。
 
 下一步进入真实受控环境联调与人工验收；仍依赖实际HTTPS测试地址、受控配置的微信凭据、测试账号/商品和可用设备。未准备这些条件时可继续完善本地恢复演练，不能声称已生产上线。
+
+## 2026-11-04 E4f本地恢复接续
+
+负责人确认暂无实际HTTPS测试环境，先完成[独立集群冷备恢复演练](POINTS-EXPRESS-LOCAL-RECOVERY.md)。本地完整备份→新目录恢复和逐表事实/原键核对通过；真实受控环境、外部密钥副本、设备和实物验收仍待完成，canLaunch=false。下一步实际环境信息到位后继续本文真实联调案例，不把本地报告作为受控部署放行。

@@ -207,7 +207,10 @@
     "preverify:points-express-gate:ui": "npm run build:server",
     "verify:points-express-gate:ui": "node --env-file=.env --import tsx scripts/ui/verify-points-express-gate.mjs",
     "precheck:points-express:config": "npm run build:server",
-    "check:points-express:config": "node --env-file-if-exists=.env scripts/check-points-express-config.mjs"
+    "check:points-express:config": "node --env-file-if-exists=.env scripts/check-points-express-config.mjs",
+    "preverify:express:recovery": "npm run build:server",
+    "verify:express:recovery": "node --import tsx scripts/verify-express-recovery.mjs",
+    "test:express:recovery": "node --test tests/express-recovery.test.mjs"
   },
   "pnpm": {
     "overrides": {

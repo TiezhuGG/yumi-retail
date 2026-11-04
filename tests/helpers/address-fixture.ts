@@ -90,7 +90,21 @@ export async function addressFixture(
         user: { id: string; displayName: string; provider: 'DEVELOPMENT' };
       };
     };
-    return { runtime, base, identity, areaId, buildingId, warehouseId, cleanup };
+    return {
+      runtime,
+      base,
+      identity,
+      areaId,
+      buildingId,
+      warehouseId,
+      cleanup,
+      // Only for an owner of a disposable whole cluster: leave the schema intact,
+      // release every connection before cold backup; the owner removes that cluster.
+      async closeForColdBackup() {
+        await runtime?.close();
+        await admin.end();
+      },
+    };
   } catch (e) {
     // A transactional migration may fail before COMMIT. Clear the aborted transaction
     // so schema cleanup can still run and the diagnostic is not masked.

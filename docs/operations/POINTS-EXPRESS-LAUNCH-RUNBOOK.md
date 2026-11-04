@@ -86,3 +86,7 @@ E4c的本地准备已完成，设备/实物/恢复与部署验收仍待完成。
 ## 2026-11-03 E4e独立门禁接续
 
 前文“生产交易门禁尚未实现”为E4c/E4d历史状态；现已实现独立controlled/production模式和提交/作业两开关，仍未真实开放。配置、暂停、原键恢复与模式隔离见[受控环境手册](POINTS-EXPRESS-CONTROLLED-ENVIRONMENT.md)和[无凭据模板](points-express.controlled.env.example)。canLaunch=false保持，实际.env未改；真实微信、HTTPS、设备、实物和备份恢复仍待分项验收，不能将本地受控账号模拟当真实试运营。
+
+## 2026-11-04 E4f本地冷备恢复接续
+
+前文“未恢复备份”为E4c历史状态。现已在完全独立的本机PG17.11集群完成完整停库文件备份→另一新目录恢复，110表逐行和1761文件核对、原键/错误密钥/历史运单防重通过。见[操作说明](POINTS-EXPRESS-LOCAL-RECOVERY.md)及[记录](../verification/E4F-LOCAL-EXPRESS-RECOVERY-2026-11-04.md)。此次未使用现有业务库/真实凭据，合成密钥副本仅在内存保存；真实环境备份介质/密钥托管、PITR和生产RPO/RTO均未验。负责人确认暂无HTTPS测试环境，实际部署与本文人工验收继续待办。
