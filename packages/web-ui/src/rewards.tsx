@@ -76,9 +76,7 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
   }, []);
   return (
     <section aria-label="兑换商品管理" className="rewards-workbench">
-      <div className="notice">
-        维护兑换商品、积分价格与展示规则。可兑换数量以库存和兑换配额核验结果为准。
-      </div>
+      <div className="notice">维护兑换商品、积分价格与展示规则。可兑换数量以实际可售库存为准。</div>
       {selected ? (
         <div className="account-card reward-detail">
           <button className="secondary-button" onClick={() => setSelected(null)}>
@@ -95,9 +93,6 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
           </div>
           <p>
             {statuses[selected.status]} · 当前最多可选 {selected.available} 件
-          </p>
-          <p>
-            每人累计限兑 {selected.perUserLimit} 件 · 总配额 {selected.totalQuota} 件
           </p>
           <p>
             开放时间（北京时间）：{beijing(selected.startsAt).replace('T', ' ') || '不限开始'} 至{' '}
@@ -239,8 +234,6 @@ function RewardEditor({
   const [title, setTitle] = useState(reward?.title ?? ''),
     [price, setPrice] = useState(reward?.pointsPrice ?? ''),
     [sort, setSort] = useState(String(reward?.sortOrder ?? 0)),
-    [limit, setLimit] = useState(String(reward?.perUserLimit ?? '')),
-    [quota, setQuota] = useState(String(reward?.totalQuota ?? '')),
     [start, setStart] = useState(beijing(reward?.startsAt ?? null)),
     [end, setEnd] = useState(beijing(reward?.endsAt ?? null)),
     [reason, setReason] = useState('');
@@ -296,15 +289,11 @@ function RewardEditor({
           !/^\d{1,10}$/.test(price) ||
           Number(price) < 1 ||
           Number(price) > 1000000000 ||
-          ![sort, limit, quota].every((v) => /^\d+$/.test(v)) ||
-          Number(limit) < 1 ||
-          Number(limit) > 100000 ||
-          Number(quota) < Number(limit) ||
-          Number(quota) > 100000000 ||
+          !/^\d+$/.test(sort) ||
           Number(sort) > 1000000 ||
           (!reward && !sku))
       ) {
-        setError('请选择规格并填写有效积分价、排序和限兑数量');
+        setError('请选择规格并填写有效积分价和排序');
         return;
       }
       const dates = {
@@ -320,8 +309,8 @@ function RewardEditor({
               title: title.trim(),
               pointsPrice: price,
               sortOrder: Number(sort),
-              perUserLimit: Number(limit),
-              totalQuota: Number(quota),
+              perUserLimit: reward?.perUserLimit ?? 100000,
+              totalQuota: reward?.totalQuota ?? 100000000,
               ...dates,
             }
           : {}),
@@ -461,24 +450,6 @@ function RewardEditor({
               />
             </label>
             <label>
-              每人累计限兑件数
-              <input
-                inputMode="numeric"
-                value={limit}
-                onChange={(e) => setLimit(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              总兑换配额
-              <input
-                inputMode="numeric"
-                value={quota}
-                onChange={(e) => setQuota(e.target.value)}
-                required
-              />
-            </label>
-            <label>
               开始时间（北京时间）
               <input
                 type="datetime-local"
@@ -536,7 +507,7 @@ function RewardEditor({
           </div>
         )}
         <p className="muted">
-          上架或下架使用当前已保存规则，修改后请先保存。用户能否兑换，以当前门禁、库存和配额核验为准。
+          上架或下架使用当前已保存规则，修改后请先保存。用户能否兑换，以当前门禁、库存和积分核验为准。
         </p>
       </form>
     </Modal>

@@ -50,7 +50,7 @@ export default function RewardDetail() {
   const valid = !!item && count >= 1 && count <= item.available;
   // Values are bounded to 1e9 points and 1e5 pieces, within JS safe integer range.
   return (
-    <View className="account-page reward-detail-page reward-product-page">
+    <View className="detail-page retail-product-page reward-detail-page reward-product-page">
       <View className="account-content">
         {loading && <LoadingState label="正在读取商品详情…" />}
         {error && (
@@ -63,31 +63,33 @@ export default function RewardDetail() {
         )}
         {item && (
           <>
-            <ProductVisual name={item.name} imageUrl={item.imageUrl} large />
-            <View className="reward-product-heading">
+            <View className="detail-visual">
+              <ProductVisual name={item.name} imageUrl={item.imageUrl} large />
+              <Text className="detail-caption">日常好物 / YUMI ESSENTIALS</Text>
+            </View>
+            <View className="reward-product-heading retail-product-heading">
               <View>
-                <Text className="points-store-tag">积分兑换</Text>
+                <Text className="points-store-tag">积分商城</Text>
                 <Text className="reward-product-name">{item.title}</Text>
               </View>
-              <Text className="reward-price">{item.pointsPrice} 积分 / 件</Text>
+              <View className="detail-price points-detail-price">
+                <Text>{item.pointsPrice}</Text>
+                <Text className="detail-unit"> 积分 / {item.unit}</Text>
+              </View>
             </View>
-            <View className="account-card">
-              <Text className="account-card-title">商品规格</Text>
-              <Text className="account-copy">
-                {item.name} · {item.spec} / {item.unit}
+            <View className="detail-card">
+              <Text className="detail-heading">商品规格</Text>
+              <Text className="detail-spec">
+                {item.spec} / {item.unit}
               </Text>
-              <Text className="account-copy">{item.description || '暂无更多商品说明'}</Text>
+              <View className="detail-promises">
+                <Text>✓ 积分兑换</Text>
+                <Text>{item.available > 0 ? '✓ 当前有货' : '暂时缺货'}</Text>
+              </View>
+              <Text className="detail-description">{item.description || '暂无更多商品说明'}</Text>
             </View>
-            <View className="account-card">
-              <Text className="account-card-title">兑换数量与限额</Text>
-              <Text className="account-copy">
-                每人累计限兑 {item.perUserLimit} 件 · 总配额 {item.totalQuota} 件
-              </Text>
-              <Text className="account-copy">
-                {item.available > 0
-                  ? '当前最多可选 ' + item.available + ' 件，最终以提交核验为准'
-                  : '当前暂时缺货'}
-              </Text>
+            <View className="detail-card points-quantity-card">
+              <Text className="detail-heading">数量</Text>
               <View className="reward-quantity">
                 <Button
                   disabled={count <= 1}
@@ -108,25 +110,22 @@ export default function RewardDetail() {
                   ＋
                 </Button>
               </View>
-              <Text className="reward-price">
-                合计 {valid ? String(Number(item.pointsPrice) * count) : '—'} 积分
+              <Text className="points-total-line">
+                合计 <Text>{valid ? String(Number(item.pointsPrice) * count) : '—'} 积分</Text>
               </Text>
-              {!valid && <Text className="account-copy">请填写可选范围内的整数件数。</Text>}
+              {!valid && <Text className="detail-spec-help">当前库存不足，请调整数量。</Text>}
             </View>
-            <View className="account-card">
-              <Text className="account-card-title">兑换说明</Text>
-              <Text className="account-copy">
-                {item.startsAt ? '开始：' + time(item.startsAt) + '（北京时间）' : '开始时间不限'}
-                {item.endsAt ? '；结束：' + time(item.endsAt) + '（北京时间）' : '；结束时间不限'}
-              </Text>
-              <Text className="account-copy">
-                兑换所需积分以确认页为准，提交订单后才会扣除积分。
+            <View className="detail-card points-availability-card">
+              <Text className="detail-heading">配送与兑换</Text>
+              <Text className="detail-spec-help">
+                {item.startsAt ? '开售时间：' + time(item.startsAt) + '（北京时间）' : '随时可兑换'}
+                {item.endsAt ? ' · 截止：' + time(item.endsAt) + '（北京时间）' : ''}
               </Text>
               <Button
                 className="account-link"
                 onClick={() => void Taro.navigateTo({ url: '/pages/service-area/index' })}
               >
-                查看配送范围 →
+                查看配送范围 ›
               </Button>
             </View>
             <View className="reward-action-dock">

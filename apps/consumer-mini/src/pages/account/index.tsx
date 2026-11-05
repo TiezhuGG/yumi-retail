@@ -118,9 +118,6 @@ export default function Account() {
             <Text className="member-name">
               {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
             </Text>
-            <Text className="member-note">
-              {profile ? '积分兑换好物，订单随时查看' : '登录后，积分和兑换记录都在这里'}
-            </Text>
           </View>
         </View>
         {!profile && !busy && phase === 'guest' && (
@@ -170,7 +167,6 @@ export default function Account() {
             </Button>
           </View>
           <View className="member-wallet-bottom">
-            <Text>用积分兑换日常好物</Text>
             <Button onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}>
               去逛商城 →
             </Button>
@@ -181,7 +177,6 @@ export default function Account() {
             <Text className="member-section-title">我的订单</Text>
             <Button onClick={() => viewOrders()}>查看全部 ›</Button>
           </View>
-          <Text className="member-section-hint">查进度、看运单、申请售后</Text>
           <View className="member-order-grid">
             {orders.map(([label, status, icon]) => (
               <Button key={label} className="member-order-link" onClick={() => viewOrders(status)}>
@@ -203,21 +198,18 @@ export default function Account() {
           >
             <View>
               <Text className="member-service-title">收货地址</Text>
-              <Text className="member-service-note">管理快递收件人、电话和地址</Text>
             </View>
             <Text>›</Text>
           </Button>
           <Button className="member-service-row" onClick={() => protectedOpen('points/index')}>
             <View>
               <Text className="member-service-title">积分记录</Text>
-              <Text className="member-service-note">查看获得、兑换和退还的积分</Text>
             </View>
             <Text>›</Text>
           </Button>
           <Button className="member-service-row" onClick={showRules}>
             <View>
               <Text className="member-service-title">兑换说明</Text>
-              <Text className="member-service-note">了解寄送范围、取消与售后</Text>
             </View>
             <Text>{rules ? '⌃' : '›'}</Text>
           </Button>
@@ -261,7 +253,6 @@ export default function Account() {
             )}
           </View>
         )}
-        <Text className="member-footer-note">玉米百货 · 日常好物，用积分换</Text>
       </View>
     </View>
   );

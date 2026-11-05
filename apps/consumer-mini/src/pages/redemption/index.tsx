@@ -108,7 +108,7 @@ export default function RedemptionDetail() {
               </Text>
               <Text className="redemption-progress-title">
                 {order.status === 'CANCELED'
-                  ? '积分已退还，库存和限兑配额已释放。'
+                  ? '积分已退还，商品预占已释放。'
                   : order.deliveryMode === 'EXPRESS'
                     ? order.expressShipment
                       ? '已快递发货'

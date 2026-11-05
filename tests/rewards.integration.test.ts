@@ -49,7 +49,7 @@ test('draft creation is idempotent, validated and private; publishing requires a
   );
   const detail = await f.api('/rewards/' + id);
   assert.equal(detail.data.pointsPrice, '120');
-  assert.equal(detail.data.available, 3);
+  assert.equal(detail.data.available, 5);
   assert.equal(detail.data.redemptionEnabled, false);
   assert.equal((await f.api('/admin/rewards/store/create', f.input)).status, 409);
 });

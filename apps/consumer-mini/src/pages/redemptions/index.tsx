@@ -1,6 +1,12 @@
 import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button } from '@tarojs/components';
-import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
+import Taro, {
+  useDidShow,
+  useDidHide,
+  useRouter,
+  useReachBottom,
+  usePullDownRefresh,
+} from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import type {
   RedemptionOrderView,
@@ -34,10 +40,13 @@ export default function Redemptions() {
     [error, setError] = useState(''),
     [guest, setGuest] = useState(false);
   const seq = useRef(0),
+    activeLoad = useRef<number | null>(null),
     pending = useRef<string | undefined>(undefined),
     owner = useRef('');
   async function load(next?: string, selected = filter) {
+    if (next && activeLoad.current !== null) return;
     const n = ++seq.current;
+    activeLoad.current = n;
     pending.current = next;
     setLoading(true);
     setError('');
@@ -78,7 +87,11 @@ export default function Redemptions() {
         } else setError(e instanceof Error ? e.message : '兑换单读取失败');
       }
     } finally {
-      if (n === seq.current) setLoading(false);
+      if (activeLoad.current === n) {
+        activeLoad.current = null;
+        setLoading(false);
+      }
+      if (!next) Taro.stopPullDownRefresh();
     }
   }
   useDidShow(() => {
@@ -100,8 +113,15 @@ export default function Redemptions() {
     setCursor(null);
     void load(undefined, nextFilter);
   });
+  useReachBottom(() => {
+    if (cursor && !loading && !error) void load(cursor);
+  });
+  usePullDownRefresh(() => {
+    void load();
+  });
   useDidHide(() => {
     seq.current++;
+    activeLoad.current = null;
     setItems([]);
     setCursor(null);
   });
@@ -114,15 +134,10 @@ export default function Redemptions() {
   return (
     <View className="account-page reward-detail-page redemption-list-page">
       <View className="account-hero">
-        <Text className="account-eyebrow">玉米百货 · 积分商城</Text>
         <Text className="account-name">{afterSales ? '兑换售后' : '订单'}</Text>
       </View>
       <View className="account-content">
-        {afterSales ? (
-          <Text className="account-copy">
-            选择已发货的订单，在详情中申请退货退积分、提交问题反馈或查看进度。
-          </Text>
-        ) : (
+        {!afterSales && (
           <View className="reward-categories">
             {filters.map(({ label }, index) => (
               <Button
@@ -163,7 +178,6 @@ export default function Redemptions() {
         {!loading && !guest && !error && !items.length && (
           <View className="account-card redemption-empty">
             <Text>暂无订单</Text>
-            <Text className="account-copy">兑换后可在这里查看发货与售后进度。</Text>
             <Button
               className="account-link"
               onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}
@@ -227,14 +241,12 @@ export default function Redemptions() {
             </View>
           );
         })}
-        {cursor && !error && (
-          <Button className="points-action" disabled={loading} onClick={() => void load(cursor)}>
-            加载更多
-          </Button>
+        {loading && cursor && (
+          <Text className="account-copy orders-load-more">正在加载更多订单…</Text>
         )}
-        <Button className="account-link" disabled={loading} onClick={() => void load()}>
-          刷新订单
-        </Button>
+        {!loading && !error && !cursor && items.length > 0 && (
+          <Text className="account-copy orders-load-more">已经到底了</Text>
+        )}
       </View>
     </View>
   );

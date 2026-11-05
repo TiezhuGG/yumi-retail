@@ -109,8 +109,6 @@ export default function PointsCart() {
     <View className="account-page points-cart-page">
       <View className="account-content">
         <Text className="account-name">购物车</Text>
-        <Text className="account-copy">积分商品 · 一次兑换，多件好物</Text>
-        <Text className="account-copy">购物车保存在本机，加入时不锁定库存或积分。</Text>
         {loading && <LoadingState label="正在读取购物车…" />}
         {error && (
           <View className="account-error">
@@ -149,7 +147,6 @@ export default function PointsCart() {
         {!loading && !items.length && (
           <View className="account-card">
             <Text className="account-card-title">购物车还是空的</Text>
-            <Text className="account-copy">在商品详情页选择数量，点击“加入购物车”。</Text>
             <Button
               className="points-action"
               onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}
@@ -222,8 +219,7 @@ export default function PointsCart() {
             </Button>
             <Text className="reward-price">合计 {total} 积分</Text>
             <Text className="account-copy">
-              已选 {chosen.length} 种 · {chosen.reduce((sum, i) => sum + i.quantity, 0)}{' '}
-              件，最终以结算核验为准
+              已选 {chosen.length} 种 · {chosen.reduce((sum, i) => sum + i.quantity, 0)} 件
             </Text>
             <Button
               className="points-action"

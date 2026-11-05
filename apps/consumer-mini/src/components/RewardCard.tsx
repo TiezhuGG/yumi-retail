@@ -20,7 +20,7 @@ export function RewardCard({ reward }: { reward: Reward }) {
           {reward.available <= 0
             ? '暂时缺货'
             : reward.redemptionEnabled
-              ? '每人限兑 ' + reward.perUserLimit + ' 件'
+              ? '当前有货'
               : '可浏览 · 兑换暂未开放'}
         </Text>
         <Button
@@ -32,7 +32,9 @@ export function RewardCard({ reward }: { reward: Reward }) {
           }}
         >
           <Text className="reward-open-label">查看详情</Text>
-          <Text className="reward-open-arrow" aria-hidden="true">↗</Text>
+          <Text className="reward-open-arrow" aria-hidden="true">
+            ↗
+          </Text>
         </Button>
       </View>
     </View>

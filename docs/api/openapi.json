@@ -22314,11 +22314,15 @@
                               },
                               "perUserLimit": {
                                 "type": "integer",
-                                "minimum": 0
+                                "minimum": 0,
+                                "deprecated": true,
+                                "description": "仅兼容历史数据，不参与兑换数量限制"
                               },
                               "totalQuota": {
                                 "type": "integer",
-                                "minimum": 0
+                                "minimum": 0,
+                                "deprecated": true,
+                                "description": "仅兼容历史数据，不参与兑换数量限制"
                               },
                               "startsAt": {
                                 "type": "string",
@@ -22853,11 +22857,15 @@
                       },
                       "perUserLimit": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "deprecated": true,
+                        "description": "仅兼容历史数据，不参与兑换数量限制"
                       },
                       "totalQuota": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "deprecated": true,
+                        "description": "仅兼容历史数据，不参与兑换数量限制"
                       },
                       "startsAt": {
                         "type": "string",
@@ -22900,11 +22908,15 @@
                       },
                       "perUserLimit": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "deprecated": true,
+                        "description": "仅兼容历史数据，不参与兑换数量限制"
                       },
                       "totalQuota": {
                         "type": "integer",
-                        "minimum": 0
+                        "minimum": 0,
+                        "deprecated": true,
+                        "description": "仅兼容历史数据，不参与兑换数量限制"
                       },
                       "startsAt": {
                         "type": "string",
@@ -23358,11 +23370,15 @@
                               },
                               "perUserLimit": {
                                 "type": "integer",
-                                "minimum": 0
+                                "minimum": 0,
+                                "deprecated": true,
+                                "description": "仅兼容历史数据，不参与兑换数量限制"
                               },
                               "totalQuota": {
                                 "type": "integer",
-                                "minimum": 0
+                                "minimum": 0,
+                                "deprecated": true,
+                                "description": "仅兼容历史数据，不参与兑换数量限制"
                               },
                               "startsAt": {
                                 "type": "string",
@@ -23721,11 +23737,15 @@
                         },
                         "perUserLimit": {
                           "type": "integer",
-                          "minimum": 0
+                          "minimum": 0,
+                          "deprecated": true,
+                          "description": "仅兼容历史数据，不参与兑换数量限制"
                         },
                         "totalQuota": {
                           "type": "integer",
-                          "minimum": 0
+                          "minimum": 0,
+                          "deprecated": true,
+                          "description": "仅兼容历史数据，不参与兑换数量限制"
                         },
                         "startsAt": {
                           "type": "string",
@@ -88443,7 +88463,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。",
-    "version": "0.61.0",
+    "version": "0.62.0",
     "contact": {}
   },
   "tags": [],

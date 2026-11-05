@@ -209,14 +209,6 @@ export class RedemptionService {
     const skus = await this.catalog.checkoutSkus(tx, this.warehouse(), [p.skuId]),
       sku = skus[0];
     if (!sku) throw failure(409, 'REWARD_UNAVAILABLE', '商品、规格或分类已暂停');
-    const usage = await tx.$queryRaw<
-      Array<{ total: bigint; personal: bigint }>
-    >`SELECT COALESCE(SUM(quantity),0)::bigint AS total,COALESCE(SUM(quantity) FILTER(WHERE user_id=${userId}::uuid),0)::bigint AS personal FROM redemption_orders WHERE reward_id=${p.id}::uuid AND status='ACTIVE'`;
-    if (
-      BigInt(input.quantity) + usage[0]!.total > BigInt(p.totalQuota) ||
-      BigInt(input.quantity) + usage[0]!.personal > BigInt(p.perUserLimit)
-    )
-      throw failure(409, 'QUOTA_EXCEEDED', '已超过剩余总配额或本人累计限兑数量');
     if (sku.available < input.quantity)
       throw failure(409, 'STOCK_UNAVAILABLE', '当前可售库存不足，请调整数量');
     const total = p.pointsPrice * BigInt(input.quantity);

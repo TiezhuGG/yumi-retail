@@ -45,7 +45,7 @@ try {
   );
   await writeFile(
     dir + '/taro.ts',
-    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},showToast:async o=>{window.__toast=o.title},switchTab:async o=>{window.__lastNavigation=o.url},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
+    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useReachBottom(fn){useEffect(()=>{window.addEventListener('yumi:bottom',fn);return()=>window.removeEventListener('yumi:bottom',fn)},[fn])}export function usePullDownRefresh(fn){useEffect(()=>{window.addEventListener('yumi:refresh',fn);return()=>window.removeEventListener('yumi:refresh',fn)},[fn])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={stopPullDownRefresh:()=>{},getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},showToast:async o=>{window.__toast=o.title},switchTab:async o=>{window.__lastNavigation=o.url},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
   );
   await writeFile(
     dir + '/main.tsx',
@@ -124,11 +124,16 @@ try {
     await page.getByRole('button', { name: '加入购物车', exact: true }).click();
     await page.waitForFunction(() => window.__toast === '已加入购物车');
   }
+  assert.equal(await page.getByText(/每人累计限兑|总配额|兑换数量与限额/).count(), 0);
   await shot('MINI-DETAIL');
   await page.goto('http://127.0.0.1:5188/?mini&view=cart');
   await page.getByRole('button', { name: '去兑换', exact: true }).waitFor();
   await page.getByRole('button', { name: '＋', exact: true }).nth(1).click();
   await page.getByText('合计 520 积分', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByText('购物车保存在本机，加入时不锁定库存或积分。', { exact: true }).count(),
+    0,
+  );
   await shot('MINI-CART');
   await page.getByRole('button', { name: '去兑换', exact: true }).click();
   assert.equal(await page.evaluate(() => window.__lastNavigation), '/pages/points-checkout/index');
@@ -176,6 +181,8 @@ try {
   await shot('MINI-CART-AFTER');
   await page.goto('http://127.0.0.1:5188/?mini&view=orders');
   await page.getByText('合成第二款商品 × 2', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '刷新订单', exact: true }).count(), 0);
+  assert.equal(await page.getByText('玉米百货 · 积分商城', { exact: true }).count(), 0);
   await shot('MINI-ORDERS');
   // A new direct purchase must start a new intent after a completed cart checkout.
   await page.goto('http://127.0.0.1:5188/?mini&id=' + f.secondRewardId);
@@ -205,6 +212,14 @@ try {
   await page.reload();
   await page.getByText('购物车还是空的', { exact: true }).waitFor();
   await shot('MINI-ACCOUNT-ISOLATION');
+  await page.goto('http://127.0.0.1:5188/?mini&view=account');
+  await page.getByText('我的订单', { exact: true }).waitFor();
+  assert.equal(await page.getByText('积分兑换好物，订单随时查看', { exact: true }).count(), 0);
+  await shot('MINI-ACCOUNT-SIMPLE');
+  await page.goto('http://127.0.0.1:5188/?mini');
+  await page.getByRole('button', { name: '查看详情：日常柔软纸巾', exact: true }).waitFor();
+  assert.equal(await page.getByText(/每人限兑|总配额/).count(), 0);
+  await shot('MINI-MALL-SIMPLE');
   // Actual backend order workbench must show both independently fulfillable children.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('http://127.0.0.1:5188/');

@@ -136,7 +136,7 @@ export function RedemptionReturnsWorkbench({ profile }: { profile: StaffProfile 
   return (
     <section aria-label="退货退积分">
       <div className="notice">
-        已发货兑换售后：按原积分价、原订单完整件数处理。退回实物登记隔离保管，不自动回补可售库存；退积分不恢复累计限兑。
+        已发货兑换售后：按原积分价、原订单完整件数处理。退回实物登记隔离保管，不自动回补可售库存；退积分保留原订单和发货记录。
       </div>
       {!view && (
         <form
@@ -370,7 +370,9 @@ function ReturnForm({
           </label>
         </>
       )}
-      {refund && <p>本次实际退还 {view.points} 积分到原用户账户。此动作不恢复限兑或可售库存。</p>}
+      {refund && (
+        <p>本次实际退还 {view.points} 积分到原用户账户。此动作不改变原发货记录，不回补可售库存。</p>
+      )}
       <label>
         处理说明
         <textarea

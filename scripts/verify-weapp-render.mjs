@@ -40,6 +40,7 @@ globalThis.wx = {
   getDeviceInfo: () => ({ platform: 'devtools' }),
   getWindowInfo: () => ({ windowWidth: 390, pixelRatio: 2 }),
   getStorageSync: () => null,
+  stopPullDownRefresh: () => {},
   request({ url, success, complete }) {
     const items = url.includes('/rewards')
       ? [

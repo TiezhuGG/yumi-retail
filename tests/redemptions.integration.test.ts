@@ -217,61 +217,60 @@ test('two devices cannot spend the last points twice', async () =>
     },
     { balance: 120 },
   ));
-test('two users cannot exceed the last total quota; pending orders consume quota and cancel restores it', async () =>
+test('legacy per-user and total quotas do not restrict actual available inventory', async () =>
   fixture(
     async (f) => {
-      const q1 = await f.call('/consumer/redemption-quotes', f.input),
-        q2 = await f.call('/consumer/redemption-quotes', f.inputB, randomUUID(), f.identityB.token);
-      const r = await Promise.all([
+      assert.equal((await f.api('/rewards/' + f.rewardId)).data.available, 5);
+      const q1 = await f.call('/consumer/redemption-quotes', { ...f.input, quantity: 2 });
+      const q2 = await f.call(
+        '/consumer/redemption-quotes',
+        { ...f.inputB, quantity: 2 },
+        randomUUID(),
+        f.identityB.token,
+      );
+      assert.equal(q1.status, 200);
+      assert.equal(q2.status, 200);
+      const results = await Promise.all([
         f.call('/consumer/redemptions', { quoteId: q1.data.id }),
         f.call('/consumer/redemptions', { quoteId: q2.data.id }, randomUUID(), f.identityB.token),
       ]);
-      assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
-      assert.equal(r.find((x) => x.status === 409)?.error?.code, 'QUOTA_EXCEEDED');
-      const i = r.findIndex((x) => x.status === 200),
-        id = r[i]!.data.id,
-        token = i ? f.identityB.token : f.identity.token;
-      assert.equal(
-        (
-          await f.call(
-            '/consumer/redemptions/' + id + '/cancel',
-            { version: 0 },
-            randomUUID(),
-            token,
-          )
-        ).status,
-        200,
+      assert.deepEqual(
+        results.map((r) => r.status),
+        [200, 200],
       );
-      assert.equal((await f.call('/consumer/redemption-quotes', f.input)).status, 200);
+      assert.equal((await f.api('/rewards/' + f.rewardId)).data.available, 1);
+      assert.equal(await f.runtime.db.redemptionOrder.count(), 2);
     },
     { limit: 1, quota: 1 },
   ));
-test('personal cumulative quota is serialized and administrators cannot lower limits below active use', async () =>
-  fixture(async (f) => {
-    const q1 = await f.call('/consumer/redemption-quotes', { ...f.input, quantity: 2 }),
-      q2 = await f.call('/consumer/redemption-quotes', { ...f.input, quantity: 2 });
-    const r = await Promise.all([
-      f.call('/consumer/redemptions', { quoteId: q1.data.id }),
-      f.call('/consumer/redemptions', { quoteId: q2.data.id }),
-    ]);
-    assert.deepEqual(r.map((x) => x.status).sort(), [200, 409]);
-    assert.equal(r.find((x) => x.status === 409)?.error?.code, 'QUOTA_EXCEEDED');
-    const update = {
-      title: '日常柔软纸巾',
-      pointsPrice: '120',
-      sortOrder: 10,
-      perUserLimit: 1,
-      totalQuota: 20,
-      startsAt: null,
-      endsAt: null,
-      version: 1,
-      reason: '降额测试',
-    };
-    assert.equal(
-      (await f.api('/admin/rewards/' + f.rewardId + '/update', update)).error?.code,
-      'QUOTA_BELOW_USAGE',
-    );
-  }));
+test('one user can repeatedly redeem above old cumulative limits while stock and balance still apply', async () =>
+  fixture(
+    async (f) => {
+      for (let i = 0; i < 2; i++) {
+        const q = await f.call('/consumer/redemption-quotes', { ...f.input, quantity: 2 });
+        assert.equal(q.status, 200);
+        assert.equal((await f.call('/consumer/redemptions', { quoteId: q.data.id })).status, 200);
+      }
+      const soldOut = await f.call('/consumer/redemption-quotes', { ...f.input, quantity: 2 });
+      assert.equal(soldOut.status, 409);
+      assert.equal(soldOut.error?.code, 'STOCK_UNAVAILABLE');
+      assert.equal((await f.call('/consumer/points')).data.balance, '520');
+      const update = {
+        title: '日常柔软纸巾',
+        pointsPrice: '120',
+        sortOrder: 10,
+        perUserLimit: 1,
+        totalQuota: 1,
+        startsAt: null,
+        endsAt: null,
+        version: 1,
+        reason: '历史字段兼容，不限制兑换',
+      };
+      assert.equal((await f.api('/admin/rewards/' + f.rewardId + '/update', update)).status, 200);
+      assert.equal((await f.api('/rewards/' + f.rewardId)).data.available, 1);
+    },
+    { limit: 1, quota: 1 },
+  ));
 test('cash orders and point redemptions compete for the same last sellable piece', async () =>
   fixture(async (f) => {
     const db = f.runtime.db;

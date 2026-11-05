@@ -45,8 +45,8 @@ const rewardSchema = object({
   pointsPrice: text,
   status: text,
   sortOrder: number,
-  perUserLimit: number,
-  totalQuota: number,
+  perUserLimit: { ...number, deprecated: true, description: '仅兼容历史数据，不参与兑换数量限制' },
+  totalQuota: { ...number, deprecated: true, description: '仅兼容历史数据，不参与兑换数量限制' },
   startsAt: nullableText,
   endsAt: nullableText,
   version: number,
@@ -62,8 +62,12 @@ const detailsSchema = object(
     title: text,
     pointsPrice: text,
     sortOrder: number,
-    perUserLimit: number,
-    totalQuota: number,
+    perUserLimit: {
+      ...number,
+      deprecated: true,
+      description: '仅兼容历史数据，不参与兑换数量限制',
+    },
+    totalQuota: { ...number, deprecated: true, description: '仅兼容历史数据，不参与兑换数量限制' },
     startsAt: nullableText,
     endsAt: nullableText,
     reason: text,
@@ -105,7 +109,7 @@ export class RewardService {
     }
     const rows = await this.catalog.db.$queryRaw<Reward[]>(Prisma.sql`
    SELECT rp.id,rp.sku_id AS "skuId",rp.title,p.name,s.spec,s.unit,p.description,p.category_id AS "categoryId",v."imageUrl",rp.points_price::text AS "pointsPrice",rp.status,rp.sort_order AS "sortOrder",rp.per_user_limit AS "perUserLimit",rp.total_quota AS "totalQuota",rp.starts_at AS "startsAt",rp.ends_at AS "endsAt",rp.version,
-   LEAST(COALESCE(v.available,0),GREATEST(0,rp.total_quota-COALESCE((SELECT SUM(quantity) FROM redemption_orders WHERE reward_id=rp.id AND status='ACTIVE'),0)),rp.per_user_limit)::int AS available
+   COALESCE(v.available,0)::int AS available
    FROM reward_products rp JOIN skus s ON s.id=rp.sku_id JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN (${visible}) v ON v.id=s.id
    WHERE ${where} AND (${cursor}::uuid IS NULL OR (rp.sort_order,rp.id)>(${anchor?.sort_order ?? 0},${cursor}::uuid))
    ORDER BY rp.sort_order,rp.id LIMIT 21`);
@@ -190,16 +194,6 @@ export class RewardService {
         if (!row) throw failure(404, 'RESOURCE_NOT_FOUND', '兑换商品不存在');
         if (row.version !== input.version)
           throw failure(409, 'VERSION_CONFLICT', '商品已更新，请刷新后重新确认');
-        if (action === 'update') {
-          const usage = await tx.$queryRaw<
-            Array<{ total: bigint; largest: bigint }>
-          >`SELECT COALESCE(SUM(q),0)::bigint AS total,COALESCE(MAX(q),0)::bigint AS largest FROM (SELECT SUM(quantity) q FROM redemption_orders WHERE reward_id=${id}::uuid AND status='ACTIVE' GROUP BY user_id) used`;
-          if (
-            usage[0]!.total > BigInt(input.totalQuota as number) ||
-            usage[0]!.largest > BigInt(input.perUserLimit as number)
-          )
-            throw failure(409, 'QUOTA_BELOW_USAGE', '限额不能低于当前有效兑换用量');
-        }
         if (action === 'update')
           await tx.rewardProduct.update({
             where: { id },
