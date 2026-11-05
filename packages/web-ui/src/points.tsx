@@ -74,9 +74,7 @@ export function PointsWorkbench() {
   const rows = selected ? entries : accounts;
   return (
     <section className="points-workbench" aria-label="积分账户查询">
-      <div className="notice">
-        积分发放请前往积分发放审批，商品兑换正在准备中。此处查询账户余额与明细。
-      </div>
+      <div className="notice">查询账户余额与积分流水。发放与误发冲正请前往对应审批入口。</div>
       {selected ? (
         <div className="points-toolbar">
           <button
@@ -186,41 +184,47 @@ export function PointsWorkbench() {
       {selected && entries.length > 0 && (
         <div className="points-table-wrap">
           <table className="points-table">
-          <thead><tr><th>时间（北京时间）</th><th>积分变动</th><th>说明</th></tr></thead>
-          <tbody>
-          {entries.map((e) => (
-            <tr key={e.id}>
-              <td>
-                <time>
-                  {new Date(e.createdAt).toLocaleString('zh-CN', {
-                    timeZone: 'Asia/Shanghai',
-                    hour12: false,
-                  })}
-                </time>
-              </td>
-              <td>
-              <strong className={e.delta.startsWith('-') ? 'points-debit' : 'points-credit'}>
-                {e.delta.startsWith('-') ? '' : '+'}
-                {e.delta} 积分
-              </strong>
-              </td>
-              <td>
-              <p>{e.reason}</p>
-              {e.entryKind === 'GRANT_REVERSAL' && (
-                <p>
-                  误发冲正 · 原发放 {e.sourceAmount} 积分
-                  {e.sourceCreatedAt
-                    ? ' · ' +
-                      new Date(e.sourceCreatedAt).toLocaleString('zh-CN', {
+            <thead>
+              <tr>
+                <th>时间（北京时间）</th>
+                <th>积分变动</th>
+                <th>说明</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <tr key={e.id}>
+                  <td>
+                    <time>
+                      {new Date(e.createdAt).toLocaleString('zh-CN', {
                         timeZone: 'Asia/Shanghai',
-                      })
-                    : ''}
-                </p>
-              )}
-              </td>
-            </tr>
-          ))}
-          </tbody>
+                        hour12: false,
+                      })}
+                    </time>
+                  </td>
+                  <td>
+                    <strong className={e.delta.startsWith('-') ? 'points-debit' : 'points-credit'}>
+                      {e.delta.startsWith('-') ? '' : '+'}
+                      {e.delta} 积分
+                    </strong>
+                  </td>
+                  <td>
+                    <p>{e.reason}</p>
+                    {e.entryKind === 'GRANT_REVERSAL' && (
+                      <p>
+                        误发冲正 · 原发放 {e.sourceAmount} 积分
+                        {e.sourceCreatedAt
+                          ? ' · ' +
+                            new Date(e.sourceCreatedAt).toLocaleString('zh-CN', {
+                              timeZone: 'Asia/Shanghai',
+                            })
+                          : ''}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       )}

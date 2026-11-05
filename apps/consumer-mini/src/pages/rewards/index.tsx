@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Input, ScrollView } from '@tarojs/components';
 import { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -151,7 +152,7 @@ export default function Rewards() {
             {categoryError}，重试
           </Button>
         )}
-        {loading && <Text className="account-copy">正在读取兑换商品…</Text>}
+        {loading && <LoadingState label="正在读取兑换商品…" />}
         {error && (
           <View className="account-error">
             <Text>{error}</Text>

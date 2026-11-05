@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Input } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -49,7 +50,7 @@ export default function RewardDetail() {
   return (
     <View className="account-page reward-detail-page reward-product-page">
       <View className="account-content">
-        {loading && <Text className="account-copy">正在读取商品详情…</Text>}
+        {loading && <LoadingState label="正在读取商品详情…" />}
         {error && (
           <View className="account-error">
             <Text>{error}</Text>

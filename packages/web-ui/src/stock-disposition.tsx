@@ -17,15 +17,6 @@ const control: CSSProperties = {
   padding: 10,
   margin: '6px 0 12px',
 };
-const button: CSSProperties = {
-  padding: 10,
-  minHeight: 44,
-  margin: '8px 8px 8px 0',
-  background: '#008a42',
-  color: 'white',
-  border: 0,
-  borderRadius: 6,
-};
 const box: CSSProperties = {
   borderTop: '1px solid #d0d5dd',
   marginTop: 20,
@@ -309,7 +300,7 @@ export function StockDispositionWorkbench({
                 问题说明
                 <input name="reason" maxLength={200} style={control} required />
               </label>
-              <button style={button}>确认立即隔离</button>
+              <button className="primary-button task-action">确认立即隔离</button>
             </form>
           </TaskDialog>
         )}
@@ -331,13 +322,19 @@ export function StockDispositionWorkbench({
                   <summary>记录编号 …{i.id.slice(-8)}</summary>
                   <p>{i.id}</p>
                 </details>
-                <button style={button} onClick={() => void work(() => openIsolation(i.id))}>
+                <button
+                  className="primary-button task-action"
+                  onClick={() => void work(() => openIsolation(i.id))}
+                >
                   查看隔离并申请处置
                 </button>
               </article>
             ))}
             {isoCursor && (
-              <button style={button} onClick={() => void work(() => loadIsolations(isoCursor))}>
+              <button
+                className="primary-button task-action"
+                onClick={() => void work(() => loadIsolations(isoCursor))}
+              >
                 更多隔离记录
               </button>
             )}
@@ -419,7 +416,7 @@ export function StockDispositionWorkbench({
                     申请原因
                     <input name="reason" maxLength={200} required style={control} />
                   </label>
-                  <button style={button}>提交处置申请</button>
+                  <button className="primary-button task-action">提交处置申请</button>
                 </form>
               )}
             </section>
@@ -463,7 +460,7 @@ export function StockDispositionWorkbench({
                           </td>
                           <td>
                             <button
-                              style={button}
+                              className="primary-button task-action"
                               onClick={() =>
                                 void work(async () =>
                                   setDocument(
@@ -484,7 +481,10 @@ export function StockDispositionWorkbench({
               </div>
             )}
             {docCursor && (
-              <button style={button} onClick={() => void work(() => loadDocuments(docCursor))}>
+              <button
+                className="primary-button task-action"
+                onClick={() => void work(() => loadDocuments(docCursor))}
+              >
                 更多处置申请
               </button>
             )}
@@ -569,7 +569,7 @@ export function StockDispositionWorkbench({
                       审批说明
                       <input name="reason" style={control} maxLength={200} required />
                     </label>
-                    <button style={button}>确认独立审批</button>
+                    <button className="primary-button task-action">确认独立审批</button>
                   </form>
                 )}
               {document.status === 'APPROVED' && can('disposition.post') && (
@@ -606,7 +606,7 @@ export function StockDispositionWorkbench({
                   ) : (
                     <p>确认货品可以恢复销售；过账时再次检查效期和库位。</p>
                   )}
-                  <button style={button}>
+                  <button className="primary-button task-action">
                     {document.kind === 'DAMAGE' ? '确认报损过账' : '确认解除隔离过账'}
                   </button>
                 </form>
@@ -630,7 +630,7 @@ export function StockDispositionWorkbench({
                     取消原因
                     <input name="reason" style={control} maxLength={200} required />
                   </label>
-                  <button style={button}>取消申请并保留隔离</button>
+                  <button className="primary-button task-action">取消申请并保留隔离</button>
                 </form>
               )}
             </section>

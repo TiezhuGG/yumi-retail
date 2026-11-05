@@ -6,16 +6,6 @@ export type { StaffProfile };
 export { CatalogWorkbench } from './catalog.js';
 export { Workspace } from './workspace.js';
 import { Brand } from './brand.js';
-const button: CSSProperties = {
-  background: '#008a42',
-  color: 'white',
-  border: 0,
-  borderRadius: 8,
-  padding: '12px 20px',
-  fontSize: 16,
-  cursor: 'pointer',
-  minHeight: 44,
-};
 const input: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
@@ -138,7 +128,9 @@ export function StaffSessionPanel({
         </header>
         <main className="login-layout staff-login-layout">
           <section className="login-card">
-            <div className="staff-login-brand"><Brand /></div>
+            <div className="staff-login-brand">
+              <Brand />
+            </div>
             <h1>员工登录</h1>
             <p>玉米百货 · 运营与仓库作业</p>
             <form onSubmit={(e) => void login(e)}>
@@ -202,7 +194,11 @@ export function StaffSessionPanel({
             }}
           >
             <p>你好，{profile.displayName}</p>
-            <button style={button} disabled={busy} onClick={() => void logout()}>
+            <button
+              className="primary-button task-action"
+              disabled={busy}
+              onClick={() => void logout()}
+            >
               退出登录
             </button>
           </div>
@@ -236,7 +232,7 @@ export function StaffSessionPanel({
               style={input}
             />
           </label>
-          <button type="submit" disabled={busy} style={{ ...button, width: '100%', marginTop: 24 }}>
+          <button type="submit" disabled={busy} className="primary-button standalone-login-submit">
             {busy ? '正在登录…' : '登录'}
           </button>
         </form>

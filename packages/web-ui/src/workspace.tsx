@@ -25,6 +25,7 @@ import { PaymentCloseLabWorkbench } from './payment-close-lab.js';
 import { NotificationLabWorkbench } from './notification-lab.js';
 import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
+import { NavIcon } from './nav-icon.js';
 export type WorkspaceView =
   | 'redemption-delivery'
   | 'redemption-picking'
@@ -284,18 +285,49 @@ const routes: Array<{
 ];
 
 const operationsNavigation: { label: string; views: WorkspaceView[] }[] = [
-  { label: '经营', views: ['overview', 'products', 'categories', 'orders', 'service-area', 'checkout-policy'] },
+  {
+    label: '经营',
+    views: ['overview', 'products', 'categories', 'orders', 'service-area', 'checkout-policy'],
+  },
   {
     label: '积分与快递',
-    views: ['points', 'points-grants', 'points-corrections', 'rewards', 'redemptions', 'redemption-after-sales', 'express-readiness'],
+    views: [
+      'points',
+      'points-grants',
+      'points-corrections',
+      'rewards',
+      'redemptions',
+      'redemption-after-sales',
+      'express-readiness',
+    ],
   },
   {
     label: '仓储与履约',
-    views: ['stock', 'receipts', 'locations', 'counts', 'dispositions', 'reversals', 'redemption-picking', 'redemption-delivery', 'picking-readiness', 'picking-lab', 'delivery-lab'],
+    views: [
+      'stock',
+      'receipts',
+      'locations',
+      'counts',
+      'dispositions',
+      'reversals',
+      'redemption-picking',
+      'redemption-delivery',
+      'picking-readiness',
+      'picking-lab',
+      'delivery-lab',
+    ],
   },
   {
     label: '支付与核查',
-    views: ['payment-readiness', 'notification-records', 'payment-review-lab', 'payment-attempt-lab', 'payment-close-lab', 'payment-adapter-lab', 'notification-lab'],
+    views: [
+      'payment-readiness',
+      'notification-records',
+      'payment-review-lab',
+      'payment-attempt-lab',
+      'payment-close-lab',
+      'payment-adapter-lab',
+      'notification-lab',
+    ],
   },
 ];
 type WorkspaceProps = { profile: StaffProfile; sessionControl: ReactNode; mobile?: boolean };
@@ -350,7 +382,9 @@ function WorkspaceSession({
   const allowed = routes.filter(
     (r) => profile.permissions.includes(r.permission) && (!mobile || mobileViews.has(r.id)),
   );
-  const [view, setView] = useState<WorkspaceView>(allowed[0]?.id ?? 'overview');
+  const [view, setView] = useState<WorkspaceView>(
+    allowed.find((r) => r.id === 'overview')?.id ?? allowed[0]?.id ?? 'overview',
+  );
   const activeNav = useRef<HTMLButtonElement>(null);
   const [retained, setRetained] = useState<WorkspaceView[]>([]),
     [reviewDestination, setReviewDestination] = useState<PaymentReviewDestination>(),
@@ -442,24 +476,28 @@ function WorkspaceSession({
           {mobile ? (pickerOnly ? '拣货作业' : '仓库作业') : '运营管理'}
         </div>
         <nav aria-label="主导航">
-          {navigation.filter(({ items }) => items.length).map(({ label, items }) => (
-            <Fragment key={label}>
-              {label && <span className="workspace-nav-group">{label}</span>}
-              {items.map((r) => (
-            <button
-              key={r.id}
-              ref={activeView === r.id ? activeNav : undefined}
-              className={activeView === r.id ? 'nav-item active' : 'nav-item'}
-              aria-current={activeView === r.id ? 'page' : undefined}
-              onClick={() => navigate(r.id)}
-            >
-              <span aria-hidden="true">{r.glyph}</span>
-              {r.name}
-              {activeView === r.id && <i />}
-            </button>
-              ))}
-            </Fragment>
-          ))}
+          {navigation
+            .filter(({ items }) => items.length)
+            .map(({ label, items }) => (
+              <Fragment key={label}>
+                {label && <span className="workspace-nav-group">{label}</span>}
+                {items.map((r) => (
+                  <button
+                    key={r.id}
+                    ref={activeView === r.id ? activeNav : undefined}
+                    className={activeView === r.id ? 'nav-item active' : 'nav-item'}
+                    aria-current={activeView === r.id ? 'page' : undefined}
+                    onClick={() => navigate(r.id)}
+                  >
+                    <span aria-hidden="true">
+                      <NavIcon view={r.id} />
+                    </span>
+                    {r.name}
+                    {activeView === r.id && <i />}
+                  </button>
+                ))}
+              </Fragment>
+            ))}
         </nav>
         <div className="sidebar-note">
           <span className="live-dot" /> 单小区 · 单仓服务<small>让社区生活更简单</small>

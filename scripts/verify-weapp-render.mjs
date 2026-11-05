@@ -67,7 +67,7 @@ app.onLaunch?.({});
 for (const [route, expected] of [
   ['pages/index/index', ['精选可兑换', '运行检查纸巾', 'points-balance-strip']],
   ['pages/redemptions/index', ['兑换订单', '登录后查看']],
-  ['pages/account/index', ['会员中心', '可用积分', '兑换订单', '常用服务']],
+  ['pages/account/index', ['我的', '我的积分', '兑换订单', '常用服务']],
 ]) {
   page = undefined;
   require(dist + '/' + route + '.js');

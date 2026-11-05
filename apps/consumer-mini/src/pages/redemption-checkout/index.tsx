@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Picker } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -230,7 +231,7 @@ export default function RedemptionCheckout() {
           <Text>确认后扣除积分并预占商品，订单进入待快递发货。</Text>
           <Text>寄送范围和运费以本次核验为准。</Text>
         </View>
-        {loading && <Text className="account-copy">正在读取兑换资料…</Text>}
+        {loading && <LoadingState label="正在读取兑换资料…" />}
         {error && (
           <View className="account-error">
             <Text>{error}</Text>

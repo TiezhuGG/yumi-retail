@@ -158,119 +158,121 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
           {view?.ticket && (
             <>
               <div className="redemption-detail-summary">
-              <div>
-              <h2>{view.title}</h2>
-              <p>
-                {view.spec} · {view.quantity} 件
-              </p>
-              <p className="redemption-order-no">兑换单号：{view.orderNo}</p>
-              </div>
-              <p className="badge amber">
-                {statuses[view.ticket.status]} · {categories[view.ticket.category]}
-              </p>
+                <div>
+                  <h2>{view.title}</h2>
+                  <p>
+                    {view.spec} · {view.quantity} 件
+                  </p>
+                  <p className="redemption-order-no">兑换单号：{view.orderNo}</p>
+                </div>
+                <p className="badge amber">
+                  {statuses[view.ticket.status]} · {categories[view.ticket.category]}
+                </p>
               </div>
               <div className="after-sales-detail-columns">
-              <div className="after-sales-timeline">
-                <h3>沟通记录</h3>
-                {view.ticket.events.map((e) => (
-                  <article key={e.version} className="picking-pack-proof">
-                    <h3>
-                      {e.actor === 'CUSTOMER'
-                        ? e.kind === 'SUBMITTED'
-                          ? '用户反馈'
-                          : e.kind === 'REOPENED'
-                            ? '用户重新反馈'
-                            : '用户补充说明'
-                        : e.kind === 'CLOSED'
-                          ? '门店处理说明'
-                          : '门店回复'}
-                    </h3>
-                    <p className="after-sales-message">{e.message}</p>
-                    <p className="muted">
-                      {e.staffName ? e.staffName + ' · ' : ''}
-                      {new Date(e.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
-                      （北京时间）
-                    </p>
-                  </article>
-                ))}
-              </div>
-              {pending ? (
-                <div className="notice">
-                  <p>有一笔处理请求待核实，请使用原请求确认结果。</p>
-                  <button
-                    className="primary-button"
-                    disabled={busy || loading}
-                    onClick={() => void submit()}
-                  >
-                    核实原处理请求
-                  </button>
+                <div className="after-sales-timeline">
+                  <h3>沟通记录</h3>
+                  {view.ticket.events.map((e) => (
+                    <article key={e.version} className="picking-pack-proof">
+                      <h3>
+                        {e.actor === 'CUSTOMER'
+                          ? e.kind === 'SUBMITTED'
+                            ? '用户反馈'
+                            : e.kind === 'REOPENED'
+                              ? '用户重新反馈'
+                              : '用户补充说明'
+                          : e.kind === 'CLOSED'
+                            ? '门店处理说明'
+                            : '门店回复'}
+                      </h3>
+                      <p className="after-sales-message">{e.message}</p>
+                      <p className="muted">
+                        {e.staffName ? e.staffName + ' · ' : ''}
+                        {new Date(e.createdAt).toLocaleString('zh-CN', {
+                          timeZone: 'Asia/Shanghai',
+                        })}
+                        （北京时间）
+                      </p>
+                    </article>
+                  ))}
                 </div>
-              ) : view.ticket.status === 'CLOSED' ? (
-                <p>本次反馈已结束，用户需要帮助时可重新反馈。</p>
-              ) : (
-                <form
-                  className="business-form after-sales-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (message.trim() && confirmed) void submit();
-                  }}
-                >
-                  <h3>回复与处理</h3>
-                  <label>
-                    处理方式
-                    <select
-                      aria-label="处理方式"
-                      disabled={busy || !view.enabled}
-                      value={action}
-                      onChange={(e) => {
-                        setAction(e.target.value as 'reply' | 'close');
-                        setConfirmed(false);
-                      }}
+                {pending ? (
+                  <div className="notice">
+                    <p>有一笔处理请求待核实，请使用原请求确认结果。</p>
+                    <button
+                      className="primary-button"
+                      disabled={busy || loading}
+                      onClick={() => void submit()}
                     >
-                      <option value="reply">回复用户并继续处理</option>
-                      <option value="close">回复并结束本次反馈</option>
-                    </select>
-                  </label>
-                  <label>
-                    回复内容
-                    <textarea
-                      aria-label="回复内容"
-                      disabled={busy || !view.enabled}
-                      maxLength={500}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="填写实际沟通或处理说明，最多500字"
-                    />
-                  </label>
-                  <label className="express-dispatch-confirm">
-                    <input
-                      type="checkbox"
-                      disabled={busy || !view.enabled}
-                      checked={confirmed}
-                      onChange={(e) => setConfirmed(e.target.checked)}
-                    />
-                    确认将此回复展示给用户{action === 'close' ? '，并结束本次反馈' : ''}
-                  </label>
-                  <p>
-                    此处只登记沟通结果，不会执行退积分、退货入库或补寄；请准确描述已完成的处理。
-                  </p>
-                  {!view.enabled && <p className="notice">售后反馈操作暂未开放</p>}
-                  <button
-                    className="primary-button"
-                    disabled={busy || !view.enabled || !message.trim() || !confirmed}
+                      核实原处理请求
+                    </button>
+                  </div>
+                ) : view.ticket.status === 'CLOSED' ? (
+                  <p>本次反馈已结束，用户需要帮助时可重新反馈。</p>
+                ) : (
+                  <form
+                    className="business-form after-sales-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (message.trim() && confirmed) void submit();
+                    }}
                   >
-                    {busy ? '正在提交…' : action === 'close' ? '回复并结束本次反馈' : '发送回复'}
-                  </button>
-                </form>
-              )}
+                    <h3>回复与处理</h3>
+                    <label>
+                      处理方式
+                      <select
+                        aria-label="处理方式"
+                        disabled={busy || !view.enabled}
+                        value={action}
+                        onChange={(e) => {
+                          setAction(e.target.value as 'reply' | 'close');
+                          setConfirmed(false);
+                        }}
+                      >
+                        <option value="reply">回复用户并继续处理</option>
+                        <option value="close">回复并结束本次反馈</option>
+                      </select>
+                    </label>
+                    <label>
+                      回复内容
+                      <textarea
+                        aria-label="回复内容"
+                        disabled={busy || !view.enabled}
+                        maxLength={500}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="填写实际沟通或处理说明，最多500字"
+                      />
+                    </label>
+                    <label className="express-dispatch-confirm">
+                      <input
+                        type="checkbox"
+                        disabled={busy || !view.enabled}
+                        checked={confirmed}
+                        onChange={(e) => setConfirmed(e.target.checked)}
+                      />
+                      确认将此回复展示给用户{action === 'close' ? '，并结束本次反馈' : ''}
+                    </label>
+                    <p>
+                      此处只登记沟通结果，不会执行退积分、退货入库或补寄；请准确描述已完成的处理。
+                    </p>
+                    {!view.enabled && <p className="notice">售后反馈操作暂未开放</p>}
+                    <button
+                      className="primary-button"
+                      disabled={busy || !view.enabled || !message.trim() || !confirmed}
+                    >
+                      {busy ? '正在提交…' : action === 'close' ? '回复并结束本次反馈' : '发送回复'}
+                    </button>
+                  </form>
+                )}
               </div>
             </>
           )}
         </>
       ) : (
-        <>
+        <div className="atlas-table-panel">
           <form
-            className="business-form"
+            className="points-toolbar"
             onSubmit={(e) => {
               e.preventDefault();
               applied.current = { keyword: keyword.trim(), status };
@@ -305,7 +307,9 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
               查询反馈
             </button>
           </form>
-          {!loading && !error && page.items.length === 0 && <p>暂无匹配售后反馈</p>}
+          {!loading && !error && page.items.length === 0 && (
+            <div className="points-empty">暂无匹配售后反馈</div>
+          )}
           {page.items.length > 0 && (
             <div className="points-table-wrap">
               <table className="points-table">
@@ -357,7 +361,7 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
               下一页反馈
             </button>
           )}
-        </>
+        </div>
       )}
       <button
         className="secondary-button"

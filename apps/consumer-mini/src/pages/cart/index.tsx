@@ -195,6 +195,7 @@ export default function Cart() {
   const allSelected = valid.length > 0 && valid.every((i) => i.selected);
   return (
     <View className="cart-page">
+      <Text className="account-eyebrow">玉米百货</Text>
       <View className="cart-heading">
         <Text className="cart-title">{accountMode ? '账号购物车' : '购物车'}</Text>
         <Button disabled={busy} onClick={() => void refresh()}>
@@ -202,12 +203,10 @@ export default function Cart() {
         </Button>
       </View>
       <View className="cart-note">
-        {accountMode
-          ? `当前账号：${identity?.profile.user.displayName}。账号购物车保存到服务端。`
-          : '商品暂存在这台设备。'}
-        购物车不占库存；参考小计不含配送费，不是下单报价，结算尚未开放。
+        {accountMode ? '账号购物车已保存到服务端。' : '商品暂存在这台设备。'}
+        购物车不占库存，商品与配送费用以结算核验为准。
       </View>
-      {identity && (
+      {identity && (guestCount > 0 || pending || !accountMode) && (
         <View className="cart-merge-panel">
           <Text>
             {pending
@@ -380,7 +379,8 @@ export default function Cart() {
             <Text>已选商品小计</Text>
             <Text className="cart-total">¥{(summary.totalCents / 100).toFixed(2)}</Text>
             <Text>
-              {summary.units}件已计入{summary.excluded ? ` · ${summary.excluded}项待处理未计入` : ''}
+              {summary.units}件已计入
+              {summary.excluded ? ` · ${summary.excluded}项待处理未计入` : ''}
             </Text>
           </View>
           {accountMode ? (

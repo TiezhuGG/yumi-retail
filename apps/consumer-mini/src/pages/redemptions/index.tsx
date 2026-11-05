@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -82,7 +83,15 @@ export default function Redemptions() {
   }
   useDidShow(() => {
     const view = takeRedemptionView();
-    const nextFilter = view?.service ? 2 : view?.status === 'EXPRESS_WAIT_SHIP' ? 1 : view?.status === 'EXPRESS_SHIPPED' ? 2 : view?.status === 'CANCELED' ? 3 : filter;
+    const nextFilter = view?.service
+      ? 2
+      : view?.status === 'EXPRESS_WAIT_SHIP'
+        ? 1
+        : view?.status === 'EXPRESS_SHIPPED'
+          ? 2
+          : view?.status === 'CANCELED'
+            ? 3
+            : filter;
     if (view) {
       setAfterSales(view.service === 'after-sales');
       setFilter(nextFilter);
@@ -128,7 +137,7 @@ export default function Redemptions() {
             ))}
           </View>
         )}
-        {loading && <Text>正在读取兑换单…</Text>}
+        {loading && <LoadingState label="正在读取兑换单…" />}
         {guest && (
           <Button
             className="points-action"
@@ -150,39 +159,63 @@ export default function Redemptions() {
           </View>
         )}
         {!loading && !guest && !error && !items.length && (
-            <View className="account-card redemption-empty">
+          <View className="account-card redemption-empty">
             <Text>暂无兑换订单</Text>
             <Text className="account-copy">兑换后可在这里查看发货与售后进度。</Text>
-            <Button className="account-link" onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}>
+            <Button
+              className="account-link"
+              onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}
+            >
               去逛商城 ›
             </Button>
           </View>
         )}
         {items.map((o) => {
-          const status = o.status === 'CANCELED'
-            ? '已取消 · 积分已退还'
-            : o.deliveryMode === 'EXPRESS'
-              ? o.expressShipment ? `已发货 · ${o.expressShipment.carrierName}` : '待发货'
-              : o.deliveryExceptionReported ? '配送异常待处理'
-                : o.fulfillmentState === 'DELIVERED' ? '已送达'
-                  : o.fulfillmentState === 'DELIVERING' ? '配送中'
-                    : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START' ? '骑手已接货'
-                      : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF' ? '等待骑手接货'
-                        : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF' ? '等待骑手接货'
-                          : o.fulfillmentState === 'PACKED_WAIT_SHIP' ? '仓库待出库'
-                            : o.fulfillmentState === 'PICKED_WAIT_PACK' ? '仓库待打包'
-                              : o.fulfillmentState === 'PICKING' ? '仓库处理中'
-                                : o.fulfillmentState === 'READY_TO_PICK' ? '等待仓库领取'
-                                  : o.fulfillmentState === 'REVIEW_REQUIRED' ? '门店核查中' : '处理中';
+          const status =
+            o.status === 'CANCELED'
+              ? '已取消 · 积分已退还'
+              : o.deliveryMode === 'EXPRESS'
+                ? o.expressShipment
+                  ? `已发货 · ${o.expressShipment.carrierName}`
+                  : '待发货'
+                : o.deliveryExceptionReported
+                  ? '配送异常待处理'
+                  : o.fulfillmentState === 'DELIVERED'
+                    ? '已送达'
+                    : o.fulfillmentState === 'DELIVERING'
+                      ? '配送中'
+                      : o.fulfillmentState === 'RIDER_RECEIVED_WAIT_START'
+                        ? '骑手已接货'
+                        : o.fulfillmentState === 'ASSIGNED_WAIT_HANDOFF'
+                          ? '等待骑手接货'
+                          : o.fulfillmentState === 'SHIPPED_WAIT_HANDOFF'
+                            ? '等待骑手接货'
+                            : o.fulfillmentState === 'PACKED_WAIT_SHIP'
+                              ? '仓库待出库'
+                              : o.fulfillmentState === 'PICKED_WAIT_PACK'
+                                ? '仓库待打包'
+                                : o.fulfillmentState === 'PICKING'
+                                  ? '仓库处理中'
+                                  : o.fulfillmentState === 'READY_TO_PICK'
+                                    ? '等待仓库领取'
+                                    : o.fulfillmentState === 'REVIEW_REQUIRED'
+                                      ? '门店核查中'
+                                      : '处理中';
           return (
             <View className="account-card redemption-list-card" key={o.id}>
               <View className="redemption-list-heading">
                 <Text className="redemption-list-status">{status}</Text>
                 <Text className="redemption-list-number">{o.orderNo}</Text>
               </View>
-              <Text className="account-card-title">{o.title} × {o.quantity}</Text>
-              <Text className="account-copy">{o.spec} · {o.totalPoints} 积分</Text>
-              {o.deliveryReturnRecorded && <Text className="redemption-list-note">配送已重新安排，积分未重复扣减</Text>}
+              <Text className="account-card-title">
+                {o.title} × {o.quantity}
+              </Text>
+              <Text className="account-copy">
+                {o.spec} · {o.totalPoints} 积分
+              </Text>
+              {o.deliveryReturnRecorded && (
+                <Text className="redemption-list-note">配送已重新安排，积分未重复扣减</Text>
+              )}
               <Button
                 className="redemption-list-open"
                 onClick={() => void Taro.navigateTo({ url: '/pages/redemption/index?id=' + o.id })}

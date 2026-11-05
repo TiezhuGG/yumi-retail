@@ -20,3 +20,6 @@ apps/consumer-mini/.swc/
 /docs/verification/**/*.jpeg
 /docs/verification/**/*.webp
 /docs/verification/**/*.gif
+
+# Generated atlas verification gallery and synthetic runtime results
+/docs/verification/atlas-pages-2026-11-05/

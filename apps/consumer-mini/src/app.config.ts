@@ -24,13 +24,28 @@ export default {
     navigationBarTextStyle: 'black',
   },
   tabBar: {
-    color: '#53635a',
-    selectedColor: '#087342',
+    color: '#62665a',
+    selectedColor: '#282c23',
     backgroundColor: '#ffffff',
     list: [
-      { pagePath: 'pages/index/index', text: '商城' },
-      { pagePath: 'pages/redemptions/index', text: '兑换订单' },
-      { pagePath: 'pages/account/index', text: '我的' },
+      {
+        pagePath: 'pages/index/index',
+        text: '商城',
+        iconPath: 'assets/tab-home.png',
+        selectedIconPath: 'assets/tab-home-active.png',
+      },
+      {
+        pagePath: 'pages/redemptions/index',
+        text: '兑换订单',
+        iconPath: 'assets/tab-orders.png',
+        selectedIconPath: 'assets/tab-orders-active.png',
+      },
+      {
+        pagePath: 'pages/account/index',
+        text: '我的',
+        iconPath: 'assets/tab-account.png',
+        selectedIconPath: 'assets/tab-account-active.png',
+      },
     ],
   },
 };

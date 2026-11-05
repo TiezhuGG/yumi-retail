@@ -10,15 +10,6 @@ const control: CSSProperties = {
   minHeight: 44,
   marginTop: 6,
 };
-const button: CSSProperties = {
-  padding: 10,
-  minHeight: 44,
-  margin: '8px 8px 0 0',
-  background: '#008a42',
-  color: 'white',
-  border: 0,
-  borderRadius: 6,
-};
 const states = {
   FROZEN: '冻结待录入',
   SUBMITTED: '待独立审批',
@@ -201,7 +192,7 @@ export function StockCountWorkbench({
                   提交后立即冻结该规格全部位置，请确认实物作业已准备好。
                 </p>
                 {message && <p role="status">{message}</p>}
-                <button style={button}>确认发起并冻结</button>
+                <button className="primary-button task-action">确认发起并冻结</button>
               </form>
             </fieldset>
           </Modal>
@@ -376,7 +367,7 @@ export function StockCountWorkbench({
                   {selected.status === 'FROZEN' &&
                     can('count.write') &&
                     selected.createdBy === profile.id && (
-                      <button style={button}>提交全部实盘数</button>
+                      <button className="primary-button task-action">提交全部实盘数</button>
                     )}
                 </form>
                 {selected.status === 'SUBMITTED' &&
@@ -400,13 +391,13 @@ export function StockCountWorkbench({
                         审批意见
                         <input name="reason" style={control} required maxLength={200} />
                       </label>
-                      <button style={button}>审批盘点差异</button>
+                      <button className="primary-button task-action">审批盘点差异</button>
                     </form>
                   ))}
                 {selected.reviewReason && <p>审批意见：{selected.reviewReason}</p>}
                 {selected.status === 'APPROVED' && can('count.post') && (
                   <button
-                    style={button}
+                    className="primary-button task-action"
                     onClick={() =>
                       void work(() => post(`/${selected.id}/post`, { version: selected.version }))
                     }
@@ -431,7 +422,7 @@ export function StockCountWorkbench({
                       终止原因
                       <input name="reason" style={control} required maxLength={200} />
                     </label>
-                    <button style={button}>终止盘点并释放冻结</button>
+                    <button className="primary-button task-action">终止盘点并释放冻结</button>
                   </form>
                 )}
                 {selected.cancelReason && <p>终止原因：{selected.cancelReason}</p>}

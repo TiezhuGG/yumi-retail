@@ -103,26 +103,32 @@ export default function Account() {
     <View className="account-page account-center">
       <View className="member-header">
         <View className="member-heading">
-          <Text>会员中心</Text>
+          <Text>我的</Text>
           <Button className="member-settings" onClick={() => setSettings(!settings)}>
             {settings ? '收起设置' : '设置 ›'}
           </Button>
         </View>
-        <View className="member-identity-card">
-        <View className="member-profile">
-          <Text className="member-avatar">玉</Text>
-          <View className="member-profile-copy">
-            <Text className="member-name">
-              {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
-            </Text>
-            <Text className="member-note">{profile ? '玉米百货会员' : '登录后查看积分和订单'}</Text>
-          </View>
+        <View className="member-intro">
+          <Text className="account-copy">管理积分和兑换订单</Text>
         </View>
-        {!profile && !busy && phase === 'guest' && (
-          <Button className="member-login" onClick={() => open('login/index')}>
-            微信登录
-          </Button>
-        )}
+        <View className="member-identity-card">
+          <Text className="member-identity-label">玉米百货会员</Text>
+          <View className="member-profile">
+            <Text className="member-avatar">玉</Text>
+            <View className="member-profile-copy">
+              <Text className="member-name">
+                {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
+              </Text>
+              <Text className="member-note">
+                {profile ? '玉米百货会员' : '登录后查看积分和订单'}
+              </Text>
+            </View>
+          </View>
+          {!profile && !busy && phase === 'guest' && (
+            <Button className="member-login" onClick={() => open('login/index')}>
+              微信登录
+            </Button>
+          )}
         </View>
       </View>
       <View className="member-content">

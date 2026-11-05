@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -92,7 +93,7 @@ export default function RedemptionDetail() {
         </Text>
       </View>
       <View className="account-content">
-        {loading && <Text>正在核实兑换状态…</Text>}
+        {loading && <LoadingState label="正在核实兑换状态…" />}
         {error && (
           <View className="account-error">
             <Text>{error}</Text>

@@ -17,15 +17,6 @@ const control: CSSProperties = {
   padding: 10,
   margin: '6px 0 12px',
 };
-const button: CSSProperties = {
-  padding: 10,
-  minHeight: 44,
-  margin: '8px 8px 8px 0',
-  background: '#008a42',
-  color: 'white',
-  border: 0,
-  borderRadius: 6,
-};
 const box: CSSProperties = {
   borderTop: '1px solid #d0d5dd',
   marginTop: 20,
@@ -248,7 +239,7 @@ export function ReceiptReversalWorkbench({
                 </select>
               </label>
               <p>请选择原收货批次所在位置；如未找到，可加载更多可选批次位置。</p>
-              <button style={button}>核对原收货及额度</button>
+              <button className="primary-button task-action">核对原收货及额度</button>
             </form>
             {source && (
               <section style={box} aria-label="原收货核对">
@@ -299,7 +290,7 @@ export function ReceiptReversalWorkbench({
                       误录原因
                       <input name="reason" style={control} maxLength={200} required />
                     </label>
-                    <button style={button}>提交逆向申请</button>
+                    <button className="primary-button task-action">提交逆向申请</button>
                   </form>
                 )}
               </section>
@@ -340,7 +331,10 @@ export function ReceiptReversalWorkbench({
                             <span className="badge">{states[d.status]}</span>
                           </td>
                           <td>
-                            <button style={button} onClick={() => void work(() => open(d.id))}>
+                            <button
+                              className="primary-button task-action"
+                              onClick={() => void work(() => open(d.id))}
+                            >
                               查看逆向单
                             </button>
                           </td>
@@ -351,7 +345,10 @@ export function ReceiptReversalWorkbench({
               </div>
             )}
             {cursor && (
-              <button style={button} onClick={() => void work(() => load(cursor))}>
+              <button
+                className="primary-button task-action"
+                onClick={() => void work(() => load(cursor))}
+              >
                 更多逆向单
               </button>
             )}
@@ -429,7 +426,7 @@ export function ReceiptReversalWorkbench({
                       逆向审批说明
                       <input name="reason" style={control} maxLength={200} required />
                     </label>
-                    <button style={button}>确认独立审批逆向单</button>
+                    <button className="primary-button task-action">确认独立审批逆向单</button>
                   </form>
                 )}
               {selected.status === 'APPROVED' && can('reversal.post') && (
@@ -453,7 +450,7 @@ export function ReceiptReversalWorkbench({
                     原单及实物核验说明
                     <input name="physicalEvidence" style={control} maxLength={200} required />
                   </label>
-                  <button style={button}>确认逆向纠错过账</button>
+                  <button className="primary-button task-action">确认逆向纠错过账</button>
                 </form>
               )}
               {['DRAFT', 'APPROVED'].includes(selected.status) && can('reversal.write') && (
@@ -472,7 +469,7 @@ export function ReceiptReversalWorkbench({
                     逆向取消原因
                     <input name="reason" style={control} maxLength={200} required />
                   </label>
-                  <button style={button}>取消逆向申请</button>
+                  <button className="primary-button task-action">取消逆向申请</button>
                 </form>
               )}
             </section>

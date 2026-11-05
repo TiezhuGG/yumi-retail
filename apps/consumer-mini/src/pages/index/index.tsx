@@ -1,3 +1,4 @@
+import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Image } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
@@ -72,7 +73,10 @@ export default function Index() {
       <View className="store-header">
         <View className="store-brand">
           <View className="points-brand-mark" aria-hidden="true">
-            <View /><View /><View /><View />
+            <View />
+            <View />
+            <View />
+            <View />
           </View>
           <Text className="store-name">玉米百货</Text>
         </View>
@@ -87,9 +91,11 @@ export default function Index() {
         </View>
         <Button
           className="points-balance-strip"
-          onClick={() => void Taro.navigateTo({
-            url: guest ? '/pages/login/index' : '/pages/points/index',
-          })}
+          onClick={() =>
+            void Taro.navigateTo({
+              url: guest ? '/pages/login/index' : '/pages/points/index',
+            })
+          }
         >
           <Text>{guest ? '微信登录' : '可用积分'}</Text>
           {balance !== null && <Text className="points-balance-value">{balance}</Text>}
@@ -102,7 +108,7 @@ export default function Index() {
           </Button>
         </View>
         {loading ? (
-          <Text className="category-status">正在加载兑换商品…</Text>
+          <LoadingState label="正在加载兑换商品…" />
         ) : error ? (
           <View className="category-error">
             <Text>商品加载失败</Text>

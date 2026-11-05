@@ -85,13 +85,13 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
             返回兑换商品列表
           </button>
           <div className="redemption-detail-summary">
-          <div>
-          <h2>{selected.title}</h2>
-          <p>
-            {selected.name} · {selected.spec} / {selected.unit}
-          </p>
-          </div>
-          <p className="reward-price">{selected.pointsPrice} 积分 / 件</p>
+            <div>
+              <h2>{selected.title}</h2>
+              <p>
+                {selected.name} · {selected.spec} / {selected.unit}
+              </p>
+            </div>
+            <p className="reward-price">{selected.pointsPrice} 积分 / 件</p>
           </div>
           <p>
             {statuses[selected.status]} · 当前最多可选 {selected.available} 件
@@ -167,7 +167,9 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
                       </td>
                       <td>{r.pointsPrice}</td>
                       <td>
-                        {statuses[r.status]}
+                        <span className={r.status === 'PUBLISHED' ? 'badge green' : 'badge amber'}>
+                          {statuses[r.status]}
+                        </span>
                         <p>最多 {r.available} 件</p>
                       </td>
                       <td>
@@ -534,7 +536,7 @@ function RewardEditor({
           </div>
         )}
         <p className="muted">
-          上架或下架使用当前已保存规则；修改后请先保存。当前仅展示，兑换下单待开放。
+          上架或下架使用当前已保存规则，修改后请先保存。用户能否兑换，以当前门禁、库存和配额核验为准。
         </p>
       </form>
     </Modal>
