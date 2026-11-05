@@ -1,7 +1,8 @@
+import { wechatProjectAppId } from './wechat-project.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function consumerDevelopmentBuild(flag, target, apiBase, environment) {
@@ -76,8 +77,14 @@ export function collectBuildInfo(root, target, apiBase) {
     ),
     '编译产物中未找到本次 API 地址，请重新编译。',
   );
+  const projectPath = join(root, 'project.config.json');
+  const wechatAppId = existsSync(projectPath)
+    ? wechatProjectAppId([JSON.parse(readFileSync(projectPath, 'utf8'))], target)
+    : null;
+  if (target === 'device') assert.ok(wechatAppId, '真机构建缺少真实AppID工程配置。');
   return {
     formatVersion: 1,
+    wechatAppId,
     target,
     apiBase: normalized,
     builtAt: new Date().toISOString(),
@@ -97,6 +104,7 @@ export function verifyBuildInfo(root, info, target) {
   assert.equal(info.formatVersion, 1, 'Unknown build info format');
   assert.equal(info.target, target, `当前产物不是 ${target} 构建，请重新编译。`);
   const fresh = collectBuildInfo(root, target, info.apiBase);
+  assert.equal(info.wechatAppId, fresh.wechatAppId, 'AppID配置已变化或清单过期，请重新编译。');
   assert.deepEqual(info.files, fresh.files, '产物已变化或清单过期，请重新编译生成清单。');
   return info;
 }

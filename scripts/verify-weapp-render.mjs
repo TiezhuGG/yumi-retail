@@ -58,7 +58,10 @@ globalThis.wx = {
           },
         ]
       : [{ id: 'fixture-category', name: '运行检查分类' }];
-    const result = { statusCode: 200, data: { data: { items, nextCursor: null } } };
+    const data = url.includes('/consumer/auth/methods')
+      ? { wechatLoginEnabled: false, developmentLoginEnabled: false }
+      : { items, nextCursor: null };
+    const result = { statusCode: 200, data: { data } };
     globalThis.queueMicrotask(() => {
       success?.(result);
       complete?.(result);
@@ -74,7 +77,8 @@ for (const [route, expected] of [
   ['pages/index/index', ['精选可兑换', '运行检查纸巾', 'points-balance-strip']],
   ['pages/points-cart/index', ['购物车', '购物车还是空的']],
   ['pages/redemptions/index', ['订单', '登录后查看']],
-  ['pages/account/index', ['我的', '我的积分', '订单', '常用服务']],
+  ['pages/account/index', ['我的', '可用积分', '订单', '常用服务']],
+  ['pages/login/index', ['玉米百货', '微信登录']],
 ]) {
   page = undefined;
   require(dist + '/' + route + '.js');
@@ -101,7 +105,15 @@ for (const [route, expected] of [
     /\bstore-tabs\b|返回逛逛|本机购物车草稿/,
     route + ' rendered a legacy navigation',
   );
+  assert.doesNotMatch(
+    rendered,
+    /玉米百货 · 积分商城|积分商品 · 一次兑换|购物车保存在本机|账号设置|登录后可查看积分、兑换商品和查询订单/,
+  );
+  if (process.env.TARO_APP_CONSUMER_DEV_LOGIN !== '1')
+    assert.doesNotMatch(rendered, /使用开发顾客/);
   page.onHide?.();
   page.onUnload?.();
 }
-console.log('WeChat bundle rendered all four native tab pages with its compiled React runtime.');
+console.log(
+  'WeChat bundle rendered all four native tab pages and the login page with its compiled React runtime.',
+);

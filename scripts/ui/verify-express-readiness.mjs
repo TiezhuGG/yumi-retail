@@ -26,31 +26,13 @@ try {
     dir + '/public/admin.css',
     await readFile('packages/web-ui/src/styles.css', 'utf8'),
   );
-  const css = (
-    await require(resolve('apps/consumer-mini/node_modules/less')).render(
-      await readFile('apps/consumer-mini/src/app.less', 'utf8'),
-    )
-  ).css.replace(/([\d.]+)rpx/g, (_, n) => Number(n) / 2 + 'px');
-  await writeFile(
-    dir + '/public/mini.css',
-    css.replace(/page\s*\{/g, 'body{') +
-      '\nbody{margin:0;font-family:Arial,Microsoft YaHei,sans-serif;}button{display:block;box-sizing:border-box;font-family:inherit;}select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dce6de;border-radius:8px;padding:10px;color:#345544;background:white;}',
-  );
   await writeFile(
     dir + '/index.html',
     '<html lang="zh-CN"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="margin:0"><div id="root"></div><script type="module" src="/main.tsx"></script></body></html>',
   );
   await writeFile(
-    dir + '/components.tsx',
-    `import React from 'react';export const ScrollView=({scrollX,children,...p})=><div style={{overflowX:scrollX?'auto':undefined}} {...p}>{children}</div>;export const View=({children,...p})=><div {...p}>{children}</div>;export const Text=({children,...p})=><span {...p}>{children}</span>;export const Button=({children,...p})=><button {...p}>{children}</button>;export const Input=({onInput,onConfirm,maxlength,...p})=><input {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})} onKeyDown={e=>{if(e.key==='Enter')onConfirm?.()}}/>;export const Picker=({range,onChange,value,disabled})=><select aria-label="收货地址" disabled={disabled} value={value} onChange={e=>onChange({detail:{value:e.target.value}})}>{range.map((v,i)=><option key={i} value={i}>{v}</option>)}</select>;export const Textarea=({onInput,maxlength,...p})=><textarea {...p} maxLength={maxlength} onChange={e=>onInput?.({detail:{value:e.target.value}})}/>;export const Switch=({onChange,checked,disabled})=><input role="switch" type="checkbox" checked={checked} disabled={disabled} onChange={e=>onChange?.({detail:{value:e.target.checked}})}/>;export const Image=({src,mode,...p})=><img src={src} {...p}/>;`,
-  );
-  await writeFile(
-    dir + '/taro.ts',
-    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
-  );
-  await writeFile(
     dir + '/main.tsx',
-    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 快递首发检查 · 非生产操作</div>{mini?(location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';const style=document.createElement('link');style.rel='stylesheet';style.href='/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 售后待办检查 · 非生产操作</div><StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c}/>}</StaffSessionPanel></></React.StrictMode>);`,
   );
   const config = {
     configFile: false,
@@ -58,8 +40,6 @@ try {
     plugins: [react()],
     resolve: {
       alias: {
-        '@tarojs/components': dir + '/components.tsx',
-        '@tarojs/taro': dir + '/taro.ts',
         react: resolve('apps/admin-web/node_modules/react'),
         'react-dom': resolve('apps/admin-web/node_modules/react-dom'),
       },
@@ -89,7 +69,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   async function shot(name, p = page) {
-    const path = `docs/verification/UI-E4C-READINESS-${name}-2026-11-03.png`;
+    const path = `docs/verification/UI-RETURN-QUEUE-${name}-2026-11-05.png`;
     if (!name.startsWith('MINI-') && !name.endsWith('MOBILE'))
       await p.evaluate(() => {
         window.scrollTo(0, 0);
@@ -165,12 +145,106 @@ try {
   assert.equal(await page.getByText('SF-E4C-UI-001', { exact: true }).count(), 0);
   assert.equal(await page.getByText('合成检查待办', { exact: true }).count(), 0);
   await shot('METRICS');
+  const applied = await f.call('/consumer/redemptions/' + id + '/returns', {
+    quantity: 1,
+    reason: '合成售后待办，请核对原积分',
+  });
+  assert.equal(applied.status, 200);
+  const returnId = applied.data.id;
+  const queue = page.getByRole('region', { name: '售后待办', exact: true });
+  const refresh = async () => {
+    await page.getByRole('button', { name: '刷新首发检查', exact: true }).click();
+    await page.getByRole('heading', { name: '正式微信身份', exact: true }).waitFor();
+  };
+  const inspectQueue = async (status, name) => {
+    await queue.getByRole('button', { name: '查看' + name, exact: true }).click();
+    await page.getByRole('combobox', { name: '售后处理状态', exact: true }).waitFor();
+    assert.equal(await page.getByRole('combobox', { name: '售后处理状态' }).inputValue(), status);
+    await page.getByRole('button', { name: '查看售后申请', exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '查看售后申请', exact: true }).count(), 1);
+    await shot('FILTER-' + status);
+    await page.getByRole('button', { name: '积分快递首发检查', exact: true }).click();
+    await page.getByRole('heading', { name: '正式微信身份', exact: true }).waitFor();
+  };
+  await refresh();
+  assert.equal(
+    await queue
+      .locator('strong')
+      .allTextContents()
+      .then((x) => x.join(',')),
+    '1,0,0',
+  );
+  await shot('REQUESTED');
+  await inspectQueue('REQUESTED', '待审核');
+  assert.equal(
+    (
+      await f.api('/admin/redemption-returns/' + returnId + '/approve', {
+        requiresReturn: true,
+        reason: '合成退回审核',
+      })
+    ).status,
+    200,
+  );
+  await refresh();
+  assert.equal(
+    await queue
+      .locator('strong')
+      .allTextContents()
+      .then((x) => x.join(',')),
+    '0,1,0',
+  );
+  await inspectQueue('WAIT_RETURN', '待验收');
+  assert.equal(
+    (
+      await f.api('/admin/redemption-returns/' + returnId + '/receive', {
+        quantity: 1,
+        condition: 'DAMAGED',
+        location: '合成隔离区',
+        physicalConfirmed: true,
+        reason: '完整隔离验收',
+      })
+    ).status,
+    200,
+  );
+  await refresh();
+  assert.equal(
+    await queue
+      .locator('strong')
+      .allTextContents()
+      .then((x) => x.join(',')),
+    '0,0,1',
+  );
+  await inspectQueue('READY_TO_REFUND', '待退积分');
+
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('.express-readiness-metrics').scrollIntoViewIfNeeded();
+  await page.locator('.express-readiness-metrics').first().scrollIntoViewIfNeeded();
   await shot('METRICS-MOBILE');
+  await queue.scrollIntoViewIfNeeded();
+  await shot('RETURNS-MOBILE');
   await page.getByRole('heading', { name: '正式微信身份', exact: true }).scrollIntoViewIfNeeded();
   await shot('BLOCKERS-MOBILE');
   await page.setViewportSize({ width: 1440, height: 1000 });
+  const scope = (await f.runtime.db.$queryRaw`SELECT current_schema() AS schema`)[0].schema;
+  assert.match(scope, /^address_ui_[a-f0-9]+$/);
+  // Only disposable synthetic facts are changed to verify the visible discrepancy state.
+  await f.runtime.db.$executeRawUnsafe(
+    'ALTER TABLE redemption_return_events DISABLE TRIGGER redemption_return_event_immutable',
+  );
+  await f.runtime.db
+    .$executeRaw`UPDATE redemption_return_events SET quantity=2 WHERE return_id=${returnId}::uuid AND kind='RECEIVE'`;
+  await refresh();
+  const invariantCard = page
+    .getByRole('heading', { name: '快递事实核对', exact: true })
+    .locator('..');
+  await invariantCard
+    .getByText('发现事实差异；先暂停相关操作并核对原始记录，禁止自动填平。', { exact: true })
+    .waitFor();
+  await shot('RETURN-DIFFERENCE');
+  await f.runtime.db
+    .$executeRaw`UPDATE redemption_return_events SET quantity=1 WHERE return_id=${returnId}::uuid AND kind='RECEIVE'`;
+  await f.runtime.db.$executeRawUnsafe(
+    'ALTER TABLE redemption_return_events ENABLE TRIGGER redemption_return_event_immutable',
+  );
   await f.runtime.db.redemptionExpressPolicy.update({
     where: { warehouseId: f.warehouseId },
     data: { enabled: false },

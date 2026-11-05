@@ -223,7 +223,11 @@
     "verify:points-cart:ui": "node --env-file=.env --import tsx scripts/ui/verify-points-cart.mjs",
     "preverify:points-cart:ui": "npm run build:server",
     "setup:points-demo:local": "node --env-file=.env scripts/setup-points-demo-local.mjs --apply",
-    "presetup:points-demo:local": "npm run build:server"
+    "presetup:points-demo:local": "npm run build:server",
+    "check:wechat:login": "node --env-file-if-exists=.env scripts/check-wechat-login.mjs",
+    "precheck:wechat:login": "npm run build:server",
+    "test:wechat-readiness": "node --test tests/wechat-login-readiness.test.mjs",
+    "pretest:wechat-readiness": "npm run build:server"
   },
   "pnpm": {
     "overrides": {

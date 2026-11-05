@@ -183,11 +183,10 @@ try {
     .waitFor();
   await shot('RECOVERED');
   await page.goto('http://127.0.0.1:5188/?mini&account');
-  await page.getByRole('button', { name: '微信登录 / 查看我的积分', exact: true }).waitFor();
+  await page.getByRole('button', { name: '微信登录', exact: true }).waitFor();
   await shot('ACCOUNT-GUEST');
   await page.getByText('收货地址', { exact: true }).click();
   assert.equal(await page.evaluate(() => window.__lastNavigation), '/pages/login/index');
-  await page.getByRole('button', { name: '账号设置', exact: true }).click();
   await page.getByText('隐私保护指引', { exact: true }).waitFor();
   await shot('ACCOUNT-SETTINGS');
   assert.deepEqual(errors, []);

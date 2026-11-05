@@ -1,8 +1,18 @@
+import { wechatProjectAppId } from './wechat-project.mjs';
 import { readFileSync } from 'node:fs';
 import { verifyBuildInfo } from './mini-build-info.mjs';
 try {
   const info = JSON.parse(readFileSync('.local/mini-build.json', 'utf8'));
   verifyBuildInfo('apps/consumer-mini/dist', info, 'device');
+  wechatProjectAppId(
+    [
+      'project.config.json',
+      'apps/consumer-mini/project.config.json',
+      'apps/consumer-mini/dist/project.config.json',
+    ].map((p) => JSON.parse(readFileSync(p, 'utf8'))),
+    'device',
+    info.wechatAppId,
+  );
   console.log(`Device build output verified. API: ${info.apiBase}. Built: ${info.builtAt}`);
   console.log(
     'Still requires WeChat legal-domain confirmation, reachable HTTPS API, developer-tool compile and physical-device acceptance.',

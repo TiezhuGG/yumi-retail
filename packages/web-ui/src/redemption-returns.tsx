@@ -10,7 +10,14 @@ const states = {
   CANCELED: '用户已撤销',
 };
 type Intent = { id: string; action: string; body: Record<string, unknown>; key: string };
-export function RedemptionReturnsWorkbench({ profile }: { profile: StaffProfile }) {
+export type ReturnQueueStatus = 'REQUESTED' | 'WAIT_RETURN' | 'READY_TO_REFUND';
+export function RedemptionReturnsWorkbench({
+  profile,
+  initialStatus = '',
+}: {
+  profile: StaffProfile;
+  initialStatus?: ReturnQueueStatus | '';
+}) {
   const [items, setItems] = useState<RedemptionReturnView[]>([]),
     [view, setView] = useState<RedemptionReturnView | null>(null),
     [enabled, setEnabled] = useState(false),
@@ -20,8 +27,8 @@ export function RedemptionReturnsWorkbench({ profile }: { profile: StaffProfile 
     [error, setError] = useState(''),
     [pending, setPending] = useState<Intent | null>(null);
   const [keyword, setKeyword] = useState(''),
-    [status, setStatus] = useState('');
-  const applied = useRef({ keyword: '', status: '' });
+    [status, setStatus] = useState<string>(initialStatus);
+  const applied = useRef({ keyword: '', status: initialStatus as string });
   const seq = useRef(0),
     writing = useRef(false),
     current = useRef<string | undefined>(undefined);

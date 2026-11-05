@@ -1032,3 +1032,12 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 按负责人最新要求，`/rewards` 列表/详情中的 `available` 仅使用共享可售库存结果；单商品及购物车报价/创建不再校验历史每人累计限兑或总兑换配额。库存、安全库存、盘点冻结、库位/批次状态、商品有效期、本人会话、地址政策和积分余额仍按原接口核验，幂等与整次回滚不变。
 
 `perUserLimit` / `totalQuota` 标记 deprecated，仅为历史客户端/数据兼容保留字段及旧结构校验，不再是有效经营限制；后台新建表单自动填写兼容值、编辑保留原值，界面不再提供限额设置。新客户端不可用这些字段计算可兑换件数。历史报价中无配额快照，仍按原效期及商品版本核验。本轮新增移除旧限额约束触发器的迁移，服务与迁移必须一起部署；不支持新旧规则进程混跑。
+
+## 2026-11-05 微信接入准备接续
+
+微信登录HTTP契约不变：GET /consumer/auth/methods、POST /consumer/auth/wechat-session（body仅code）、GET /consumer/me、POST /consumer/auth/logout。登录失败由用户再次触发Taro.login，重新获取code；不把登录作为可重放token的普通交易幂等请求。新增的是只读CLI和构建检查，不新增调试登录API、不向消费者暴露AppSecret，也不自动开启正式积分兑换。
+
+
+## 2026-11-05 售后待办指标（OpenAPI 0.63.0）
+
+`GET /admin/redemption-express-readiness` 的 `metrics` 追加非负整数 `returnsRequested`（待审核）、`returnsWaitingReceipt`（待退货验收）、`returnsReadyToRefund`（待退积分）、`inconsistentReturns`（存在售后事实/退积分流水差异的申请数）。前三项与 `GET /admin/redemption-returns?status=REQUESTED|WAIT_RETURN|READY_TO_REFUND` 共用状态过滤逻辑，不受列表20条分页上限影响。当前仓、员工Cookie/points.read、未知查询参数拒绝、no-store及事务内复核权限保持不变，不返回申请ID、正文、个人资料或积分流水明细。`INVARIANTS` 同时纳入售后差异，`canLaunch` 仍固定false。前后端需匹配构建；旧客户端可忽略新增字段。

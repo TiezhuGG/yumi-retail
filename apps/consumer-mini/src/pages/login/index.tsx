@@ -70,14 +70,13 @@ export default function Login() {
             <Text>玉米百货</Text>
           </View>
           <Text className="account-name">微信登录</Text>
-          <Text className="account-copy">登录后可查看积分、兑换商品和查询订单。</Text>
           {state.error && <Text className="account-error">{state.error}</Text>}
           {methodsFailed && (
             <Button onClick={() => void loadMethods()}>登录方式加载失败，点击重试</Button>
           )}
           <Button
             className="points-action"
-            disabled={enabled !== true || state.busy || state.phase !== 'guest'}
+            disabled={enabled !== true || state.busy || !['guest', 'error'].includes(state.phase)}
             onClick={() => void session.current!.wechatLogin()}
           >
             {state.busy
@@ -85,12 +84,14 @@ export default function Login() {
               : enabled === false
                 ? '微信登录暂未开放'
                 : enabled === true
-                  ? '使用微信登录'
+                  ? state.phase === 'error'
+                    ? '重新微信登录'
+                    : '使用微信登录'
                   : '正在读取登录方式…'}
           </Button>
           {state.phase === 'error' && (
             <Button className="account-link" onClick={() => void session.current!.restore()}>
-              重试核验
+              重新检查登录状态
             </Button>
           )}
           {CONSUMER_DEV_LOGIN && state.phase === 'guest' && (
@@ -109,7 +110,6 @@ export default function Login() {
               </Button>
             </View>
           )}
-
         </View>
       </View>
     </View>

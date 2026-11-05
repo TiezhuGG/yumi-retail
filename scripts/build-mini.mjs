@@ -1,5 +1,6 @@
+import { wechatProjectAppId } from './wechat-project.mjs';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import {
   apiBaseForBuild,
   collectBuildInfo,
@@ -16,6 +17,13 @@ try {
     target,
     apiBase,
     process.env.NODE_ENV,
+  );
+  const projectAppId = wechatProjectAppId(
+    ['project.config.json', 'apps/consumer-mini/project.config.json'].map((path) =>
+      JSON.parse(readFileSync(path, 'utf8')),
+    ),
+    target,
+    process.env.TARO_APP_WECHAT_APP_ID,
   );
   const manifest = '.local/mini-build.json';
   mkdirSync('.local', { recursive: true });
@@ -41,6 +49,8 @@ try {
     throw Error('微信产物运行检查失败，未生成构建清单。');
   const info = collectBuildInfo('apps/consumer-mini/dist', target, apiBase);
   info.consumerDevelopmentLogin = developmentLogin;
+  if (info.wechatAppId !== projectAppId)
+    throw Error('输出工程AppID与源工程不一致，请重新配置并编译。');
   verifyBuildInfo('apps/consumer-mini/dist', info, target);
   writeFileSync(manifest, JSON.stringify(info, null, 2) + '\n');
   console.log(`Mini ${target} build verified. API: ${apiBase}. Manifest: ${manifest}`);

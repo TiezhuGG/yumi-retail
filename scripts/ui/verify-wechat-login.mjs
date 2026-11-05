@@ -1,4 +1,4 @@
-/* global document, innerWidth, window, localStorage, Event */
+/* global document, innerWidth, window, Event */
 // Actual React pages + real API + disposable PG schema. Browser mini adapter is not native WeChat.
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -11,7 +11,7 @@ if (process.env.YUMI_LIVE_UI !== '1' || process.env.NODE_ENV === 'production')
   throw Error('Local opt-in only');
 const require = createRequire(import.meta.url),
   root = process.cwd().replaceAll('\\', '/'),
-  dir = resolve('.local/wechat-login-ui');
+  dir = resolve('.local/wechat-entry-ui');
 const { createServer, build } =
   await import('../../apps/admin-web/node_modules/vite/dist/node/index.js');
 const react = (await import('../../apps/admin-web/node_modules/@vitejs/plugin-react/dist/index.js'))
@@ -57,11 +57,11 @@ try {
   );
   await writeFile(
     dir + '/taro.ts',
-    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={login:async()=>{if(window.__wxFail)throw Error("synthetic wx.login failure");if(window.__wxPending)await new Promise(done=>{window.__wxResolve=done});window.__wxCode=(window.__wxCode||0)+1;return {code:"ui_code_"+window.__wxCode}},showModal:async()=>({confirm:true}),getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
+    `import {useEffect} from 'react';export function useDidShow(fn){useEffect(()=>{fn();window.addEventListener('yumi:show',fn);return()=>window.removeEventListener('yumi:show',fn)},[])}export function useReachBottom(fn){useEffect(()=>{window.addEventListener('yumi:bottom',fn);return()=>window.removeEventListener('yumi:bottom',fn)},[fn])}export function usePullDownRefresh(fn){useEffect(()=>{window.addEventListener('yumi:refresh',fn);return()=>window.removeEventListener('yumi:refresh',fn)},[fn])}export function useRouter(){return {params:Object.fromEntries(new URLSearchParams(location.search))}};export function useDidHide(fn){useEffect(()=>{window.addEventListener('yumi:hide',fn);return()=>window.removeEventListener('yumi:hide',fn)},[])}const Taro={stopPullDownRefresh:()=>{},navigateBack:async()=>{window.__loginReturned=true},switchTab:async o=>{window.__lastNavigation=o.url},showToast:async()=>{},login:async()=>{if(window.__wxFail)throw Error("synthetic wx.login failure");if(window.__wxPending)await new Promise(done=>{window.__wxResolve=done});window.__wxCode=(window.__wxCode||0)+1;return {code:"ui_code_"+window.__wxCode}},showModal:async()=>({confirm:true}),getStorageSync:k=>JSON.parse(localStorage.getItem(k)||'null'),setStorageSync:(k,v)=>localStorage.setItem(k,JSON.stringify(v)),removeStorageSync:k=>localStorage.removeItem(k),setClipboardData:async o=>{window.__clipboard=o.data;return{}},request:async o=>{const r=await fetch('/api/v1'+o.url.split('/api/v1')[1],{method:o.method,headers:o.header,body:o.method==='GET'?undefined:JSON.stringify(o.data)});return {statusCode:r.status,data:await r.json()}},navigateTo:async o=>{window.__lastNavigation=o.url}};export default Taro;`,
   );
   await writeFile(
     dir + '/main.tsx',
-    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Account from '${root}/apps/consumer-mini/src/pages/account/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 微信登录适配器 · 合成身份 · 非真实微信联调</div>{mini?(location.search.includes("view=account")?<Account/>:location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Account from '${root}/apps/consumer-mini/src/pages/account/index';import Login from '${root}/apps/consumer-mini/src/pages/login/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/redemption-checkout/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 微信登录适配器 · 合成身份 · 非真实微信联调</div>{mini?(location.search.includes("view=login")?<Login/>:location.search.includes("view=account")?<Account/>:location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
   );
   const config = {
     configFile: false,
@@ -97,7 +97,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   async function shot(name, p = page) {
-    const path = `docs/verification/UI-E4D-WECHAT-${name}-2026-11-03.png`;
+    const path = `docs/verification/UI-WECHAT-ENTRY-${name}-2026-11-05.png`;
     if (!name.startsWith('MINI-') && !name.endsWith('MOBILE'))
       await p.evaluate(() => {
         window.scrollTo(0, 0);
@@ -117,6 +117,7 @@ try {
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
+  const auth = f.runtime.app.get(ConsumerAuthService);
   let releaseMethods;
   const gate = new Promise((done) => {
     releaseMethods = done;
@@ -129,106 +130,111 @@ try {
       await route.fulfill({
         status: 503,
         contentType: 'application/json',
-        body: JSON.stringify({ error: { message: 'synthetic' } }),
+        body: JSON.stringify({ error: { message: '合成方式读取失败' } }),
       });
     else await route.continue();
   });
-  await page.goto('http://127.0.0.1:5188/?mini&view=account');
+  await page.goto('http://127.0.0.1:5188/?mini&view=login');
   await page.getByRole('button', { name: '正在读取登录方式…', exact: true }).waitFor();
-  await page
-    .getByRole('button', { name: '正在读取登录方式…', exact: true })
-    .scrollIntoViewIfNeeded();
   await shot('MINI-LOADING');
   releaseMethods();
-  await page.getByText('登录方式读取失败，请重试', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '登录方式加载失败，点击重试', exact: true }).waitFor();
   await shot('MINI-METHODS-ERROR');
   failMethods = false;
-  const auth = f.runtime.app.get(ConsumerAuthService);
   auth.config.wechatLogin = false;
-  await page.getByRole('button', { name: '重试登录方式', exact: true }).click();
+  await page.getByRole('button', { name: '登录方式加载失败，点击重试', exact: true }).click();
   await page.getByRole('button', { name: '微信登录暂未开放', exact: true }).waitFor();
-  assert.equal(
-    await page.getByRole('button', { name: '微信登录暂未开放', exact: true }).isEnabled(),
-    false,
-  );
   await shot('MINI-DISABLED');
   auth.config.wechatLogin = true;
   await page.reload();
-  await page.getByRole('button', { name: '微信登录', exact: true }).waitFor();
-  await page.getByRole('button', { name: '微信登录', exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole('button', { name: '使用微信登录', exact: true }).waitFor();
   await shot('MINI-GUEST');
   await page.evaluate(() => {
     window.__wxFail = true;
   });
-  await page.getByRole('button', { name: '微信登录', exact: true }).click();
+  await page.getByRole('button', { name: '使用微信登录', exact: true }).click();
   await page.getByText('未能获取微信登录凭证，请重试', { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole('button', { name: '重新微信登录', exact: true }).isEnabled(),
+    true,
+  );
   await shot('MINI-CODE-ERROR');
-  assert.equal(exchanges, 0);
   await page.evaluate(() => {
     window.__wxFail = false;
   });
-  await page.getByRole('button', { name: '重试核验', exact: true }).click();
   mode = 'invalid';
-  await page.getByRole('button', { name: '微信登录', exact: true }).click();
+  await page.getByRole('button', { name: '重新微信登录', exact: true }).click();
   await page.getByText('微信登录凭证已失效，请重新登录', { exact: true }).waitFor();
   await shot('MINI-INVALID');
   mode = 'ok';
-  await page.getByRole('button', { name: '重试核验', exact: true }).click();
-  let dropped = true;
-  await page.route('**/consumer/auth/wechat-session', async (route) => {
-    if (dropped) {
-      dropped = false;
-      const response = await route.fetch();
-      assert.equal(response.status(), 200);
-      await route.abort('failed');
-    } else await route.continue();
+  let lost = false,
+    finishDrop;
+  const dropped = new Promise((done) => {
+    finishDrop = done;
   });
-  await page.getByRole('button', { name: '微信登录', exact: true }).click();
+  const codes = [];
+  await page.route('**/consumer/auth/wechat-session', async (route) => {
+    const body = route.request().postDataJSON();
+    assert.deepEqual(Object.keys(body), ['code']);
+    codes.push(body.code);
+    if (lost) {
+      await route.continue();
+      return;
+    }
+    lost = true;
+    const response = await route.fetch();
+    assert.equal(response.status(), 200);
+    await route.abort('failed');
+    finishDrop();
+  });
+  await page.getByRole('button', { name: '重新微信登录', exact: true }).click();
+  await dropped;
   await page.getByText('暂时无法连接，请检查网络后重试。', { exact: true }).waitFor();
   await shot('MINI-UNKNOWN');
-  assert.equal(
-    await page.evaluate(() =>
-      localStorage.getItem('yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1'),
-    ),
-    null,
-  );
-  await page.getByRole('button', { name: '重试核验', exact: true }).click();
-  await page.getByRole('button', { name: '微信登录', exact: true }).click();
-  await page.getByText('微信账号', { exact: true }).waitFor();
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await shot('MINI-AUTHENTICATED');
-  const data = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem('yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1')),
-  );
-  assert.deepEqual(Object.keys(data).sort(), ['expiresAt', 'token']);
+  await page.getByRole('button', { name: '重新微信登录', exact: true }).click();
+  await page.waitForFunction(() => window.__loginReturned === true);
+  assert.equal(codes.length, 2);
+  assert.notEqual(codes[0], codes[1]);
   assert.equal(await f.runtime.db.consumerUser.count({ where: { provider: 'WECHAT' } }), 1);
-  const count = exchanges;
+  await page.goto('http://127.0.0.1:5188/?mini&view=account');
+  await page.getByText('微信顾客', { exact: true }).waitFor();
+  await page.getByText('0', { exact: true }).waitFor();
+  await shot('MINI-AUTHENTICATED');
+  assert.equal(await page.getByRole('button', { name: '账号设置', exact: true }).count(), 0);
   await page.reload();
-  await page.getByText('微信账号', { exact: true }).waitFor();
-  assert.equal(exchanges, count);
+  await page.getByText('微信顾客', { exact: true }).waitFor();
   await shot('MINI-RESTORED');
-  await page.getByRole('button', { name: '退出当前登录', exact: true }).click();
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await page.getByRole('button', { name: '微信登录', exact: true }).waitFor();
-  await page.getByRole('button', { name: '微信登录', exact: true }).scrollIntoViewIfNeeded();
   await shot('MINI-LOGGED-OUT');
-  const sessions = await f.runtime.db.consumerSession.count();
+  const sessions = await f.runtime.db.consumerSession.count(),
+    beforeExchanges = exchanges;
+  await page.goto('http://127.0.0.1:5188/?mini&view=login');
+  await page.getByRole('button', { name: '使用微信登录', exact: true }).waitFor();
   await page.evaluate(() => {
     window.__wxPending = true;
   });
-  await page.getByRole('button', { name: '微信登录', exact: true }).click();
+  await page.getByRole('button', { name: '使用微信登录', exact: true }).click();
   await page.waitForFunction(() => typeof window.__wxResolve === 'function');
   await page.evaluate(() => {
     window.dispatchEvent(new Event('yumi:hide'));
     window.__wxResolve();
   });
   await page.evaluate(() => window.dispatchEvent(new Event('yumi:show')));
-  await page.getByRole('button', { name: '微信登录', exact: true }).waitFor();
-  await page.waitForTimeout(100);
+  await page.getByRole('button', { name: '使用微信登录', exact: true }).waitFor();
   assert.equal(await f.runtime.db.consumerSession.count(), sessions);
+  assert.equal(exchanges, beforeExchanges);
   await shot('MINI-HIDDEN-CANCEL');
   assert.deepEqual(errors, []);
   console.log(
-    JSON.stringify({ passed: true, screenshots: shots, realWechat: false, nativeDevice: false }),
+    JSON.stringify({
+      passed: true,
+      screenshots: shots,
+      realWechat: false,
+      nativeDevice: false,
+      oneClickRetry: true,
+      freshCodeOnRetry: true,
+    }),
   );
 } finally {
   for (const release of releases) release();

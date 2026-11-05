@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ExpressReadiness } from '@yumi/contracts';
+import type { ReturnQueueStatus } from './redemption-returns.js';
 import { staffRequest } from './index.js';
 const labels = { CONFIGURED: '已配置 / 本次核对通过', BLOCKED: '阻断', UNVERIFIED: '未验收' };
-export function ExpressReadinessWorkbench() {
+export function ExpressReadinessWorkbench({
+  onReturns,
+}: {
+  onReturns?: (status: ReturnQueueStatus) => void;
+}) {
   const [view, setView] = useState<ExpressReadiness | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState('');
@@ -70,10 +75,33 @@ export function ExpressReadinessWorkbench() {
               <strong>
                 {view.metrics.inconsistentOrders +
                   view.metrics.inconsistentFeedback +
-                  view.metrics.inconsistentWaybills}
+                  view.metrics.inconsistentWaybills +
+                  view.metrics.inconsistentReturns}
               </strong>
             </article>
           </div>
+          <section aria-label="售后待办">
+            <h2 className="express-release-section-title">售后待办</h2>
+            <div className="express-readiness-metrics">
+              {(
+                [
+                  ['REQUESTED', '待审核', view.metrics.returnsRequested],
+                  ['WAIT_RETURN', '待退货验收', view.metrics.returnsWaitingReceipt],
+                  ['READY_TO_REFUND', '待退积分', view.metrics.returnsReadyToRefund],
+                ] as const
+              ).map(([status, label, count]) => (
+                <article key={status}>
+                  <span>{label}</span>
+                  <strong>{count}</strong>
+                  {onReturns && (
+                    <button className="secondary-button" onClick={() => onReturns(status)}>
+                      查看{label === '待退货验收' ? '待验收' : label}
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+          </section>
           <p>
             {view.metrics.oldestWaitingAt
               ? '最早待发订单创建于：' +
@@ -85,7 +113,8 @@ export function ExpressReadinessWorkbench() {
           </p>
           <p>
             订单/预占差异 {view.metrics.inconsistentOrders} · 反馈历史差异{' '}
-            {view.metrics.inconsistentFeedback} · 运单归属差异 {view.metrics.inconsistentWaybills}
+            {view.metrics.inconsistentFeedback} · 运单归属差异 {view.metrics.inconsistentWaybills} ·
+            售后/退积分差异 {view.metrics.inconsistentReturns}
             。数字来自本次快照，未接外部告警。
           </p>
           <section aria-label="发布条件">

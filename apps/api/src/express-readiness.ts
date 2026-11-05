@@ -1,6 +1,7 @@
 import { Controller, Get, Header, Inject, Query, Req } from '@nestjs/common';
 import { ApiCookieAuth, ApiTags } from '@nestjs/swagger';
 import { CatalogService } from './catalog-service.js';
+import { redemptionReturnStateWhere } from './redemption-returns.js';
 import { PointsGrantService } from './points-grants.js';
 import type { ApplicationConfig } from './config.js';
 import { Permissions } from './staff-guard.js';
@@ -51,6 +52,35 @@ export class ExpressReadinessService {
             Array<{ count: number }>
           >`SELECT count(*)::int AS count FROM redemption_express_shipments s WHERE s.warehouse_id=${w}::uuid AND (NOT EXISTS(SELECT 1 FROM redemption_express_waybills b WHERE b.shipment_id=s.id AND b.warehouse_id=s.warehouse_id AND b.carrier_code=s.carrier_code AND b.carrier_name=s.carrier_name AND b.tracking_no=s.tracking_no) OR EXISTS(SELECT 1 FROM redemption_express_shipment_corrections c WHERE c.shipment_id=s.id AND NOT EXISTS(SELECT 1 FROM redemption_express_waybills b WHERE b.shipment_id=s.id AND b.warehouse_id=s.warehouse_id AND b.carrier_code=c.carrier_code AND b.carrier_name=c.carrier_name AND b.tracking_no=c.tracking_no)))`
         )[0]!.count;
+        const returnCounts = [];
+        for (const status of ['REQUESTED', 'WAIT_RETURN', 'READY_TO_REFUND']) {
+          returnCounts.push(
+            await tx.redemptionReturn.count({
+              where: { AND: [{ order: { warehouseId: w } }, redemptionReturnStateWhere(status)] },
+            }),
+          );
+        }
+        const badReturns = (
+          await tx.$queryRaw<Array<{ count: number }>>`SELECT count(*)::int AS count
+          FROM redemption_returns r JOIN redemption_orders o ON o.id=r.order_id
+          LEFT JOIN redemption_return_events a ON a.return_id=r.id AND a.kind='APPROVE'
+          LEFT JOIN redemption_return_events c ON c.return_id=r.id AND c.kind='CANCEL'
+          LEFT JOIN redemption_return_events d ON d.return_id=r.id AND d.kind='REJECT'
+          LEFT JOIN redemption_return_events g ON g.return_id=r.id AND g.kind='RECEIVE'
+          LEFT JOIN redemption_return_events f ON f.return_id=r.id AND f.kind='REFUND'
+          LEFT JOIN points_ledger p ON p.action_key='RETURN_REFUND:'||r.id::text
+          WHERE o.warehouse_id=${w}::uuid AND (
+            r.user_id<>o.user_id OR o.delivery_mode<>'EXPRESS' OR o.status<>'ACTIVE'
+            OR NOT EXISTS(SELECT 1 FROM redemption_express_shipments s WHERE s.order_id=o.id)
+            OR (a.id IS NOT NULL)::int+(c.id IS NOT NULL)::int+(d.id IS NOT NULL)::int>1
+            OR (a.id IS NOT NULL AND (a.requires_return IS NULL OR a.created_at<r.created_at))
+            OR (g.id IS NOT NULL AND (a.id IS NULL OR a.requires_return IS DISTINCT FROM true OR g.quantity IS DISTINCT FROM r.quantity OR g.created_at<a.created_at OR g.condition IS NULL OR g.location IS NULL))
+            OR (f.id IS NOT NULL AND (a.id IS NULL OR (a.requires_return AND g.id IS NULL) OR f.created_at<COALESCE(g.created_at,a.created_at)))
+            OR (f.id IS NULL)<>(p.id IS NULL)
+            OR (f.id IS NOT NULL AND (f.ledger_id IS DISTINCT FROM p.id OR p.user_id IS DISTINCT FROM r.user_id OR p.delta IS DISTINCT FROM r.quantity::bigint*o.points_price OR p.actor_id IS DISTINCT FROM f.actor_id))
+            OR (SELECT COALESCE(sum(x.quantity),0) FROM redemption_returns x WHERE x.order_id=o.id AND NOT EXISTS(SELECT 1 FROM redemption_return_events e WHERE e.return_id=x.id AND e.kind IN ('REJECT','CANCEL')))>o.quantity
+          )`
+        )[0]!.count;
         const now = (await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`)[0]!
           .now;
         await this.staff.authorize(r, tx);
@@ -68,6 +98,10 @@ export class ExpressReadinessService {
             waiting: stats.waiting,
             shipped: stats.shipped,
             openFeedback: feedback,
+            returnsRequested: returnCounts[0]!,
+            returnsWaitingReceipt: returnCounts[1]!,
+            returnsReadyToRefund: returnCounts[2]!,
+            inconsistentReturns: badReturns,
             oldestWaitingAt: stats.oldest?.toISOString() ?? null,
             inconsistentOrders: stats.exceptions,
             inconsistentFeedback: badFeedback,
@@ -94,7 +128,7 @@ export class ExpressReadinessService {
               'REWARDS',
               '兑换商品',
               rewards > 0 ? 'CONFIGURED' : 'BLOCKED',
-              '已上架兑换商品 ' + rewards + ' 个；不代表批次、效期、配额及实时可售库存均可用。',
+              '已上架兑换商品 ' + rewards + ' 个；不代表商品来源、批次、效期及实时可售库存均可用。',
             ),
             check(
               'ENCRYPTION',
@@ -107,9 +141,11 @@ export class ExpressReadinessService {
             check(
               'INVARIANTS',
               '快递事实核对',
-              stats.exceptions + badFeedback + badClaims === 0 ? 'CONFIGURED' : 'BLOCKED',
-              stats.exceptions + badFeedback + badClaims === 0
-                ? '本次检查未发现订单/预占、运单归属或反馈投影差异；不代替全量账实核对。'
+              stats.exceptions + badFeedback + badClaims + badReturns === 0
+                ? 'CONFIGURED'
+                : 'BLOCKED',
+              stats.exceptions + badFeedback + badClaims + badReturns === 0
+                ? '本次检查未发现订单/预占、运单归属、反馈投影或售后/退积分流水差异；不代替全量账实核对。'
                 : '发现事实差异；先暂停相关操作并核对原始记录，禁止自动填平。',
             ),
             check(
@@ -209,6 +245,10 @@ export class ExpressReadinessController {
         waiting: count,
         shipped: count,
         openFeedback: count,
+        returnsRequested: count,
+        returnsWaitingReceipt: count,
+        returnsReadyToRefund: count,
+        inconsistentReturns: count,
         oldestWaitingAt: { type: 'string', nullable: true },
         inconsistentOrders: count,
         inconsistentFeedback: count,

@@ -67,6 +67,10 @@ test('manifest detects stale API and changed/added/missing output', () =>
     const api = 'https://api.yumi-retail.com/api/v1';
     const code = `const api=${JSON.stringify(api)};`;
     writeFileSync(join(root, 'app.js'), code);
+    writeFileSync(
+      join(root, 'project.config.json'),
+      JSON.stringify({ appid: 'wx1234567890abcdef' }),
+    );
     const info = collectBuildInfo(root, 'device', api);
     verifyBuildInfo(root, info, 'device');
     assert.throws(() => collectBuildInfo(root, 'device', 'https://other.yumi-retail.com/api/v1'));
@@ -96,4 +100,28 @@ test('development consumer identity is explicit, local-only and unavailable in d
     ['local', 'https://remote.invalid/api/v1', 'development'],
   ])
     assert.throws(() => consumerDevelopmentBuild('1', target, api, environment));
+});
+
+test('real login device builds reject tourist, placeholder and mismatched project AppIDs', async () => {
+  const { wechatProjectAppId } = await import('../scripts/wechat-project.mjs');
+  for (const appid of ['touristappid', 'wx0000000000000000', '', 'bad'])
+    assert.throws(() => wechatProjectAppId([{ appid }], 'device'));
+  assert.throws(() =>
+    wechatProjectAppId(
+      [{ appid: 'wx1234567890abcdef' }, { appid: 'wxabcdef1234567890' }],
+      'device',
+    ),
+  );
+  assert.throws(() =>
+    wechatProjectAppId([{ appid: 'wx1234567890abcdef' }], 'device', 'wxabcdef1234567890'),
+  );
+  assert.equal(wechatProjectAppId([{ appid: 'touristappid' }], 'local'), 'touristappid');
+  assert.equal(
+    wechatProjectAppId([{ appid: 'wx1234567890abcdef' }, { appid: 'touristappid' }], 'local'),
+    'touristappid',
+  );
+  assert.equal(
+    wechatProjectAppId([{ appid: 'wx1234567890abcdef' }], 'device', 'wx1234567890abcdef'),
+    'wx1234567890abcdef',
+  );
 });

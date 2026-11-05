@@ -12,7 +12,6 @@ export default function Account() {
   const [state, setState] = useState(initialSessionState);
   const [balance, setBalance] = useState<string | null>(null);
   const [balanceFailed, setBalanceFailed] = useState(false);
-  const [settings, setSettings] = useState(false);
   const [rules, setRules] = useState(false);
   const [policy, setPolicy] = useState<RedemptionExpressPolicy | null>(null);
   const [policyFailed, setPolicyFailed] = useState(false);
@@ -32,7 +31,6 @@ export default function Account() {
     setState(initialSessionState);
     setBalance(null);
     setBalanceFailed(false);
-    setSettings(false);
     setRules(false);
   });
   useEffect(() => cancel, []);
@@ -108,9 +106,6 @@ export default function Account() {
       <View className="member-header">
         <View className="member-heading">
           <Text>我的</Text>
-          <Button className="member-settings" onClick={() => setSettings(!settings)}>
-            {settings ? '收起设置' : '账号设置'}
-          </Button>
         </View>
         <View className="member-profile member-simple-profile">
           <Text className="member-avatar">玉</Text>
@@ -122,7 +117,7 @@ export default function Account() {
         </View>
         {!profile && !busy && phase === 'guest' && (
           <Button className="member-login" onClick={() => open('login/index')}>
-            微信登录 / 查看我的积分
+            微信登录
           </Button>
         )}
       </View>
@@ -229,30 +224,25 @@ export default function Account() {
               </Text>
             </View>
           )}
-        </View>
-        {settings && (
-          <View className="member-section member-settings-panel">
-            <Text className="member-section-title">账号与隐私</Text>
-            <Button className="member-service-row" onClick={privacy}>
-              <Text>隐私保护指引</Text>
-              <Text>›</Text>
+          <Button className="member-service-row" onClick={privacy}>
+            <Text>隐私保护指引</Text>
+            <Text>›</Text>
+          </Button>
+          {profile && (
+            <Button
+              className="member-service-row"
+              disabled={busy}
+              onClick={() => void session.current!.logout()}
+            >
+              退出登录
             </Button>
-            {profile && (
-              <Button
-                className="member-service-row"
-                disabled={busy}
-                onClick={() => void session.current!.logout()}
-              >
-                退出登录
-              </Button>
-            )}
-            {phase === 'error' && (
-              <Button className="member-service-row" onClick={() => void clearLocal()}>
-                清除本机登录记录
-              </Button>
-            )}
-          </View>
-        )}
+          )}
+          {phase === 'error' && (
+            <Button className="member-service-row" onClick={() => void clearLocal()}>
+              清除本机登录记录
+            </Button>
+          )}
+        </View>
       </View>
     </View>
   );

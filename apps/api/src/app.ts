@@ -434,7 +434,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。',
       )
-      .setVersion('0.62.0')
+      .setVersion('0.63.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

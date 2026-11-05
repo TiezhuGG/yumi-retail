@@ -34,6 +34,40 @@ const include = {
   },
   order: true,
 };
+export function redemptionReturnStateWhere(status: string): Prisma.RedemptionReturnWhereInput {
+  return status === 'REQUESTED'
+    ? { events: { none: { kind: { in: ['APPROVE', 'REJECT', 'CANCEL'] } } } }
+    : status === 'WAIT_RETURN'
+      ? {
+          AND: [
+            { events: { some: { kind: 'APPROVE', requiresReturn: true } } },
+            { events: { none: { kind: { in: ['RECEIVE', 'REFUND'] } } } },
+          ],
+        }
+      : status === 'READY_TO_REFUND'
+        ? {
+            AND: [
+              { events: { some: { kind: 'APPROVE' } } },
+              { events: { none: { kind: 'REFUND' } } },
+              {
+                OR: [
+                  { events: { some: { kind: 'APPROVE', requiresReturn: false } } },
+                  { events: { some: { kind: 'RECEIVE' } } },
+                ],
+              },
+            ],
+          }
+        : status
+          ? {
+              events: {
+                some: {
+                  kind:
+                    status === 'REFUNDED' ? 'REFUND' : status === 'REJECTED' ? 'REJECT' : 'CANCEL',
+                },
+              },
+            }
+          : {};
+}
 export class RedemptionReturnsService {
   constructor(readonly base: RedemptionAfterSalesService) {}
   get catalog() {
@@ -198,43 +232,7 @@ export class RedemptionReturnsService {
         await this.base.staff.authorize(r, tx);
         return p;
       }
-      const stateWhere: Prisma.RedemptionReturnWhereInput =
-        status === 'REQUESTED'
-          ? { events: { none: { kind: { in: ['APPROVE', 'REJECT', 'CANCEL'] } } } }
-          : status === 'WAIT_RETURN'
-            ? {
-                AND: [
-                  { events: { some: { kind: 'APPROVE', requiresReturn: true } } },
-                  { events: { none: { kind: { in: ['RECEIVE', 'REFUND'] } } } },
-                ],
-              }
-            : status === 'READY_TO_REFUND'
-              ? {
-                  AND: [
-                    { events: { some: { kind: 'APPROVE' } } },
-                    { events: { none: { kind: 'REFUND' } } },
-                    {
-                      OR: [
-                        { events: { some: { kind: 'APPROVE', requiresReturn: false } } },
-                        { events: { some: { kind: 'RECEIVE' } } },
-                      ],
-                    },
-                  ],
-                }
-              : status
-                ? {
-                    events: {
-                      some: {
-                        kind:
-                          status === 'REFUNDED'
-                            ? 'REFUND'
-                            : status === 'REJECTED'
-                              ? 'REJECT'
-                              : 'CANCEL',
-                      },
-                    },
-                  }
-                : {};
+      const stateWhere = redemptionReturnStateWhere(status);
       const where: Prisma.RedemptionReturnWhereInput = {
         AND: [
           {

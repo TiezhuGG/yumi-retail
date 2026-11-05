@@ -49,7 +49,7 @@ try {
   );
   await writeFile(
     dir + '/main.tsx',
-    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Account from '${root}/apps/consumer-mini/src/pages/account/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/points-checkout/index';import Cart from '${root}/apps/consumer-mini/src/pages/points-cart/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 购物车整次兑换验收 · 非生产操作</div>{mini?(location.search.includes("view=cart")?<Cart/>:location.search.includes("view=account")?<Account/>:location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
+    `import React from 'react';import{createRoot}from'react-dom/client';import{StaffSessionPanel,Workspace}from'${root}/packages/web-ui/src/index';import Account from '${root}/apps/consumer-mini/src/pages/account/index';import Login from '${root}/apps/consumer-mini/src/pages/login/index';import Rewards from '${root}/apps/consumer-mini/src/pages/rewards/index';import Detail from '${root}/apps/consumer-mini/src/pages/reward/index';import Checkout from '${root}/apps/consumer-mini/src/pages/points-checkout/index';import Cart from '${root}/apps/consumer-mini/src/pages/points-cart/index';import Orders from '${root}/apps/consumer-mini/src/pages/redemptions/index';import Order from '${root}/apps/consumer-mini/src/pages/redemption/index';import ExpressAddresses from '${root}/apps/consumer-mini/src/pages/express-addresses/index';import Points from '${root}/apps/consumer-mini/src/pages/points/index';const mini=location.search.includes('mini');const style=document.createElement('link');style.rel='stylesheet';style.href=mini?'/mini.css':'/admin.css';await new Promise((done,fail)=>{style.onload=done;style.onerror=fail;document.head.appendChild(style)});createRoot(document.getElementById('root')).render(<React.StrictMode><><div style={{padding:8,background:'#fff3cd',fontSize:12}}>隔离验收 · 合成数据 · 购物车整次兑换验收 · 非生产操作</div>{mini?(location.search.includes("view=login")?<Login/>:location.search.includes("view=cart")?<Cart/>:location.search.includes("view=account")?<Account/>:location.search.includes("view=express-addresses")?<ExpressAddresses/>:location.search.includes("view=checkout")?<Checkout/>:location.search.includes("view=orders")?<Orders/>:location.search.includes("view=order&")?<Order/>:location.search.includes("view=points")?<Points/>:location.search.includes("id=")?<Detail/>:<Rewards/>):<StaffSessionPanel workspace>{(p,c)=><Workspace profile={p} sessionControl={c} mobile={location.search.includes("ops")}/>}</StaffSessionPanel>}</></React.StrictMode>);`,
   );
   const config = {
     configFile: false,
@@ -215,11 +215,27 @@ try {
   await page.goto('http://127.0.0.1:5188/?mini&view=account');
   await page.getByText('我的订单', { exact: true }).waitFor();
   assert.equal(await page.getByText('积分兑换好物，订单随时查看', { exact: true }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: '账号设置', exact: true }).count(), 0);
+  await page.getByText('隐私保护指引', { exact: true }).waitFor();
   await shot('MINI-ACCOUNT-SIMPLE');
   await page.goto('http://127.0.0.1:5188/?mini');
   await page.getByRole('button', { name: '查看详情：日常柔软纸巾', exact: true }).waitFor();
   assert.equal(await page.getByText(/每人限兑|总配额/).count(), 0);
   await shot('MINI-MALL-SIMPLE');
+  await page.evaluate(() =>
+    localStorage.removeItem('yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1'),
+  );
+  await page.goto('http://127.0.0.1:5188/?mini&view=account');
+  await page.getByRole('button', { name: '微信登录', exact: true }).waitFor();
+  await shot('MINI-ACCOUNT-GUEST-SIMPLE');
+  await page.goto('http://127.0.0.1:5188/?mini&view=login');
+  await page.getByRole('button', { name: '微信登录暂未开放', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: /使用开发顾客/ }).count(), 0);
+  assert.equal(
+    await page.getByText('登录后可查看积分、兑换商品和查询订单。', { exact: true }).count(),
+    0,
+  );
+  await shot('MINI-LOGIN-SIMPLE');
   // Actual backend order workbench must show both independently fulfillable children.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('http://127.0.0.1:5188/');

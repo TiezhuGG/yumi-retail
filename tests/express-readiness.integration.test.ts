@@ -146,3 +146,99 @@ test('readiness detects a broken historical waybill claim and stops reporting a 
     await f.cleanup();
   }
 });
+test('return queues follow per-piece decisions and receipts; original-points differences block readiness without writes', async () => {
+  const f = await expressShippingFixture();
+  try {
+    const id = await f.createExpress(3);
+    assert.equal(
+      (
+        await f.api('/admin/redemptions/' + id + '/ship', {
+          version: 0,
+          carrierCode: 'SF',
+          trackingNo: 'SF-RETURN-QUEUE',
+          dispatchConfirmed: true,
+        })
+      ).status,
+      200,
+    );
+    const request = async () => {
+      const r = await f.call('/consumer/redemptions/' + id + '/returns', {
+        quantity: 1,
+        reason: '合成待办测试',
+      });
+      assert.equal(r.status, 200);
+      return r.data.id as string;
+    };
+    const action = async (rid: string, name: string, body: unknown) =>
+      assert.equal(
+        (await f.api('/admin/redemption-returns/' + rid + '/' + name, body)).status,
+        200,
+      );
+    const counts = async (expected: number[]) => {
+      const data = (await f.api(endpoint)).data as unknown as ExpressReadiness;
+      assert.deepEqual(
+        [
+          data.metrics.returnsRequested,
+          data.metrics.returnsWaitingReceipt,
+          data.metrics.returnsReadyToRefund,
+        ],
+        expected,
+      );
+      assert.equal(data.metrics.inconsistentReturns, 0);
+      // Queue totals use exactly the same filters as the destination lists.
+      for (const [i, status] of ['REQUESTED', 'WAIT_RETURN', 'READY_TO_REFUND'].entries()) {
+        const r = await fetch(f.base + '/api/v1/admin/redemption-returns?status=' + status, {
+          headers: { Cookie: f.cookie },
+        });
+        assert.equal(r.status, 200);
+        assert.equal((await r.json()).data.items.length, expected[i]);
+      }
+    };
+    const rejected = await request();
+    await action(rejected, 'reject', { reason: '合成驳回' });
+    const canceled = await request();
+    assert.equal(
+      (await f.call('/consumer/redemptions/' + id + '/returns/' + canceled + '/cancel', {})).status,
+      200,
+    );
+    const a = await request(),
+      b = await request(),
+      c = await request();
+    await counts([3, 0, 0]);
+    await action(a, 'approve', { requiresReturn: true, reason: '需退回' });
+    await action(b, 'approve', { requiresReturn: false, reason: '免退回' });
+    await counts([1, 1, 1]);
+    await action(a, 'receive', {
+      quantity: 1,
+      condition: 'DAMAGED',
+      location: '合成隔离区',
+      physicalConfirmed: true,
+      reason: '完整验收',
+    });
+    await counts([1, 0, 2]);
+    await action(a, 'refund', { confirmed: true, reason: '退还原积分' });
+    await counts([1, 0, 1]);
+    await action(c, 'reject', { reason: '合成驳回' });
+    await action(b, 'refund', { confirmed: true, reason: '免退回原积分' });
+    await counts([0, 0, 0]);
+    const db = f.runtime.db;
+    const scope = (
+      await db.$queryRaw<Array<{ schema: string }>>`SELECT current_schema() AS schema`
+    )[0]!.schema;
+    assert.match(scope, /^address_ui_[a-f0-9]+$/);
+    // Only corrupt a disposable schema to prove reconciliation detects a mismatched credit.
+    await db.$executeRawUnsafe('ALTER TABLE points_ledger DISABLE TRIGGER points_ledger_immutable');
+    await db.$executeRaw`UPDATE points_ledger SET delta=delta+1 WHERE action_key=${'RETURN_REFUND:' + a}`;
+    const before = await db.businessAudit.count();
+    const result = (await f.api(endpoint)).data as unknown as ExpressReadiness;
+    assert.equal(result.metrics.inconsistentReturns, 1);
+    assert.equal(result.checks.find((c) => c.code === 'INVARIANTS')!.status, 'BLOCKED');
+    assert.equal(await db.businessAudit.count(), before);
+    assert.equal(JSON.stringify(result).includes('合成待办测试'), false);
+    await db.$executeRaw`UPDATE points_ledger SET delta=delta-1 WHERE action_key=${'RETURN_REFUND:' + a}`;
+    await db.$executeRawUnsafe('ALTER TABLE points_ledger ENABLE TRIGGER points_ledger_immutable');
+    await counts([0, 0, 0]);
+  } finally {
+    await f.cleanup();
+  }
+});

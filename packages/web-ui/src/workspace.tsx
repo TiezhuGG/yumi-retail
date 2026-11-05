@@ -1,4 +1,4 @@
-import { RedemptionReturnsWorkbench } from './redemption-returns.js';
+import { RedemptionReturnsWorkbench, type ReturnQueueStatus } from './redemption-returns.js';
 import { RedemptionDeliveryWorkbench } from './redemption-delivery.js';
 import { RedemptionPickingWorkbench } from './redemption-picking.js';
 import { ExpressReadinessWorkbench } from './express-readiness.js';
@@ -418,11 +418,13 @@ function WorkspaceSession({
     mobileWidth.addEventListener('change', reveal);
     return () => mobileWidth.removeEventListener('change', reveal);
   }, [view]);
+  const [returnQueueStatus, setReturnQueueStatus] = useState<ReturnQueueStatus | ''>('');
   const activeView = allowed.some((r) => r.id === view) ? view : (allowed[0]?.id ?? 'overview');
   const navigate = (next: WorkspaceView) => {
     if (allowed.some((r) => r.id === next)) {
       restore.current = undefined;
       setReturned(false);
+      setReturnQueueStatus('');
       setView(next);
     }
   };
@@ -600,9 +602,18 @@ function WorkspaceSession({
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
           ) : activeView === 'express-readiness' ? (
-            <ExpressReadinessWorkbench />
+            <ExpressReadinessWorkbench
+              onReturns={
+                allowed.some((r) => r.id === 'redemption-returns')
+                  ? (status) => {
+                      navigate('redemption-returns');
+                      setReturnQueueStatus(status);
+                    }
+                  : undefined
+              }
+            />
           ) : activeView === 'redemption-returns' ? (
-            <RedemptionReturnsWorkbench profile={profile} />
+            <RedemptionReturnsWorkbench profile={profile} initialStatus={returnQueueStatus} />
           ) : activeView === 'redemption-after-sales' ? (
             <RedemptionAfterSalesWorkbench profile={profile} />
           ) : activeView === 'redemptions' ? (

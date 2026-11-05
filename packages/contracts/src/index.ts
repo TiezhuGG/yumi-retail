@@ -1181,6 +1181,10 @@ export interface ExpressReadiness {
     waiting: number;
     shipped: number;
     openFeedback: number;
+    returnsRequested: number;
+    returnsWaitingReceipt: number;
+    returnsReadyToRefund: number;
+    inconsistentReturns: number;
     oldestWaitingAt: string | null;
     inconsistentOrders: number;
     inconsistentFeedback: number;
