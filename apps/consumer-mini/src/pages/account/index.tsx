@@ -104,16 +104,15 @@ export default function Account() {
   return (
     <View className="account-page account-center member-simple">
       <View className="member-header">
-        <View className="member-heading">
-          <Text>我的</Text>
-        </View>
         <View className="member-profile member-simple-profile">
           <Text className="member-avatar">玉</Text>
-          <View className="member-profile-copy">
-            <Text className="member-name">
-              {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
-            </Text>
-          </View>
+          {(busy || profile) && (
+            <View className="member-profile-copy">
+              <Text className="member-name">
+                {busy ? '正在核验账号…' : profile?.user.displayName}
+              </Text>
+            </View>
+          )}
         </View>
         {!profile && !busy && phase === 'guest' && (
           <Button className="member-login" onClick={() => open('login/index')}>

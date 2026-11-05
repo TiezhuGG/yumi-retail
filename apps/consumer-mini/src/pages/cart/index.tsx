@@ -195,16 +195,11 @@ export default function Cart() {
   const allSelected = valid.length > 0 && valid.every((i) => i.selected);
   return (
     <View className="cart-page">
-      <Text className="account-eyebrow">玉米百货</Text>
       <View className="cart-heading">
         <Text className="cart-title">{accountMode ? '账号购物车' : '购物车'}</Text>
         <Button disabled={busy} onClick={() => void refresh()}>
           {busy ? '正在核验…' : '刷新价格与库存'}
         </Button>
-      </View>
-      <View className="cart-note">
-        {accountMode ? '账号购物车已保存到服务端。' : '商品暂存在这台设备。'}
-        购物车不占库存，商品与配送费用以结算核验为准。
       </View>
       {identity && (guestCount > 0 || pending || !accountMode) && (
         <View className="cart-merge-panel">
@@ -250,7 +245,6 @@ export default function Cart() {
       {draft && items.length === 0 && (
         <View className="store-feedback cart-empty">
           <Text>购物车还是空的</Text>
-          <Text className="feedback-copy">去商品详情选好规格，再加入购物车吧</Text>
           <Button onClick={() => void Taro.reLaunch({ url: '/pages/index/index' })}>
             去逛好物
           </Button>

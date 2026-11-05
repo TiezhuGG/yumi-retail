@@ -4399,23 +4399,51 @@ button[disabled] {
 }
 
 .redemption-search {
-  gap: 8px;
+  gap: 10px;
   align-items: center;
+  width: 100%;
 }
 .redemption-search button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   flex-shrink: 0;
-  padding: 0 12px;
+  height: 48px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 18px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1;
+  background: #303328;
+  color: #fff;
 }
 .redemption-search .redemption-search-clear {
+  height: 40px;
+  min-height: 40px;
   background: transparent;
   color: #536346;
-  padding: 0 4px;
+  padding: 0 8px;
 }
 .redemption-search input {
+  display: block;
   box-sizing: border-box;
-  height: 44px;
-  min-height: 44px;
-  padding: 10px 12px;
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #e5e5dd;
+  border-radius: 14px;
+  background: #fff;
+  color: #303328;
+  font-size: 15px;
+  line-height: 48px;
+}
+.redemption-search input:focus {
+  border-color: #9b9f8c;
 }
 .return-list-heading {
   display: flex;

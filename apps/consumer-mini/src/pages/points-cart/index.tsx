@@ -145,7 +145,6 @@ export default function PointsCart() {
   return (
     <View className="account-page points-cart-page">
       <View className="account-content">
-        <Text className="account-name">购物车</Text>
         {loading && <LoadingState label="正在读取购物车…" />}
         {error && (
           <View className="account-error">

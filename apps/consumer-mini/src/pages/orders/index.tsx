@@ -60,9 +60,7 @@ export default function Orders() {
   return (
     <View className="orders-page retail-order-list">
       <View className="address-hero">
-        <Text className="account-eyebrow">YUMI · YOUR ORDERS</Text>
         <Text className="address-title">零售订单</Text>
-        <Text className="address-subtitle">查看购买商品和订单进度</Text>
       </View>
       <View className="address-content">
         {error && (
@@ -88,9 +86,7 @@ export default function Orders() {
               <View className="address-state">
                 <Text className="address-empty-icon">▣</Text>
                 <Text>还没有订单</Text>
-                <Text className="address-hint">
-                  有订单后可在这里查看详情。
-                </Text>
+                <Text className="address-hint">有订单后可在这里查看详情。</Text>
               </View>
             )}
             {items.map((order) => (
@@ -117,16 +113,18 @@ export default function Orders() {
                   <Text className="address-hint">另有 {order.items.length - 3} 种规格</Text>
                 )}
                 <View className="retail-order-footer">
-                <View className="checkout-total">
-                  <Text>订单金额</Text>
-                  <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
-                </View>
-                <Button
-                  className="retail-order-open"
-                  onClick={() => void Taro.navigateTo({ url: '/pages/order/index?id=' + order.id })}
-                >
-                  查看详情 ›
-                </Button>
+                  <View className="checkout-total">
+                    <Text>订单金额</Text>
+                    <Text>¥{(order.payableCents / 100).toFixed(2)}</Text>
+                  </View>
+                  <Button
+                    className="retail-order-open"
+                    onClick={() =>
+                      void Taro.navigateTo({ url: '/pages/order/index?id=' + order.id })
+                    }
+                  >
+                    查看详情 ›
+                  </Button>
                 </View>
               </View>
             ))}

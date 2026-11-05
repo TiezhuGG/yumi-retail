@@ -199,9 +199,6 @@ export default function Redemptions() {
   }
   return (
     <View className="account-page reward-detail-page redemption-list-page">
-      <View className="account-hero">
-        <Text className="account-name">{afterSales ? '兑换售后' : '订单'}</Text>
-      </View>
       <View className="account-content">
         <View className="reward-search redemption-search">
           <Input
