@@ -1180,3 +1180,32 @@ export interface ExpressReadiness {
     detail: string;
   }>;
 }
+
+export interface RedemptionReturnView {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  title: string;
+  quantity: number;
+  points: string;
+  state: 'REQUESTED' | 'WAIT_RETURN' | 'READY_TO_REFUND' | 'REFUNDED' | 'REJECTED' | 'CANCELED';
+  reason: string;
+  createdAt: string;
+  requiresReturn: boolean | null;
+  events: Array<{
+    kind: string;
+    createdAt: string;
+    reason: string;
+    quantity: number | null;
+    condition: string | null;
+    location: string | null;
+    staffName: string | null;
+  }>;
+}
+export interface RedemptionReturnPage {
+  orderId: string;
+  remainingQuantity: number;
+  unitPoints: string;
+  enabled: boolean;
+  items: RedemptionReturnView[];
+}

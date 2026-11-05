@@ -94,72 +94,153 @@ export default function Account() {
   }
 
   const orders = [
-    ['全部订单', '', 'all'],
     ['待发货', 'EXPRESS_WAIT_SHIP', 'waiting'],
     ['已发货', 'EXPRESS_SHIPPED', 'shipped'],
     ['已取消', 'CANCELED', 'canceled'],
   ];
+  const protectedOpen = (url: string) => (profile ? open(url) : open('login/index'));
+  const viewOrders = (status?: string, afterSales = false) =>
+    profile
+      ? void openRedemptions(afterSales ? { service: 'after-sales' } : { status })
+      : open('login/index');
   return (
-    <View className="account-page account-center">
+    <View className="account-page account-center member-simple">
       <View className="member-header">
         <View className="member-heading">
           <Text>我的</Text>
           <Button className="member-settings" onClick={() => setSettings(!settings)}>
-            {settings ? '收起设置' : '设置 ›'}
+            {settings ? '收起设置' : '账号设置'}
           </Button>
         </View>
-        <View className="member-intro">
-          <Text className="account-copy">管理积分和兑换订单</Text>
-        </View>
-        <View className="member-identity-card">
-          <Text className="member-identity-label">玉米百货会员</Text>
-          <View className="member-profile">
-            <Text className="member-avatar">玉</Text>
-            <View className="member-profile-copy">
-              <Text className="member-name">
-                {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
-              </Text>
-              <Text className="member-note">
-                {profile ? '玉米百货会员' : '登录后查看积分和订单'}
-              </Text>
-            </View>
-          </View>
-          {!profile && !busy && phase === 'guest' && (
-            <Button className="member-login" onClick={() => open('login/index')}>
-              微信登录
-            </Button>
-          )}
-        </View>
-      </View>
-      <View className="member-content">
-        <View className="member-wallet">
-          <View className="member-points-main">
-            <Text className="member-wallet-label">我的积分</Text>
-            <Text
-              className={
-                balance !== null && profile && !balanceFailed
-                  ? 'member-wallet-value'
-                  : 'member-wallet-status'
-              }
-            >
-              {profile
-                ? balanceFailed
-                  ? '积分暂不可用'
-                  : balance === null
-                    ? '正在读取…'
-                    : balance + ' 积分'
-                : '登录后查看积分'}
+        <View className="member-profile member-simple-profile">
+          <Text className="member-avatar">玉</Text>
+          <View className="member-profile-copy">
+            <Text className="member-name">
+              {busy ? '正在核验账号…' : (profile?.user.displayName ?? '欢迎来到玉米百货')}
+            </Text>
+            <Text className="member-note">
+              {profile ? '积分兑换好物，订单随时查看' : '登录后，积分和兑换记录都在这里'}
             </Text>
           </View>
-          <Button
-            className="member-wallet-link"
-            onClick={() => (balanceFailed ? void session.current!.restore() : open('points/index'))}
-          >
-            {profile && balanceFailed ? '重试' : '积分明细 ›'}
+        </View>
+        {!profile && !busy && phase === 'guest' && (
+          <Button className="member-login" onClick={() => open('login/index')}>
+            微信登录 / 查看我的积分
           </Button>
+        )}
+      </View>
+      <View className="member-content">
+        {error && (
+          <View className="account-error">
+            <Text>{error}</Text>
+            {phase === 'error' && (
+              <Button disabled={busy} onClick={() => void session.current!.restore()}>
+                重试核验账号
+              </Button>
+            )}
+          </View>
+        )}
+        <View className="member-wallet member-simple-wallet">
+          <View className="member-wallet-top">
+            <View>
+              <Text className="member-wallet-label">可用积分</Text>
+              <Text
+                className={
+                  balance !== null && profile && !balanceFailed
+                    ? 'member-wallet-value'
+                    : 'member-wallet-status'
+                }
+              >
+                {profile
+                  ? balanceFailed
+                    ? '暂时未能读取'
+                    : balance === null
+                      ? '读取中…'
+                      : balance
+                  : '登录后查看'}
+              </Text>
+            </View>
+            <Button
+              className="member-wallet-link"
+              onClick={() =>
+                balanceFailed ? void session.current!.restore() : protectedOpen('points/index')
+              }
+            >
+              {balanceFailed ? '重新读取' : '收支明细 ›'}
+            </Button>
+          </View>
+          <View className="member-wallet-bottom">
+            <Text>用积分兑换日常好物</Text>
+            <Button onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}>
+              去逛商城 →
+            </Button>
+          </View>
+        </View>
+        <View className="member-section member-orders">
+          <View className="member-section-heading">
+            <Text className="member-section-title">我的兑换订单</Text>
+            <Button onClick={() => viewOrders()}>查看全部 ›</Button>
+          </View>
+          <Text className="member-section-hint">查进度、看运单、申请售后</Text>
+          <View className="member-order-grid">
+            {orders.map(([label, status, icon]) => (
+              <Button key={label} className="member-order-link" onClick={() => viewOrders(status)}>
+                <View className={'member-order-icon member-order-icon-' + icon} />
+                <Text>{label}</Text>
+              </Button>
+            ))}
+            <Button className="member-order-link" onClick={() => viewOrders(undefined, true)}>
+              <View className="member-order-icon member-order-icon-service" />
+              <Text>售后服务</Text>
+            </Button>
+          </View>
+        </View>
+        <View className="member-section member-services">
+          <Text className="member-section-title">常用服务</Text>
+          <Button
+            className="member-service-row"
+            onClick={() => protectedOpen('express-addresses/index')}
+          >
+            <View>
+              <Text className="member-service-title">收货地址</Text>
+              <Text className="member-service-note">管理快递收件人、电话和地址</Text>
+            </View>
+            <Text>›</Text>
+          </Button>
+          <Button className="member-service-row" onClick={() => protectedOpen('points/index')}>
+            <View>
+              <Text className="member-service-title">积分记录</Text>
+              <Text className="member-service-note">查看获得、兑换和退还的积分</Text>
+            </View>
+            <Text>›</Text>
+          </Button>
+          <Button className="member-service-row" onClick={showRules}>
+            <View>
+              <Text className="member-service-title">兑换说明</Text>
+              <Text className="member-service-note">了解寄送范围、取消与售后</Text>
+            </View>
+            <Text>{rules ? '⌃' : '›'}</Text>
+          </Button>
+          {rules && (
+            <View className="member-rules">
+              <Text className="account-copy">
+                所需积分以确认页为准。未发货订单可在详情核验能否取消；已发货可在订单中申请售后，由门店审核处理。
+              </Text>
+              <Text className="account-copy">
+                {policyFailed
+                  ? '寄送范围读取失败，请收起后重试。'
+                  : !policy
+                    ? '正在读取寄送范围…'
+                    : policy.enabled
+                      ? '商家承担运费。寄送范围：' + policy.provinces.join('、')
+                      : '快递兑换暂未开放。'}
+              </Text>
+            </View>
+          )}
         </View>
         {settings && (
           <View className="member-section member-settings-panel">
+            <Text className="member-section-title">账号与隐私</Text>
             <Button className="member-service-row" onClick={privacy}>
               <Text>隐私保护指引</Text>
               <Text>›</Text>
@@ -175,70 +256,12 @@ export default function Account() {
             )}
             {phase === 'error' && (
               <Button className="member-service-row" onClick={() => void clearLocal()}>
-                清除登录记录
+                清除本机登录记录
               </Button>
             )}
           </View>
         )}
-        {error && (
-          <View className="account-error">
-            <Text>{error}</Text>
-            {phase === 'error' && (
-              <Button disabled={busy} onClick={() => void session.current!.restore()}>
-                重试核验
-              </Button>
-            )}
-          </View>
-        )}
-        <View className="member-section member-orders">
-          <Text className="member-section-title">兑换订单</Text>
-          <View className="member-order-grid">
-            {orders.map(([label, status, icon]) => (
-              <Button
-                key={label}
-                className="member-order-link"
-                onClick={() => void openRedemptions({ status: status || undefined })}
-              >
-                <View className={'member-order-icon member-order-icon-' + icon} />
-                <Text>{label}</Text>
-              </Button>
-            ))}
-          </View>
-        </View>
-        <View className="member-section member-services">
-          <Text className="member-section-title">常用服务</Text>
-          <Button className="member-service-row" onClick={() => open('express-addresses/index')}>
-            <Text>快递收货地址</Text>
-            <Text className="member-chevron">›</Text>
-          </Button>
-          <Button
-            className="member-service-row"
-            onClick={() => void openRedemptions({ service: 'after-sales' })}
-          >
-            <Text>兑换售后</Text>
-            <Text className="member-chevron">›</Text>
-          </Button>
-          <Button className="member-service-row" onClick={showRules}>
-            <Text>兑换规则</Text>
-            <Text className="member-chevron">{rules ? '⌃' : '›'}</Text>
-          </Button>
-          {rules && (
-            <View className="member-rules">
-              <Text className="account-copy">
-                所需积分以确认页为准。发货前可在订单详情核验能否取消，发货后可在订单详情提交反馈。
-              </Text>
-              <Text className="account-copy">
-                {policyFailed
-                  ? '寄送范围读取失败，请收起后重试。'
-                  : !policy
-                    ? '正在读取寄送范围…'
-                    : policy.enabled
-                      ? '商家承担运费。寄送范围：' + policy.provinces.join('、')
-                      : '快递兑换暂未开放。'}
-              </Text>
-            </View>
-          )}
-        </View>
+        <Text className="member-footer-note">玉米百货 · 日常好物，用积分换</Text>
       </View>
     </View>
   );

@@ -994,3 +994,26 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 ## 积分个人中心订单筛选
 
 消费者 GET /api/v1/consumer/redemptions 支持可选 fulfillment=EXPRESS_WAIT_SHIP 或 EXPRESS_SHIPPED。两者仅匹配当前本人有效快递单，并沿用原分页游标与筛选范围校验。已取消使用 status=CANCELED。未指定 fulfillment 时保留原列表语义。管理员专用 LOCAL 仍由消费者接口拒绝。没有数据库结构变化。
+
+
+## 2026-11-05 E5已发货兑换退货与退积分（OpenAPI0.60.0）
+
+本人有效已发货EXPRESS订单可申请售后；原订单保留ACTIVE/EXPRESS_SHIPPED，售后独立记录，不随意取消已发货单。原兑换价×申请整数件数为唯一可退积分，客户端不得传退款金额。申请中、审核通过和已退款件数共同占用可退额度，合计不超过原quantity；驳回/撤销释放售后可退件数，退积分不释放原累计限兑或总配额。适用原订单executionMode和正式operations开关，沿用本地默认关闭、生产拒用DEV适配器。成功原键在暂停后仍可核实，当前会话/本人/本仓权限每次检查。
+
+| API | 严格请求与语义 |
+|---|---|
+| GET /consumer/redemptions/:id/returns | 本人售后申请、剩余可退件数、原单价、开关、状态和历史，无其他用户信息 |
+| POST 同路径 | {quantity,reason}，Idempotency-Key；加密原因、同账号原键恢复，不自动退分 |
+| POST 同路径/:returnId/cancel | {}；只允许本人未审核申请，一次撤销记录 |
+| GET /admin/redemption-returns | cursor/keyword/status筛选，20条UUID升序分页；本仓points.read，列表仅售后必要字段，无地址电话 |
+| GET /admin/redemption-returns/:returnId | 本仓申请所属订单售后记录，服务端校验当前员工与仓库 |
+| POST 同路径/approve | {requiresReturn:boolean,reason}，负责人明确是否退货 |
+| POST 同路径/reject | {reason}，仅未审核申请 |
+| POST 同路径/receive | {quantity,condition,location,physicalConfirmed:true,reason}；件数须与本次批准申请完全一致，condition为UNOPENED/DAMAGED/WRONG_ITEM，记录实际隔离位置，不支持部分包裹验收 |
+| POST 同路径/refund | {confirmed:true,reason}；仅无须退货已批准或退货已完整验收，原账户原价退还一次 |
+
+员工写接口需要Cookie、Origin/CSRF、Idempotency-Key和returns.manage（SUPER_ADMIN独有）；OPERATIONS只有本仓读取权限，不授予骑手/拣货员财务权限。负责人仍须当前有效SUPER_ADMIN/本仓授权，处理末尾重查真实时钟会话；金融动作及审计/幂等同事务。消费者Bearer及资源归属、会话实际到期/版本在末尾复查。不存在/非本人/错仓404，字段/实物确认不符400，超出原件数RETURN_QUANTITY_EXCEEDED、阶段变化RETURN_STATE_CHANGED、同键变参IDEMPOTENCY_CONFLICT、游标跨筛选CURSOR_INVALID为409；开关关闭503，不自动补偿回库或改派。
+
+投影状态REQUESTED→WAIT_RETURN（需退货）→READY_TO_REFUND→REFUNDED；批准不需退货直接READY_TO_REFUND；未审核可REJECTED或CANCELED。每个申请/阶段不可改删，无通用状态接口。退款记录给出points十进制字符串，事件包括说明、时间及隔离验收信息；员工名称仅后台返回，消费者不暴露内部员工名。原因与处理说明使用AAD绑定用户/申请的加密数据，缓存失权后清理。
+
+积分流水新增entryKind=AFTER_SALES_RETURN及原兑换单关联，展示“售后退积分”，不同于取消退积分。底层points_ledger保持员工正向流水来源，RETURN_REFUND:<申请ID>唯一，由不可变退款事件关联；不冒充取消、发放或恢复原库存。申请/处理结果未知时各端保存原输入和键，重载后使用原请求核实。分类按钮弹窗使用原GET /categories游标遍历所有公开标签，无新分类契约；我的页复用积分/订单/地址/登录API，无虚构统计。详见[E5记录](../verification/MALL-RETURNS-CATEGORIES-ACCOUNT-2026-11-05.md)。

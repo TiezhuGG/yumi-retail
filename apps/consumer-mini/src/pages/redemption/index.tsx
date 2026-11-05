@@ -1,3 +1,4 @@
+import { RedemptionReturns } from '../../redemption-returns';
 import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
@@ -217,7 +218,10 @@ export default function RedemptionDetail() {
               </View>
             )}
             {order.deliveryMode === 'EXPRESS' && order.expressShipment && (
-              <RedemptionAfterSales key={order.id} orderId={order.id} />
+              <>
+                <RedemptionReturns key={'return:' + order.id} orderId={order.id} />
+                <RedemptionAfterSales key={order.id} orderId={order.id} />
+              </>
             )}
             {order.status === 'ACTIVE' &&
               ![

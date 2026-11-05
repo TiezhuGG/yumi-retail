@@ -30,7 +30,10 @@ export class PointsService {
         redemptionId: string | null;
         redemptionOrderNo: string | null;
       }>
-    >`SELECT l.id,l.delta::text,l.reason,l.created_at AS "createdAt",CASE WHEN l.redemption_action='REDEEM' THEN 'REDEMPTION' WHEN l.redemption_action='CANCEL' THEN 'REDEMPTION_RETURN' WHEN c.id IS NOT NULL THEN 'GRANT_REVERSAL' WHEN g.id IS NOT NULL THEN 'GRANT' ELSE 'ADJUSTMENT' END AS "entryKind",source.amount::text AS "sourceAmount",source.decided_at AS "sourceCreatedAt",COALESCE(original.id,redemption_debit.id) AS "relatedEntryId",ro.id AS "redemptionId",ro.order_no AS "redemptionOrderNo" FROM points_ledger l
+    >`SELECT l.id,l.delta::text,l.reason,l.created_at AS "createdAt",CASE WHEN ret.id IS NOT NULL THEN 'AFTER_SALES_RETURN' WHEN l.redemption_action='REDEEM' THEN 'REDEMPTION' WHEN l.redemption_action='CANCEL' THEN 'REDEMPTION_RETURN' WHEN c.id IS NOT NULL THEN 'GRANT_REVERSAL' WHEN g.id IS NOT NULL THEN 'GRANT' ELSE 'ADJUSTMENT' END AS "entryKind",source.amount::text AS "sourceAmount",source.decided_at AS "sourceCreatedAt",COALESCE(original.id,redemption_debit.id) AS "relatedEntryId",COALESCE(ro.id,refund_order.id) AS "redemptionId",COALESCE(ro.order_no,refund_order.order_no) AS "redemptionOrderNo" FROM points_ledger l
+       LEFT JOIN redemption_return_events refund_event ON refund_event.ledger_id=l.id AND refund_event.kind='REFUND'
+       LEFT JOIN redemption_returns ret ON ret.id=refund_event.return_id AND ret.user_id=l.user_id
+       LEFT JOIN redemption_orders refund_order ON refund_order.id=ret.order_id AND refund_order.user_id=l.user_id
        LEFT JOIN points_grants g ON l.action_key='GRANT:'||g.id::text AND g.user_id=l.user_id
        LEFT JOIN points_corrections c ON l.action_key='CORRECTION:'||c.id::text AND c.user_id=l.user_id
        LEFT JOIN points_grants source ON source.id=c.grant_id AND source.user_id=l.user_id

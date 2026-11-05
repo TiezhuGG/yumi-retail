@@ -36,6 +36,7 @@ const icons: Record<WorkspaceView, keyof typeof paths> = {
   'points-corrections': 'history',
   rewards: 'bag',
   redemptions: 'list',
+  'redemption-returns': 'history',
   'redemption-after-sales': 'alert',
   'express-readiness': 'shield',
   'redemption-delivery': 'truck',

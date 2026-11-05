@@ -8,6 +8,7 @@ import type { ApiRequest } from './http.js';
 export const STAFF_COOKIE = 'yumi_staff_session';
 export const rolePermissions: Record<string, readonly string[]> = {
   SUPER_ADMIN: [
+    'returns.manage',
     'redemption-picking.retry',
     'redemption-picking.resolve',
     'redemption-picking.ship',

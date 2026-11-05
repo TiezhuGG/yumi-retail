@@ -11,8 +11,8 @@ export default function Rewards() {
   const [items, setItems] = useState<Reward[]>([]),
     [keyword, setKeyword] = useState(''),
     [category, setCategory] = useState(''),
+    [categoryOpen, setCategoryOpen] = useState(false),
     [categories, setCategories] = useState<PublicCategory[]>([]),
-    [categoryCursor, setCategoryCursor] = useState<string | null>(null),
     [categoryError, setCategoryError] = useState(''),
     [categoryLoading, setCategoryLoading] = useState(false),
     [cursor, setCursor] = useState<string | null>(null),
@@ -47,23 +47,36 @@ export default function Rewards() {
       if (n === seq.current) setLoading(false);
     }
   }
-  async function loadCategories(next?: string) {
+  async function loadCategories() {
     const n = ++categorySeq.current;
     setCategoryLoading(true);
     setCategoryError('');
+    const all: PublicCategory[] = [],
+      seen = new Set<string>();
+    let next: string | null = null;
     try {
-      const p = await request<{ items: PublicCategory[]; nextCursor: string | null }>(
-        '/categories' + (next ? '?cursor=' + next : ''),
-      );
-      if (n === categorySeq.current) {
-        setCategories((old) => (next ? [...old, ...p.items] : p.items));
-        setCategoryCursor(p.nextCursor);
-      }
+      do {
+        const p: { items: PublicCategory[]; nextCursor: string | null } = await request(
+          '/categories' + (next ? '?cursor=' + encodeURIComponent(next) : ''),
+        );
+        if (n !== categorySeq.current) return;
+        all.push(...p.items);
+        setCategories([...new Map(all.map((c) => [c.id, c])).values()]);
+        next = p.nextCursor;
+        if (next && seen.has(next)) throw Error('分类列表已变化，请重试');
+        if (next) seen.add(next);
+      } while (next);
     } catch {
-      if (n === categorySeq.current) setCategoryError('分类读取失败');
+      if (n === categorySeq.current) setCategoryError('分类未能全部加载，请重试');
     } finally {
       if (n === categorySeq.current) setCategoryLoading(false);
     }
+  }
+  function selectCategory(id: string) {
+    setCategory(id);
+    setCategoryOpen(false);
+    applied.current = { keyword: keyword.trim(), category: id };
+    void load();
   }
   useDidShow(() => {
     const filter = takeRewardFilter();
@@ -78,6 +91,7 @@ export default function Rewards() {
   useDidHide(() => {
     seq.current++;
     categorySeq.current++;
+    setCategoryOpen(false);
   });
   useEffect(
     () => () => {
@@ -111,46 +125,83 @@ export default function Rewards() {
             搜索
           </Button>
         </View>
-        <ScrollView scrollX className="reward-category-scroll">
-          <View className="reward-categories reward-category-track">
-            <Button
-              className={category === '' ? 'active' : ''}
-              onClick={() => {
-                setCategory('');
-                applied.current = { keyword: keyword.trim(), category: '' };
-                void load();
-              }}
-            >
-              全部
-            </Button>
-            {categories.map((c) => (
-              <Button
-                key={c.id}
-                className={category === c.id ? 'active' : ''}
-                onClick={() => {
-                  setCategory(c.id);
-                  applied.current = { keyword: keyword.trim(), category: c.id };
-                  void load();
-                }}
-              >
-                {c.parentName ? c.parentName + ' / ' : ''}
-                {c.name}
-              </Button>
-            ))}
-            {categoryCursor && (
-              <Button
-                disabled={categoryLoading}
-                onClick={() => void loadCategories(categoryCursor)}
-              >
-                更多分类
-              </Button>
-            )}
-          </View>
-        </ScrollView>
-        {categoryError && (
-          <Button disabled={categoryLoading} onClick={() => void loadCategories()}>
-            {categoryError}，重试
+        <View className="reward-filter-bar">
+          <Text className="reward-filter-current">
+            {category
+              ? (categories.find((c) => c.id === category)?.name ?? '已选分类')
+              : '全部商品'}
+          </Text>
+          <Button
+            className="reward-filter-button"
+            onClick={() => {
+              setCategoryOpen(true);
+              void loadCategories();
+            }}
+          >
+            选择分类 ▾
           </Button>
+          {category && (
+            <Button className="reward-filter-clear" onClick={() => selectCategory('')}>
+              清除筛选
+            </Button>
+          )}
+        </View>
+        {categoryOpen && (
+          <View
+            className="category-popup-backdrop"
+            catchMove
+            onClick={() => setCategoryOpen(false)}
+          >
+            <View
+              className="category-popup"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="选择商品分类"
+            >
+              <View className="category-popup-heading">
+                <View>
+                  <Text className="category-popup-title">商品分类</Text>
+                  <Text className="account-copy">选择标签，找到想兑换的好物</Text>
+                </View>
+                <Button
+                  aria-label="关闭分类"
+                  className="category-popup-close"
+                  onClick={() => setCategoryOpen(false)}
+                >
+                  ×
+                </Button>
+              </View>
+              <ScrollView scrollY className="category-popup-scroll">
+                <View className="category-popup-tags">
+                  <Button
+                    className={!category ? 'selected' : ''}
+                    onClick={() => selectCategory('')}
+                  >
+                    全部商品
+                  </Button>
+                  {categories.map((c) => (
+                    <Button
+                      key={c.id}
+                      className={category === c.id ? 'selected' : ''}
+                      onClick={() => selectCategory(c.id)}
+                    >
+                      {c.parentName ? c.parentName + ' / ' : ''}
+                      {c.name}
+                    </Button>
+                  ))}
+                </View>
+                {categoryLoading && <Text className="account-copy">正在读取全部分类…</Text>}
+                {!categoryLoading && !categories.length && !categoryError && (
+                  <Text className="account-copy">暂时没有商品分类</Text>
+                )}
+                {categoryError && (
+                  <View className="account-error">
+                    <Text>{categoryError}</Text>
+                    <Button onClick={() => void loadCategories()}>重试加载分类</Button>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
         )}
         {loading && <LoadingState label="正在读取兑换商品…" />}
         {error && (

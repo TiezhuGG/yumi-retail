@@ -124,11 +124,11 @@ export default function Points() {
               {items.map((e) => (
                 <View className="account-card points-ledger-entry" key={e.id}>
                   <View className="points-ledger-entry-heading">
-                  <Text className="account-card-title">{e.reason}</Text>
-                  <Text className="points-ledger-delta">
-                    {e.delta.startsWith('-') ? '' : '+'}
-                    {e.delta} 积分
-                  </Text>
+                    <Text className="account-card-title">{e.reason}</Text>
+                    <Text className="points-ledger-delta">
+                      {e.delta.startsWith('-') ? '' : '+'}
+                      {e.delta} 积分
+                    </Text>
                   </View>
                   {e.redemptionId && (
                     <Button
@@ -139,8 +139,12 @@ export default function Points() {
                         })
                       }
                     >
-                      {e.entryKind === 'REDEMPTION_RETURN' ? '取消退积分' : '兑换扣积分'} ·
-                      查看兑换单
+                      {e.entryKind === 'AFTER_SALES_RETURN'
+                        ? '售后退积分'
+                        : e.entryKind === 'REDEMPTION_RETURN'
+                          ? '取消退积分'
+                          : '兑换扣积分'}{' '}
+                      · 查看兑换单
                     </Button>
                   )}
                   {e.entryKind === 'GRANT_REVERSAL' && (

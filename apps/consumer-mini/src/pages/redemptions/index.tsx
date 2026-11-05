@@ -119,7 +119,9 @@ export default function Redemptions() {
       </View>
       <View className="account-content">
         {afterSales ? (
-          <Text className="account-copy">选择已发货的订单，在详情中提交反馈或查看处理进度。</Text>
+          <Text className="account-copy">
+            选择已发货的订单，在详情中申请退货退积分、提交问题反馈或查看进度。
+          </Text>
         ) : (
           <View className="reward-categories">
             {filters.map(({ label }, index) => (

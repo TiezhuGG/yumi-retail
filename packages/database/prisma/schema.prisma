@@ -70,6 +70,7 @@ model Warehouse {
 }
 
 model Staff {
+ redemptionReturnEvents RedemptionReturnEvent[]
  redemptionExpressShipments RedemptionExpressShipment[]
  redemptionExpressCorrections RedemptionExpressShipmentCorrection[]
  redemptionCustodyReturns RedemptionCustodyReturn[]
@@ -643,6 +644,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ redemptionReturns RedemptionReturn[]
  wechatAppId String? @map("wechat_app_id") @db.VarChar(18)
  expressAddressBook ConsumerExpressAddressBook?
  redemptionPickingEvents RedemptionPickingEvent[]
@@ -1293,6 +1295,7 @@ model PointsAccount {
  @@map("points_accounts")
 }
 model PointsEntry {
+ returnEvent RedemptionReturnEvent?
  id String @id @db.Uuid
  userId String @map("user_id") @db.Uuid
  delta BigInt
@@ -1407,6 +1410,7 @@ model RedemptionQuote {
  @@map("redemption_quotes")
 }
 model RedemptionOrder {
+ returns RedemptionReturn[]
  executionMode String @default("DEVELOPMENT") @map("execution_mode") @db.VarChar(20)
  afterSales RedemptionAfterSales?
  expressShipment RedemptionExpressShipment?
@@ -1880,4 +1884,38 @@ model RedemptionAfterSalesEvent {
  case RedemptionAfterSales @relation(fields:[caseId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([caseId,version])
  @@map("redemption_after_sales_events")
+}
+
+model RedemptionReturn {
+ id String @id @db.Uuid
+ orderId String @map("order_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ quantity Int
+ reasonPayload String @map("reason_payload")
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+ order RedemptionOrder @relation(fields:[orderId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ events RedemptionReturnEvent[]
+ @@index([orderId,id])
+ @@map("redemption_returns")
+}
+model RedemptionReturnEvent {
+ id String @id @db.Uuid
+ returnId String @map("return_id") @db.Uuid
+ kind String @db.VarChar(12)
+ actorId String? @map("actor_id") @db.Uuid
+ requiresReturn Boolean? @map("requires_return")
+ quantity Int?
+ condition String? @db.VarChar(24)
+ location String? @db.VarChar(100)
+ reasonPayload String @map("reason_payload")
+ ledgerId String? @unique @map("ledger_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ return RedemptionReturn @relation(fields:[returnId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ actor Staff? @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ ledger PointsEntry? @relation(fields:[ledgerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([returnId,kind])
+ @@map("redemption_return_events")
 }

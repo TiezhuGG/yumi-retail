@@ -166,7 +166,7 @@
     "preverify:redemption-withdrawals:ui": "npm run build:server",
     "verify:redemption-withdrawals:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-withdrawals.mjs",
     "pretest:redemption-returns": "npm run build:server",
-    "test:redemption-returns": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-custody-returns.integration.test.ts",
+    "test:redemption-returns": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-returns.integration.test.ts",
     "preverify:redemption-returns:ui": "npm run build:server",
     "verify:redemption-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-returns.mjs",
     "pretest:redemption-print": "npm run build:server",
@@ -210,7 +210,14 @@
     "check:points-express:config": "node --env-file-if-exists=.env scripts/check-points-express-config.mjs",
     "preverify:express:recovery": "npm run build:server",
     "verify:express:recovery": "node --import tsx scripts/verify-express-recovery.mjs",
-    "test:express:recovery": "node --test tests/express-recovery.test.mjs"
+    "test:express:recovery": "node --test tests/express-recovery.test.mjs",
+    "preseed:rewards:local": "npm run build:server",
+    "seed:rewards:local": "node --env-file=.env scripts/seed-rewards-local.mjs --apply",
+    "seed:mall:local": "node --env-file=.env scripts/seed-mall-catalog-local.mjs --apply",
+    "preseed:mall:local": "npm run build:server",
+    "verify:express-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-returns.mjs",
+    "preverify:express-returns:ui": "npm run build:server",
+    "verify:mall:local:ui": "node --env-file=.env --import tsx scripts/ui/verify-local-rewards.mjs"
   },
   "pnpm": {
     "overrides": {
