@@ -122,6 +122,68 @@ export class RedemptionAfterSalesService {
       return v;
     });
   }
+  async listConsumer(r: ApiRequest, input: unknown): Promise<RedemptionAfterSalesPage> {
+    const b = fields(input, ['status', 'keyword', 'cursor']),
+      status = b.status === undefined ? '' : str(b.status, 20),
+      keyword =
+        b.keyword === undefined || (typeof b.keyword === 'string' && !b.keyword.trim())
+          ? ''
+          : str(b.keyword, 80),
+      cursor = b.cursor === undefined ? undefined : uuid(b.cursor);
+    if (status && !['OPEN', 'PROCESSING', 'CLOSED'].includes(status))
+      throw failure(400, 'VALIDATION_ERROR', '反馈状态无效');
+    const escape = String.fromCharCode(92),
+      term = keyword
+        .replaceAll(escape, escape + escape)
+        .replaceAll('%', escape + '%')
+        .replaceAll('_', escape + '_');
+    return this.catalog.db.$transaction(
+      async (tx) => {
+        const user = await this.consumer(tx, r),
+          where: Prisma.RedemptionAfterSalesWhereInput = {
+            userId: user,
+            order: {
+              userId: user,
+              deliveryMode: 'EXPRESS',
+              ...(term
+                ? {
+                    OR: [
+                      { title: { contains: term, mode: 'insensitive' } },
+                      { orderNo: { contains: term, mode: 'insensitive' } },
+                    ],
+                  }
+                : {}),
+            },
+            ...(status ? { status } : {}),
+          };
+        if (
+          cursor &&
+          !(await tx.redemptionAfterSales.findFirst({ where: { ...where, id: cursor } }))
+        )
+          throw failure(409, 'CURSOR_INVALID', '售后反馈已变化，请重新读取');
+        const rows = await tx.redemptionAfterSales.findMany({
+          where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
+          include: { order: { select: { orderNo: true, title: true } } },
+          orderBy: { id: 'asc' },
+          take: 21,
+        });
+        await this.consumer(tx, r);
+        return {
+          items: rows.slice(0, 20).map((c) => ({
+            orderId: c.orderId,
+            orderNo: c.order.orderNo,
+            title: c.order.title,
+            category: c.category,
+            status: c.status,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
+          })),
+          nextCursor: rows.length > 20 ? rows[19]!.id : null,
+        };
+      },
+      { isolationLevel: 'RepeatableRead', timeout: 15000 },
+    );
+  }
   async readStaff(r: ApiRequest, id: string) {
     return this.catalog.db.$transaction(async (tx) => {
       const w = await this.staff.authorize(r, tx),

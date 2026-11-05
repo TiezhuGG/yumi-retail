@@ -152,16 +152,24 @@ export default function Returns() {
     <View className="account-page redemption-list-page">
       <View className="account-hero return-list-heading">
         <Text className="account-name">售后</Text>
-        <Button
-          className="account-link"
-          onClick={() =>
-            guest
-              ? void Taro.navigateTo({ url: '/pages/login/index' })
-              : void openRedemptions({ service: 'after-sales' })
-          }
-        >
-          申请售后
-        </Button>
+        <View className="return-list-actions">
+          <Button
+            className="account-link"
+            onClick={() => void Taro.navigateTo({ url: '/pages/return-feedback/index' })}
+          >
+            售后反馈
+          </Button>
+          <Button
+            className="account-link"
+            onClick={() =>
+              guest
+                ? void Taro.navigateTo({ url: '/pages/login/index' })
+                : void openRedemptions({ service: 'after-sales' })
+            }
+          >
+            申请售后
+          </Button>
+        </View>
       </View>
       <View className="account-content">
         <View className="reward-search redemption-search">

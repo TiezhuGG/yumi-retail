@@ -10,7 +10,14 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCookieAuth,
+  ApiHeader,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Consumer, Permissions } from './staff-guard.js';
 import { ApiResult, object, text } from './api-result.js';
 import { fields, key, uuid } from './catalog-input.js';
@@ -23,6 +30,41 @@ const input = object({
   version: integer,
   message: { type: 'string', minLength: 1, maxLength: 500 },
 });
+@ApiTags('消费者售后反馈列表')
+@ApiBearerAuth('consumerSession')
+@Consumer()
+@Controller('consumer/redemption-after-sales')
+export class ConsumerAfterSalesListController {
+  constructor(@Inject(RedemptionAfterSalesService) readonly service: RedemptionAfterSalesService) {}
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'PROCESSING', 'CLOSED'] })
+  @ApiQuery({ name: 'keyword', required: false, maxLength: 80 })
+  @ApiQuery({ name: 'cursor', required: false, format: 'uuid' })
+  @ApiResult(
+    object({
+      items: {
+        type: 'array',
+        maxItems: 20,
+        items: object({
+          orderId: text,
+          orderNo: text,
+          title: text,
+          category: text,
+          status: text,
+          createdAt: text,
+          updatedAt: text,
+        }),
+      },
+      nextCursor: nullable,
+    }),
+    errors,
+  )
+  async list(@Req() r: ApiRequest, @Query() q: unknown) {
+    return success(r, await this.service.listConsumer(r, q));
+  }
+}
+
 const event = object({
   version: integer,
   kind: text,

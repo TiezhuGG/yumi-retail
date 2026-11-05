@@ -15,6 +15,7 @@ export default {
     'pages/redemption/index',
     'pages/returns/index',
     'pages/return/index',
+    'pages/return-feedback/index',
     'pages/service-area/index',
     'pages/addresses/index',
     'pages/express-addresses/index',
