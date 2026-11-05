@@ -1,3 +1,5 @@
+import { cartIdentity } from '../../account-cart';
+import { addPointsCart, readPointsIntent, pointsCheckoutKey } from '../../points-cart';
 import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Input } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
@@ -56,12 +58,6 @@ export default function RewardDetail() {
             <Text>{error}</Text>
             <Button className="points-action" onClick={() => void load()}>
               重试读取
-            </Button>
-            <Button
-              className="points-action"
-              onClick={() => void Taro.navigateTo({ url: '/pages/rewards/index' })}
-            >
-              返回积分商城
             </Button>
           </View>
         )}
@@ -135,15 +131,39 @@ export default function RewardDetail() {
             </View>
             <View className="reward-action-dock">
               <Button
-                className="points-action"
-                disabled={!item.redemptionEnabled || !valid}
+                className="points-cart-add"
+                disabled={!valid}
                 onClick={() =>
-                  void Taro.navigateTo({
-                    url: '/pages/redemption-checkout/index?id=' + item.id + '&quantity=' + count,
-                  })
+                  void (async () => {
+                    try {
+                      const who = await cartIdentity();
+                      addPointsCart(item.id, count, who?.profile.user.id);
+                      await Taro.showToast({ title: '已加入购物车', icon: 'success' });
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : '加入失败');
+                    }
+                  })()
                 }
               >
-                {item.redemptionEnabled ? '立即兑换' : '兑换暂未开放'}
+                加入购物车
+              </Button>
+              <Button
+                className="points-action"
+                disabled={!valid}
+                onClick={() => {
+                  try {
+                    const previous = readPointsIntent();
+                    if (previous?.result && previous.cleared)
+                      Taro.removeStorageSync(pointsCheckoutKey);
+                    void Taro.navigateTo({
+                      url: '/pages/points-checkout/index?id=' + item.id + '&quantity=' + count,
+                    });
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : '无法打开结算');
+                  }
+                }}
+              >
+                立即兑换
               </Button>
             </View>
           </>

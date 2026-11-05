@@ -109,9 +109,7 @@ export default function Login() {
               </Button>
             </View>
           )}
-          <Button className="account-link" onClick={back}>
-            {state.phase === 'authenticated' ? '返回继续操作' : '返回继续浏览'}
-          </Button>
+
         </View>
       </View>
     </View>

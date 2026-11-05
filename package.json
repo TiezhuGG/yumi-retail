@@ -217,7 +217,13 @@
     "preseed:mall:local": "npm run build:server",
     "verify:express-returns:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-returns.mjs",
     "preverify:express-returns:ui": "npm run build:server",
-    "verify:mall:local:ui": "node --env-file=.env --import tsx scripts/ui/verify-local-rewards.mjs"
+    "verify:mall:local:ui": "node --env-file=.env --import tsx scripts/ui/verify-local-rewards.mjs",
+    "test:points-cart": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/points-cart.integration.test.ts",
+    "pretest:points-cart": "npm run build:server",
+    "verify:points-cart:ui": "node --env-file=.env --import tsx scripts/ui/verify-points-cart.mjs",
+    "preverify:points-cart:ui": "npm run build:server",
+    "setup:points-demo:local": "node --env-file=.env scripts/setup-points-demo-local.mjs --apply",
+    "presetup:points-demo:local": "npm run build:server"
   },
   "pnpm": {
     "overrides": {

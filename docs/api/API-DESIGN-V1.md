@@ -1017,3 +1017,12 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 投影状态REQUESTED→WAIT_RETURN（需退货）→READY_TO_REFUND→REFUNDED；批准不需退货直接READY_TO_REFUND；未审核可REJECTED或CANCELED。每个申请/阶段不可改删，无通用状态接口。退款记录给出points十进制字符串，事件包括说明、时间及隔离验收信息；员工名称仅后台返回，消费者不暴露内部员工名。原因与处理说明使用AAD绑定用户/申请的加密数据，缓存失权后清理。
 
 积分流水新增entryKind=AFTER_SALES_RETURN及原兑换单关联，展示“售后退积分”，不同于取消退积分。底层points_ledger保持员工正向流水来源，RETURN_REFUND:<申请ID>唯一，由不可变退款事件关联；不冒充取消、发放或恢复原库存。申请/处理结果未知时各端保存原输入和键，重载后使用原请求核实。分类按钮弹窗使用原GET /categories游标遍历所有公开标签，无新分类契约；我的页复用积分/订单/地址/登录API，无虚构统计。详见[E5记录](../verification/MALL-RETURNS-CATEGORIES-ACCOUNT-2026-11-05.md)。
+
+## 2026-11-05 多商品积分结算（OpenAPI 0.61.0）
+
+新增消费者 Bearer 会话接口，均严格拒绝额外字段，POST 必须提供 `Idempotency-Key`：
+
+- `POST /consumer/redemption-cart-quotes`：`{items:[{rewardId,rewardVersion,quantity}],addressId,addressVersion}`，1—20种，重复商品/规格拒绝；仅 EXPRESS 同一地址。返回 `quotes:RedemptionQuoteView[]`、`totalPoints/balance/remainingBalance` 十进制字符串、`expiresAt`。统一积分余额，逐项规则/配额/可售校验，报价整次写入或整次回滚；本人有效报价总数上限20（两分钟后释放额度）。
+- `POST /consumer/redemption-cart-orders`：`{quoteIds:string[]}`，1—20条，全部必须属于本人、未使用、有效、同一快递地址及政策版本、商品/规格不重复。返回 `{id,orderIds,totalPoints}`；`id`为第一条商品订单ID，`orderIds`是本次完整商品订单列表，不是独立的合并发货订单。单个 PostgreSQL 事务内按统一锁序创建全部原订单、扣分流水、库存预占、分配、事件和 outbox；失败全回滚。末尾再次校验全部报价、活动、批次效期和会话。
+
+幂等作用域为 `userId:REDEMPTION_CART_QUOTE` / `userId:REDEMPTION_CART_CREATE`，重试必须使用原内容和原键；同键不同内容409，恢复成功结果在新提交门禁前完成。401会话失效、403身份不符、404非本人报价、409规则/积分/库存/过期/复用冲突、429报价频率、503并发可重试或门禁关闭。原单商品报价/创建/取消/发货/售后契约保持兼容；购物车商品仍需逐单操作取消和发货。

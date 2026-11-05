@@ -26,7 +26,7 @@ export async function openRedemptions(view: { status?: string; service?: 'after-
     await Taro.switchTab({ url: '/pages/redemptions/index' });
   } catch {
     nextRedemptionView = undefined;
-    void Taro.showToast({ title: '暂时无法打开兑换订单', icon: 'none' });
+    void Taro.showToast({ title: '暂时无法打开订单', icon: 'none' });
   }
 }
 

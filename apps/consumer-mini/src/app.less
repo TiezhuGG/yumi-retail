@@ -4223,3 +4223,96 @@ button[disabled] {
 .points-ledger-delta {
   white-space: nowrap;
 }
+
+.points-cart-page .account-name {
+  display: block;
+  margin: 24rpx 0 12rpx;
+}
+.points-cart-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+}
+.points-cart-row .cart-select {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8rpx;
+  min-width: 56rpx;
+  border: 0;
+  background: transparent;
+  color: #576332;
+  font-size: 40rpx;
+  line-height: 1.2;
+}
+.points-cart-product {
+  flex: 1;
+  min-width: 0;
+}
+.points-cart-product .product-visual {
+  max-height: 240rpx;
+}
+.points-cart-product .account-card-title {
+  margin-top: 14rpx;
+}
+.points-cart-product .reward-quantity {
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.points-cart-product .reward-quantity text {
+  min-width: 44rpx;
+  text-align: center;
+}
+.points-checkout-line {
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #eceee7;
+}
+.points-checkout-line > text {
+  display: block;
+  line-height: 1.8;
+}
+.reward-action-dock {
+  display: flex;
+  gap: 20rpx;
+}
+.reward-action-dock > button {
+  flex: 1;
+  margin: 0;
+  min-width: 0;
+}
+.reward-action-dock .points-cart-add {
+  color: #38412c;
+  background: #f2eed7;
+  border: 0;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.points-cart-thumbnail {
+  float: left;
+  width: 140rpx;
+  margin: 0 20rpx 8rpx 0;
+}
+.points-cart-thumbnail .product-visual {
+  height: 140rpx;
+  border-radius: 16rpx;
+}
+.points-cart-thumbnail .visual-package {
+  transform: scale(0.55);
+  transform-origin: center;
+}
+.points-cart-thumbnail .visual-caption {
+  font-size: 14rpx;
+}
+.points-cart-product .account-card-title {
+  font-size: 30rpx;
+}
+.points-cart-product .reward-quantity {
+  clear: both;
+  padding-top: 16rpx;
+}
+.points-cart-summary {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  box-shadow: 0 -8rpx 24rpx rgba(40, 44, 35, 0.07);
+}

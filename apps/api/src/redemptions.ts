@@ -313,159 +313,301 @@ export class RedemptionService {
     const b = fields(body, ['quoteId']),
       quoteId = uuid(b.quoteId);
     return this.run(r, key, 'CREATE', { quoteId }, async (tx, userId) => {
+      return this.createInTransaction(tx, userId, r, quoteId);
+    });
+  }
+  // Shared by single-item and cart checkout; never opens an inner transaction.
+  private async createInTransaction(tx: Tx, userId: string, r: ApiRequest, quoteId: string) {
+    const executionMode = await this.gate(tx, userId, 'EXPRESS');
+    const balance = await this.account(tx, userId);
+    const quote = await tx.redemptionQuote.findFirst({ where: { id: quoteId, userId } });
+    if (!quote) throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人兑换报价');
+    if (await tx.redemptionOrder.findUnique({ where: { quoteId } }))
+      throw failure(409, 'QUOTE_ALREADY_USED', '该报价已有兑换单，请核实原订单');
+    if (quote.expiresAt <= (await this.clock(tx)))
+      throw failure(409, 'QUOTE_EXPIRED', '兑换报价已过期，请重新确认');
+    const old = quote.snapshot as unknown as RedemptionSnapshot,
+      p = await this.reward(tx, quote.rewardId);
+    await this.gate(tx, userId, old.deliveryMode);
+    if ((old.executionMode ?? 'DEVELOPMENT') !== executionMode)
+      throw failure(409, 'EXECUTION_MODE_CHANGED', '兑换模式已变化，请重新核验报价');
+    // Before stock locks, hold address/range/catalogue shared locks in the cash-order order.
+    await this.address(tx, userId, old);
+    await metadataLocks(tx, [p.skuId]);
+    await inventoryLocks(tx, this.warehouse(), [p.skuId]);
+    const fresh = { ...(await this.snapshot(tx, userId, old, balance, p)), executionMode };
+    const compare = (s: RedemptionSnapshot) =>
+      JSON.stringify([
+        s.rewardId,
+        s.rewardVersion,
+        s.skuId,
+        s.quantity,
+        s.pointsPrice,
+        s.totalPoints,
+        s.title,
+        s.name,
+        s.spec,
+        s.unit,
+        s.addressId,
+        s.addressVersion,
+        s.areaVersion,
+        s.productVersion,
+        s.deliveryMode,
+        s.shippingFeeMode ?? null,
+        s.shippingFeeCents ?? null,
+      ]);
+    if (compare(old) !== compare(fresh))
+      throw failure(409, 'QUOTE_CHANGED', '商品或地址规则已变化，请重新报价并确认');
+    const { snapshotAddress } = await this.address(tx, userId, old);
+    const now = await this.clock(tx),
+      id = randomUUID();
+    const addressPayload = this.privateData.encrypt(userId, id, snapshotAddress);
+    await tx.redemptionOrder.create({
+      data: {
+        id,
+        userId,
+        quoteId,
+        rewardId: p.id,
+        warehouseId: p.warehouseId,
+        skuId: p.skuId,
+        orderNo: 'R' + id.replaceAll('-', '').toUpperCase(),
+        title: fresh.title,
+        name: fresh.name,
+        spec: fresh.spec,
+        unit: fresh.unit,
+        quantity: fresh.quantity,
+        pointsPrice: p.pointsPrice,
+        totalPoints: BigInt(fresh.totalPoints),
+        rewardVersion: p.version,
+        addressPayload,
+        deliveryMode: fresh.deliveryMode,
+        executionMode,
+        createdAt: now,
+      },
+    });
+    await tx.pointsAccount.update({
+      where: { userId },
+      data: { balance: { decrement: BigInt(fresh.totalPoints) }, version: { increment: 1 } },
+    });
+    await tx.pointsEntry.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        delta: -BigInt(fresh.totalPoints),
+        actionKey: 'REDEMPTION:' + id,
+        reason: '积分兑换商品',
+        consumerActorId: userId,
+        redemptionId: id,
+        redemptionAction: 'REDEEM',
+      },
+    });
+    const positions = await tx.stockPosition.findMany({
+      where: {
+        warehouseId: p.warehouseId,
+        skuId: p.skuId,
+        location: { enabled: true },
+        lot: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      },
+      include: { lot: true },
+      orderBy: [
+        { lot: { expiresAt: { sort: 'asc', nulls: 'last' } } },
+        { lot: { receivedAt: 'asc' } },
+        { lotId: 'asc' },
+        { id: 'asc' },
+      ],
+    });
+    let remaining = fresh.quantity;
+    const lotFree = new Map<string, number>();
+    for (const pos of positions) {
+      if (!remaining) break;
+      const free = lotFree.get(pos.lotId) ?? pos.lot.onHand - pos.lot.reserved - pos.lot.blocked;
+      const quantity = Math.min(remaining, pos.onHand - pos.reserved - pos.blocked, free);
+      if (quantity <= 0) continue;
+      const allocation = {
+        id: randomUUID(),
+        orderId: id,
+        warehouseId: p.warehouseId,
+        skuId: p.skuId,
+        lotId: pos.lotId,
+        positionId: pos.id,
+        quantity,
+      };
+      const reserveLedgerId = await orderReservationDelta(
+        tx,
+        allocation,
+        false,
+        r.requestId,
+        userId,
+        'REDEMPTION',
+      );
+      await tx.redemptionAllocation.create({ data: { ...allocation, reserveLedgerId } });
+      remaining -= quantity;
+      lotFree.set(pos.lotId, free - quantity);
+    }
+    if (remaining) throw failure(409, 'STOCK_UNAVAILABLE', '批次可售库存变化，未创建兑换单');
+    await tx.redemptionOutbox.create({
+      data: { orderId: id, state: fresh.deliveryMode === 'EXPRESS' ? 'EXPRESS_WAIT' : 'PENDING' },
+    });
+    await tx.redemptionEvent.create({
+      data: {
+        id: randomUUID(),
+        orderId: id,
+        type: 'REDEMPTION_CREATED',
+        consumerActorId: userId,
+        requestId: r.requestId,
+      },
+    });
+    const final = await this.clock(tx);
+    const lots = await tx.redemptionAllocation.findMany({
+      where: { orderId: id },
+      select: { lotId: true },
+    });
+    if (
+      quote.expiresAt <= final ||
+      (p.endsAt && p.endsAt <= final) ||
+      (await tx.stockLot.count({
+        where: { id: { in: lots.map((a) => a.lotId) }, expiresAt: { lte: final } },
+      }))
+    )
+      throw failure(409, 'QUOTE_EXPIRED', '报价或批次已过期，本次兑换已回滚');
+    return { id };
+  }
+  async quoteCart(r: ApiRequest, key: string, body: unknown) {
+    const b = fields(body, ['items', 'addressId', 'addressVersion']);
+    if (!Array.isArray(b.items) || b.items.length < 1 || b.items.length > 20)
+      throw failure(400, 'VALIDATION_ERROR', '一次请选择1至20种商品');
+    const addressId = uuid(b.addressId),
+      addressVersion = integer(b.addressVersion, 0, 2147483646);
+    const items = b.items
+      .map((v) => {
+        const row = fields(v, ['rewardId', 'rewardVersion', 'quantity']);
+        return {
+          rewardId: uuid(row.rewardId),
+          rewardVersion: integer(row.rewardVersion, 0, 2147483646),
+          quantity: integer(row.quantity, 1, 100000),
+          addressId,
+          addressVersion,
+          deliveryMode: 'EXPRESS' as const,
+        };
+      })
+      .sort((a, b) => a.rewardId.localeCompare(b.rewardId));
+    if (new Set(items.map((i) => i.rewardId)).size !== items.length)
+      throw failure(400, 'VALIDATION_ERROR', '同一商品请合并数量');
+    const result = await this.run(r, key, 'CART_QUOTE', items, async (tx, userId) => {
       const executionMode = await this.gate(tx, userId, 'EXPRESS');
       const balance = await this.account(tx, userId);
-      const quote = await tx.redemptionQuote.findFirst({ where: { id: quoteId, userId } });
-      if (!quote) throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人兑换报价');
-      if (await tx.redemptionOrder.findUnique({ where: { quoteId } }))
-        throw failure(409, 'QUOTE_ALREADY_USED', '该报价已有兑换单，请核实原订单');
-      if (quote.expiresAt <= (await this.clock(tx)))
-        throw failure(409, 'QUOTE_EXPIRED', '兑换报价已过期，请重新确认');
-      const old = quote.snapshot as unknown as RedemptionSnapshot,
-        p = await this.reward(tx, quote.rewardId);
-      await this.gate(tx, userId, old.deliveryMode);
-      if ((old.executionMode ?? 'DEVELOPMENT') !== executionMode)
-        throw failure(409, 'EXECUTION_MODE_CHANGED', '兑换模式已变化，请重新核验报价');
-      // Before stock locks, hold address/range/catalogue shared locks in the cash-order order.
-      await this.address(tx, userId, old);
-      await metadataLocks(tx, [p.skuId]);
-      await inventoryLocks(tx, this.warehouse(), [p.skuId]);
-      const fresh = { ...(await this.snapshot(tx, userId, old, balance, p)), executionMode };
-      const compare = (s: RedemptionSnapshot) =>
-        JSON.stringify([
-          s.rewardId,
-          s.rewardVersion,
-          s.skuId,
-          s.quantity,
-          s.pointsPrice,
-          s.totalPoints,
-          s.title,
-          s.name,
-          s.spec,
-          s.unit,
-          s.addressId,
-          s.addressVersion,
-          s.areaVersion,
-          s.productVersion,
-          s.deliveryMode,
-          s.shippingFeeMode ?? null,
-          s.shippingFeeCents ?? null,
-        ]);
-      if (compare(old) !== compare(fresh))
-        throw failure(409, 'QUOTE_CHANGED', '商品或地址规则已变化，请重新报价并确认');
-      const { snapshotAddress } = await this.address(tx, userId, old);
-      const now = await this.clock(tx),
-        id = randomUUID();
-      const addressPayload = this.privateData.encrypt(userId, id, snapshotAddress);
-      await tx.redemptionOrder.create({
-        data: {
-          id,
-          userId,
-          quoteId,
-          rewardId: p.id,
-          warehouseId: p.warehouseId,
-          skuId: p.skuId,
-          orderNo: 'R' + id.replaceAll('-', '').toUpperCase(),
-          title: fresh.title,
-          name: fresh.name,
-          spec: fresh.spec,
-          unit: fresh.unit,
-          quantity: fresh.quantity,
-          pointsPrice: p.pointsPrice,
-          totalPoints: BigInt(fresh.totalPoints),
-          rewardVersion: p.version,
-          addressPayload,
-          deliveryMode: fresh.deliveryMode,
+      const products = [];
+      for (const item of items) products.push(await this.reward(tx, item.rewardId));
+      if (new Set(products.map((p) => p.skuId)).size !== products.length)
+        throw failure(400, 'VALIDATION_ERROR', '同一规格请合并数量');
+      await this.address(tx, userId, items[0]!);
+      await metadataLocks(
+        tx,
+        products.map((p) => p.skuId),
+      );
+      const now = await this.clock(tx);
+      if (
+        (await tx.redemptionQuote.count({ where: { userId, expiresAt: { gt: now } } })) +
+          items.length >
+        20
+      )
+        throw failure(429, 'QUOTE_LIMIT', '报价刷新过于频繁，请两分钟后再试');
+      let remaining = balance;
+      const quoteIds: string[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const snapshot = {
+          ...(await this.snapshot(tx, userId, items[i]!, remaining, products[i]!)),
           executionMode,
-          createdAt: now,
-        },
-      });
-      await tx.pointsAccount.update({
-        where: { userId },
-        data: { balance: { decrement: BigInt(fresh.totalPoints) }, version: { increment: 1 } },
-      });
-      await tx.pointsEntry.create({
-        data: {
-          id: randomUUID(),
-          userId,
-          delta: -BigInt(fresh.totalPoints),
-          actionKey: 'REDEMPTION:' + id,
-          reason: '积分兑换商品',
-          consumerActorId: userId,
-          redemptionId: id,
-          redemptionAction: 'REDEEM',
-        },
-      });
-      const positions = await tx.stockPosition.findMany({
-        where: {
-          warehouseId: p.warehouseId,
-          skuId: p.skuId,
-          location: { enabled: true },
-          lot: { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-        },
-        include: { lot: true },
-        orderBy: [
-          { lot: { expiresAt: { sort: 'asc', nulls: 'last' } } },
-          { lot: { receivedAt: 'asc' } },
-          { lotId: 'asc' },
-          { id: 'asc' },
-        ],
-      });
-      let remaining = fresh.quantity;
-      const lotFree = new Map<string, number>();
-      for (const pos of positions) {
-        if (!remaining) break;
-        const free = lotFree.get(pos.lotId) ?? pos.lot.onHand - pos.lot.reserved - pos.lot.blocked;
-        const quantity = Math.min(remaining, pos.onHand - pos.reserved - pos.blocked, free);
-        if (quantity <= 0) continue;
-        const allocation = {
-          id: randomUUID(),
-          orderId: id,
-          warehouseId: p.warehouseId,
-          skuId: p.skuId,
-          lotId: pos.lotId,
-          positionId: pos.id,
-          quantity,
         };
-        const reserveLedgerId = await orderReservationDelta(
-          tx,
-          allocation,
-          false,
-          r.requestId,
-          userId,
-          'REDEMPTION',
-        );
-        await tx.redemptionAllocation.create({ data: { ...allocation, reserveLedgerId } });
-        remaining -= quantity;
-        lotFree.set(pos.lotId, free - quantity);
+        remaining -= BigInt(snapshot.totalPoints);
+        const id = randomUUID();
+        await tx.redemptionQuote.create({
+          data: {
+            id,
+            userId,
+            rewardId: products[i]!.id,
+            snapshot: snapshot as unknown as Prisma.InputJsonValue,
+            createdAt: now,
+            expiresAt: new Date(now.getTime() + 120000),
+          },
+        });
+        quoteIds.push(id);
       }
-      if (remaining) throw failure(409, 'STOCK_UNAVAILABLE', '批次可售库存变化，未创建兑换单');
-      await tx.redemptionOutbox.create({
-        data: { orderId: id, state: fresh.deliveryMode === 'EXPRESS' ? 'EXPRESS_WAIT' : 'PENDING' },
-      });
-      await tx.redemptionEvent.create({
-        data: {
-          id: randomUUID(),
-          orderId: id,
-          type: 'REDEMPTION_CREATED',
-          consumerActorId: userId,
-          requestId: r.requestId,
-        },
-      });
+      return { quoteIds };
+    });
+    const quotes = await Promise.all(result.quoteIds.map((id) => this.readQuote(r, id)));
+    return {
+      quotes,
+      totalPoints: quotes.reduce((sum, q) => sum + BigInt(q.snapshot.totalPoints), 0n).toString(),
+      balance: quotes[0]!.snapshot.balance,
+      remainingBalance: quotes.at(-1)!.snapshot.remainingBalance,
+      expiresAt: quotes[0]!.expiresAt,
+    };
+  }
+  async createCart(r: ApiRequest, key: string, body: unknown) {
+    const b = fields(body, ['quoteIds']);
+    if (!Array.isArray(b.quoteIds) || b.quoteIds.length < 1 || b.quoteIds.length > 20)
+      throw failure(400, 'VALIDATION_ERROR', '一次请选择1至20种商品');
+    const quoteIds = b.quoteIds.map((v) => uuid(v)).sort();
+    if (new Set(quoteIds).size !== quoteIds.length)
+      throw failure(400, 'VALIDATION_ERROR', '报价不能重复');
+    return this.run(r, key, 'CART_CREATE', { quoteIds }, async (tx, userId) => {
+      await this.gate(tx, userId, 'EXPRESS');
+      await this.account(tx, userId);
+      const quotes = await tx.redemptionQuote.findMany({ where: { id: { in: quoteIds }, userId } });
+      if (quotes.length !== quoteIds.length)
+        throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人全部报价');
+      const snapshots = quotes.map((q) => q.snapshot as unknown as RedemptionSnapshot);
+      if (
+        new Set(snapshots.map((s) => s.rewardId)).size !== quotes.length ||
+        new Set(snapshots.map((s) => s.skuId)).size !== quotes.length
+      )
+        throw failure(400, 'VALIDATION_ERROR', '同一商品请合并数量');
+      if (
+        snapshots.some(
+          (s) =>
+            s.deliveryMode !== 'EXPRESS' ||
+            s.addressId !== snapshots[0]!.addressId ||
+            s.addressVersion !== snapshots[0]!.addressVersion ||
+            s.areaVersion !== snapshots[0]!.areaVersion,
+        )
+      )
+        throw failure(409, 'QUOTE_CHANGED', '购物车商品必须使用同一快递地址与寄送规则');
+      // Lock every reward, then metadata and inventory in global order before creating any child.
+      for (const id of snapshots.map((s) => s.rewardId).sort()) await this.reward(tx, id);
+      await this.address(tx, userId, snapshots[0]!);
+      await metadataLocks(
+        tx,
+        snapshots.map((s) => s.skuId),
+      );
+      await inventoryLocks(
+        tx,
+        this.warehouse(),
+        snapshots.map((s) => s.skuId),
+      );
+      const orderIds: string[] = [];
+      for (const id of quoteIds)
+        orderIds.push((await this.createInTransaction(tx, userId, r, id)).id);
       const final = await this.clock(tx);
       const lots = await tx.redemptionAllocation.findMany({
-        where: { orderId: id },
+        where: { orderId: { in: orderIds } },
         select: { lotId: true },
       });
       if (
-        quote.expiresAt <= final ||
-        (p.endsAt && p.endsAt <= final) ||
+        quotes.some((q) => q.expiresAt <= final) ||
         (await tx.stockLot.count({
-          where: { id: { in: lots.map((a) => a.lotId) }, expiresAt: { lte: final } },
+          where: { id: { in: lots.map((l) => l.lotId) }, expiresAt: { lte: final } },
+        })) ||
+        (await tx.rewardProduct.count({
+          where: { id: { in: snapshots.map((s) => s.rewardId) }, endsAt: { lte: final } },
         }))
       )
-        throw failure(409, 'QUOTE_EXPIRED', '报价或批次已过期，本次兑换已回滚');
-      return { id };
+        throw failure(409, 'QUOTE_EXPIRED', '报价、活动或批次已过期，整次兑换已回滚');
+      return {
+        id: orderIds[0]!,
+        orderIds,
+        totalPoints: snapshots.reduce((sum, s) => sum + BigInt(s.totalPoints), 0n).toString(),
+      };
     });
   }
   async cancel(r: ApiRequest, key: string, id: string, body: unknown) {

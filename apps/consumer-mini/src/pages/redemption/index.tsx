@@ -104,7 +104,7 @@ export default function RedemptionDetail() {
           <>
             <View className="account-card redemption-progress">
               <Text className="points-store-tag">
-                {order.deliveryMode === 'EXPRESS' ? '积分快递订单' : '积分兑换订单'}
+                {order.deliveryMode === 'EXPRESS' ? '积分快递订单' : '积分订单'}
               </Text>
               <Text className="redemption-progress-title">
                 {order.status === 'CANCELED'
@@ -259,7 +259,7 @@ export default function RedemptionDetail() {
           className="account-link"
           onClick={() => void Taro.switchTab({ url: '/pages/redemptions/index' })}
         >
-          查看全部兑换单 →
+          查看全部订单 →
         </Button>
       </View>
     </View>

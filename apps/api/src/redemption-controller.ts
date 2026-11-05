@@ -171,6 +171,53 @@ const errors = [400, 401, 403, 404, 409, 429, 500, 503];
 @Controller('consumer')
 export class RedemptionController {
   constructor(@Inject(RedemptionService) readonly service: RedemptionService) {}
+  @Post('redemption-cart-quotes')
+  @HttpCode(200)
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object({
+      items: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 20,
+        items: object({
+          rewardId: text,
+          rewardVersion: integer,
+          quantity: { type: 'integer', minimum: 1, maximum: 100000 },
+        }),
+      },
+      addressId: text,
+      addressVersion: integer,
+    }),
+  })
+  @ApiResult(
+    object({
+      quotes: { type: 'array', items: quote },
+      totalPoints: text,
+      balance: text,
+      remainingBalance: text,
+      expiresAt: text,
+    }),
+    errors,
+  )
+  async cartQuote(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.service.quoteCart(r, key(r), b));
+  }
+  @Post('redemption-cart-orders')
+  @HttpCode(200)
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object({ quoteIds: { type: 'array', minItems: 1, maxItems: 20, items: text } }),
+  })
+  @ApiResult(
+    object({ id: text, orderIds: { type: 'array', items: text }, totalPoints: text }),
+    errors,
+  )
+  async cartCreate(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.service.createCart(r, key(r), b));
+  }
   @Post('redemption-quotes')
   @HttpCode(200)
   @ApiHeader({ name: 'Idempotency-Key', required: true })

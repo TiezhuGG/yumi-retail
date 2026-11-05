@@ -178,7 +178,7 @@ export default function Account() {
         </View>
         <View className="member-section member-orders">
           <View className="member-section-heading">
-            <Text className="member-section-title">我的兑换订单</Text>
+            <Text className="member-section-title">我的订单</Text>
             <Button onClick={() => viewOrders()}>查看全部 ›</Button>
           </View>
           <Text className="member-section-hint">查进度、看运单、申请售后</Text>

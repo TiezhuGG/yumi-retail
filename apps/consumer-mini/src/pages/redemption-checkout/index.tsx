@@ -372,7 +372,7 @@ export default function RedemptionCheckout() {
           className="account-link"
           onClick={() => void Taro.switchTab({ url: '/pages/redemptions/index' })}
         >
-          我的兑换订单 →
+          我的订单 →
         </Button>
       </View>
     </View>

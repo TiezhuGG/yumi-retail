@@ -47,7 +47,7 @@ export default function ProductDetail() {
       setAdding(false);
     }
   }
-  const back = () => void Taro.reLaunch({ url: '/pages/index/index' });
+  const goHome = () => void Taro.switchTab({ url: '/pages/index/index' });
   return (
     <View className="detail-page retail-product-page">
       {busy && <View className="store-feedback">正在为你准备好物…</View>}
@@ -55,7 +55,6 @@ export default function ProductDetail() {
         <View className="store-feedback">
           <Text>{error}</Text>
           <Button onClick={() => void loader.current!.retry()}>重新加载</Button>
-          <Button onClick={back}>返回首页</Button>
         </View>
       )}
       {product && (
@@ -165,7 +164,7 @@ export default function ProductDetail() {
             </View>
           </View>
           <View className="detail-footer">
-            <Button className="back-home" onClick={back}>
+            <Button className="back-home" onClick={goHome}>
               <Text>⌂</Text>首页
             </Button>
             <Button

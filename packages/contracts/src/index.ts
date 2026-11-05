@@ -828,6 +828,19 @@ export interface RedemptionQuoteView {
     executionMode?: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
   };
 }
+/** One atomic points checkout; fulfillment and returns remain per product order. */
+export interface RedemptionCartQuoteView {
+  quotes: RedemptionQuoteView[];
+  totalPoints: string;
+  balance: string;
+  remainingBalance: string;
+  expiresAt: string;
+}
+export interface RedemptionCartResult {
+  id: string;
+  orderIds: string[];
+  totalPoints: string;
+}
 export interface RedemptionOrderView {
   executionMode?: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
   expressShipment?: RedemptionExpressShipmentView | null;

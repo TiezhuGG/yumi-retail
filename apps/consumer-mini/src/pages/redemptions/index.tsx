@@ -115,7 +115,7 @@ export default function Redemptions() {
     <View className="account-page reward-detail-page redemption-list-page">
       <View className="account-hero">
         <Text className="account-eyebrow">玉米百货 · 积分商城</Text>
-        <Text className="account-name">{afterSales ? '兑换售后' : '兑换订单'}</Text>
+        <Text className="account-name">{afterSales ? '兑换售后' : '订单'}</Text>
       </View>
       <View className="account-content">
         {afterSales ? (
@@ -162,7 +162,7 @@ export default function Redemptions() {
         )}
         {!loading && !guest && !error && !items.length && (
           <View className="account-card redemption-empty">
-            <Text>暂无兑换订单</Text>
+            <Text>暂无订单</Text>
             <Text className="account-copy">兑换后可在这里查看发货与售后进度。</Text>
             <Button
               className="account-link"
@@ -233,7 +233,7 @@ export default function Redemptions() {
           </Button>
         )}
         <Button className="account-link" disabled={loading} onClick={() => void load()}>
-          刷新兑换订单
+          刷新订单
         </Button>
       </View>
     </View>

@@ -1,5 +1,5 @@
 import { View, Text, Button, Input } from '@tarojs/components';
-import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
+import { useDidShow, useDidHide } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 interface PublicServiceArea {
   id: string;
@@ -113,14 +113,6 @@ export default function ServiceArea() {
             </View>
           </>
         )}
-        <Button
-          className="range-back"
-          onClick={() =>
-            void Taro.navigateBack().catch(() => Taro.reLaunch({ url: '/pages/index/index' }))
-          }
-        >
-          返回逛逛
-        </Button>
       </View>
     </View>
   );

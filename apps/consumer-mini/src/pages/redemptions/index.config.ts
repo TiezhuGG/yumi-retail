@@ -1,1 +1,1 @@
-export default { navigationBarTitleText: '兑换订单' };
+export default { navigationBarTitleText: '订单' };
