@@ -8,3 +8,6 @@ export function acknowledgeRedemption(userId: string, id: string) {
   const v = parseOrderIntent(Taro.getStorageSync(redemptionIntentKey));
   if (v?.userId === userId && v.orderId === id) Taro.removeStorageSync(redemptionIntentKey);
 }
+
+export const redemptionReceiptKey = (userId: string, id: string) =>
+  `yumi.redemption-receipt.v1:${API_BASE_URL}:${userId}:${id}`;

@@ -4370,3 +4370,50 @@ button[disabled] {
 .member-simple .member-wallet-bottom {
   justify-content: flex-end;
 }
+
+/* Keep long order numbers from squeezing status labels on phones. */
+@media (max-width: 480px) {
+  .redemption-list-heading {
+    flex-wrap: wrap;
+  }
+  .redemption-list-status {
+    flex-shrink: 0;
+  }
+  .redemption-list-heading .redemption-list-number {
+    flex-basis: 100%;
+    max-width: 100%;
+    text-align: left;
+  }
+}
+.member-order-icon-completed {
+  border-radius: 50%;
+}
+.member-order-icon-completed::after {
+  inset: 5px 6px auto;
+  height: 6px;
+  background: transparent;
+  border-left: 1.5px solid #536346;
+  border-bottom: 1.5px solid #536346;
+  box-shadow: none;
+  transform: rotate(-45deg);
+}
+
+.redemption-search {
+  gap: 8px;
+  align-items: center;
+}
+.redemption-search button {
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+.redemption-search .redemption-search-clear {
+  background: transparent;
+  color: #536346;
+  padding: 0 4px;
+}
+.redemption-search input {
+  box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
+}

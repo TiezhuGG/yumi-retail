@@ -644,6 +644,8 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+ expressReceipts RedemptionExpressReceipt[]
+ rewardCart RewardCart?
  redemptionReturns RedemptionReturn[]
  wechatAppId String? @map("wechat_app_id") @db.VarChar(18)
  expressAddressBook ConsumerExpressAddressBook?
@@ -1817,6 +1819,7 @@ model RedemptionExpressPolicy {
 }
 
 model RedemptionExpressShipment {
+ receipt RedemptionExpressReceipt?
  corrections RedemptionExpressShipmentCorrection[]
  id String @id @db.Uuid
  orderId String @unique @map("order_id") @db.Uuid
@@ -1918,4 +1921,34 @@ model RedemptionReturnEvent {
  ledger PointsEntry? @relation(fields:[ledgerId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([returnId,kind])
  @@map("redemption_return_events")
+}
+
+model RewardCart {
+ userId String @id @map("user_id") @db.Uuid
+ version Int @default(0)
+ items Json @default("[]")
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ audits RewardCartAudit[]
+ @@map("reward_carts")
+}
+model RewardCartAudit {
+ id String @id @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ version Int
+ action String @db.VarChar(16)
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ cart RewardCart @relation(fields:[userId],references:[userId],onDelete:Restrict,onUpdate:NoAction)
+ @@unique([userId,version])
+ @@map("reward_cart_audits")
+}
+
+model RedemptionExpressReceipt {
+ shipmentId String @id @map("shipment_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ confirmedAt DateTime @default(dbgenerated("clock_timestamp()")) @map("confirmed_at") @db.Timestamptz(3)
+ shipment RedemptionExpressShipment @relation(fields:[shipmentId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ user ConsumerUser @relation(fields:[userId],references:[id],onDelete:Restrict,onUpdate:NoAction)
+ @@map("redemption_express_receipts")
 }

@@ -1,3 +1,5 @@
+import { ExpressReceiptController, ExpressReceiptService } from './express-receipt.js';
+import { RewardCartController, RewardCartService } from './reward-cart.js';
 import {
   RedemptionReturnsService,
   ConsumerReturnsController,
@@ -194,6 +196,7 @@ export async function createApplication(
       RedemptionAccessController,
       ExpressReadinessController,
       ConsumerAfterSalesController,
+      ExpressReceiptController,
       ConsumerReturnsController,
       AdminReturnsController,
       AdminAfterSalesController,
@@ -205,6 +208,7 @@ export async function createApplication(
       AdminPointsController,
       ConsumerController,
       ConsumerCartController,
+      RewardCartController,
       OrderController,
       PaymentReadinessController,
       NotificationLabController,
@@ -285,6 +289,11 @@ export async function createApplication(
         ),
       },
       {
+        provide: ExpressReceiptService,
+        useFactory: (base: RedemptionAfterSalesService) => new ExpressReceiptService(base),
+        inject: [RedemptionAfterSalesService],
+      },
+      {
         provide: RedemptionReturnsService,
         useFactory: (base: RedemptionAfterSalesService) => new RedemptionReturnsService(base),
         inject: [RedemptionAfterSalesService],
@@ -312,6 +321,7 @@ export async function createApplication(
         useValue: new ConsumerExpressAddressService(catalog, config.addressEncryptionKey),
       },
       { provide: ExpressPolicyService, useValue: new ExpressPolicyService(catalog) },
+      { provide: RewardCartService, useValue: new RewardCartService(catalog) },
       { provide: ConsumerCartService, useValue: new ConsumerCartService(catalog) },
       { provide: CheckoutService, useValue: checkout },
       {
@@ -434,7 +444,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。',
       )
-      .setVersion('0.63.0')
+      .setVersion('0.66.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

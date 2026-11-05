@@ -1,5 +1,5 @@
-import { cartIdentity } from '../../account-cart';
-import { addPointsCart, readPointsIntent, pointsCheckoutKey } from '../../points-cart';
+import { addAccountPointsCart } from '../../points-cart-api';
+import { readPointsIntent, pointsCheckoutKey } from '../../points-cart';
 import { LoadingState } from '../../components/LoadingState';
 import { View, Text, Button, Input } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide, useRouter } from '@tarojs/taro';
@@ -14,7 +14,9 @@ export default function RewardDetail() {
   const [item, setItem] = useState<Reward | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
-    [quantity, setQuantity] = useState('1');
+    [quantity, setQuantity] = useState('1'),
+    [adding, setAdding] = useState(false);
+  const addLock = useRef(false);
   const seq = useRef(0);
   async function load() {
     const n = ++seq.current;
@@ -58,6 +60,12 @@ export default function RewardDetail() {
             <Text>{error}</Text>
             <Button className="points-action" onClick={() => void load()}>
               重试读取
+            </Button>
+            <Button
+              className="account-link"
+              onClick={() => void Taro.switchTab({ url: '/pages/points-cart/index' })}
+            >
+              查看购物车
             </Button>
           </View>
         )}
@@ -131,15 +139,20 @@ export default function RewardDetail() {
             <View className="reward-action-dock">
               <Button
                 className="points-cart-add"
-                disabled={!valid}
+                disabled={!valid || adding}
                 onClick={() =>
                   void (async () => {
+                    if (addLock.current) return;
+                    addLock.current = true;
+                    setAdding(true);
                     try {
-                      const who = await cartIdentity();
-                      addPointsCart(item.id, count, who?.profile.user.id);
+                      await addAccountPointsCart(item.id, count);
                       await Taro.showToast({ title: '已加入购物车', icon: 'success' });
                     } catch (e) {
                       setError(e instanceof Error ? e.message : '加入失败');
+                    } finally {
+                      addLock.current = false;
+                      setAdding(false);
                     }
                   })()
                 }

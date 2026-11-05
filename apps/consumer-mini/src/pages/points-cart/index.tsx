@@ -1,7 +1,8 @@
 import { View, Text, Button } from '@tarojs/components';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { useRef, useState } from 'react';
-import { cartIdentity } from '../../account-cart';
+import { cartIdentity, type CartIdentity } from '../../account-cart';
+import { readCloudPointsCart, saveCloudPointsCart } from '../../points-cart-api';
 import { request } from '../../api';
 import type { Reward } from '../../rewards-api';
 import { ProductVisual } from '../../components/ProductVisual';
@@ -12,7 +13,6 @@ import {
   pointsCartKey,
   readPointsIntent,
   pointsCheckoutKey,
-  addPointsCart,
 } from '../../points-cart';
 import type { PointsCartLine } from '../../points-cart';
 export default function PointsCart() {
@@ -21,11 +21,16 @@ export default function PointsCart() {
     [selected, setSelected] = useState<string[]>([]),
     [userId, setUserId] = useState<string | undefined>(),
     [guest, setGuest] = useState(false),
+    [legacy, setLegacy] = useState(false),
+    [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [pending, setPending] = useState(false);
-  const seq = useRef(0);
-  async function load() {
+  const seq = useRef(0),
+    writing = useRef(false),
+    identity = useRef<CartIdentity | null>(null),
+    version = useRef(0);
+  async function load(keepSelection = false) {
     const n = ++seq.current;
     setLoading(true);
     setError('');
@@ -34,11 +39,16 @@ export default function PointsCart() {
     try {
       const who = await cartIdentity();
       if (n !== seq.current) return;
-      const uid = who?.profile.user.id,
-        rows = readPointsCart(uid),
+      const uid = who?.profile.user.id;
+      const cloud = who ? await readCloudPointsCart(who) : null;
+      if (n !== seq.current) return;
+      identity.current = who;
+      version.current = cloud?.version ?? 0;
+      const rows = cloud?.items ?? readPointsCart(),
         intent = readPointsIntent();
       setUserId(uid);
       setGuest(!!uid && readPointsCart().length > 0);
+      setLegacy(!!uid && readPointsCart(uid).length > 0);
       setPending(!!intent && (!intent.result || !intent.cleared));
       const all = await Promise.all(
         rows.map(async (i) => {
@@ -52,7 +62,11 @@ export default function PointsCart() {
       if (n !== seq.current) return;
       setItems(rows);
       setProducts(Object.fromEntries(all.filter((p): p is Reward => !!p).map((p) => [p.id, p])));
-      setSelected(rows.map((i) => i.rewardId));
+      setSelected((old) =>
+        keepSelection
+          ? old.filter((id) => rows.some((i) => i.rewardId === id))
+          : rows.map((i) => i.rewardId),
+      );
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '购物车读取失败');
     } finally {
@@ -66,18 +80,41 @@ export default function PointsCart() {
     seq.current++;
     setItems([]);
     setProducts({});
+    identity.current = null;
   });
+  async function persist(next: PointsCartLine[], source?: 'guest' | 'account') {
+    if (writing.current) return;
+    writing.current = true;
+    setBusy(true);
+    setError('');
+    const n = seq.current;
+    try {
+      const who = identity.current;
+      if (who) await saveCloudPointsCart(who, version.current, next, source);
+      else savePointsCart(next);
+      if (n === seq.current) await load(!source);
+    } catch (e) {
+      if (n === seq.current) {
+        setItems([]);
+        setProducts({});
+        setError(e instanceof Error ? e.message : '保存结果待核实，请重新读取');
+      }
+    } finally {
+      writing.current = false;
+      setBusy(false);
+    }
+  }
   function change(id: string, delta: number) {
-    const next = items.map((i) =>
-      i.rewardId === id ? { ...i, quantity: Math.max(1, Math.min(100000, i.quantity + delta)) } : i,
+    void persist(
+      items.map((i) =>
+        i.rewardId === id
+          ? { ...i, quantity: Math.max(1, Math.min(100000, i.quantity + delta)) }
+          : i,
+      ),
     );
-    savePointsCart(next, userId);
-    setItems(next);
   }
   function remove(id: string) {
-    const next = items.filter((i) => i.rewardId !== id);
-    savePointsCart(next, userId);
-    setItems(next);
+    void persist(items.filter((i) => i.rewardId !== id));
   }
   const chosen = items.filter((i) => selected.includes(i.rewardId)),
     total = chosen.reduce(
@@ -113,27 +150,27 @@ export default function PointsCart() {
         {error && (
           <View className="account-error">
             <Text>{error}</Text>
-            <Button onClick={() => void load()}>重新读取</Button>
+            <Button disabled={busy} onClick={() => void load()}>
+              重新读取
+            </Button>
           </View>
         )}
         {!loading && guest && (
           <Button
             className="account-link"
-            onClick={() => {
-              try {
-                const rows = readPointsCart();
-                const current = readPointsCart(userId);
-                if (new Set([...current, ...rows].map((i) => i.rewardId)).size > 20)
-                  throw Error('导入后超过20种，请先删除部分商品');
-                for (const i of rows) addPointsCart(i.rewardId, i.quantity, userId);
-                savePointsCart([]);
-                void load();
-              } catch (e) {
-                setError(e instanceof Error ? e.message : '导入失败');
-              }
-            }}
+            disabled={busy || !!error}
+            onClick={() => void persist(readPointsCart(), 'guest')}
           >
             导入未登录时加入的商品
+          </Button>
+        )}
+        {!loading && legacy && (
+          <Button
+            className="account-link"
+            disabled={busy || !!error}
+            onClick={() => void persist(readPointsCart(userId), 'account')}
+          >
+            导入本机账号商品
           </Button>
         )}
         {pending && (
@@ -144,7 +181,7 @@ export default function PointsCart() {
             核实上次兑换结果
           </Button>
         )}
-        {!loading && !items.length && (
+        {!loading && !error && !items.length && (
           <View className="account-card">
             <Text className="account-card-title">购物车还是空的</Text>
             <Button
@@ -191,17 +228,22 @@ export default function PointsCart() {
                   <Text className="account-error">库存不足，请减少数量或取消勾选</Text>
                 )}
                 <View className="reward-quantity">
-                  <Button disabled={i.quantity <= 1} onClick={() => change(i.rewardId, -1)}>
+                  <Button
+                    disabled={busy || loading || i.quantity <= 1}
+                    onClick={() => change(i.rewardId, -1)}
+                  >
                     −
                   </Button>
                   <Text>{i.quantity}</Text>
                   <Button
-                    disabled={i.quantity >= Math.min(100000, p?.available ?? 0)}
+                    disabled={busy || loading || i.quantity >= Math.min(100000, p?.available ?? 0)}
                     onClick={() => change(i.rewardId, 1)}
                   >
                     ＋
                   </Button>
-                  <Button onClick={() => remove(i.rewardId)}>删除</Button>
+                  <Button disabled={busy || loading} onClick={() => remove(i.rewardId)}>
+                    删除
+                  </Button>
                 </View>
               </View>
             </View>
@@ -223,7 +265,7 @@ export default function PointsCart() {
             </Text>
             <Button
               className="points-action"
-              disabled={!chosen.length || invalid || loading}
+              disabled={!chosen.length || invalid || loading || busy || !!error}
               onClick={checkout}
             >
               {userId ? '去兑换' : '登录后兑换'}

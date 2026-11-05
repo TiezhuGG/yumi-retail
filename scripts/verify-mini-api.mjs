@@ -19,7 +19,15 @@ assert(Number.isSafeInteger(sku.priceCents) && sku.priceCents > 0);
 assert(Number.isSafeInteger(sku.available) && sku.available >= 0);
 assert.equal('unitCostCents' in sku, false);
 const detail = await read(`products/${encodeURIComponent(sku.id)}`);
-assert.deepEqual(detail, sku);
+const { variants, ...primary } = detail;
+assert.deepEqual(primary, sku);
+assert(Array.isArray(variants) && variants.some((v) => v.id === sku.id));
+for (const variant of variants) {
+  assert.equal(variant.productId, sku.productId);
+  assert(Number.isSafeInteger(variant.priceCents) && variant.priceCents > 0);
+  assert(Number.isSafeInteger(variant.available) && variant.available >= 0);
+  assert.equal('unitCostCents' in variant, false);
+}
 if (first.nextCursor) {
   const next = await read(`products?limit=1&cursor=${encodeURIComponent(first.nextCursor)}`);
   assert(next.items.every((r) => r.id !== sku.id));

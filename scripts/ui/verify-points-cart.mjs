@@ -88,7 +88,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   async function shot(name, p = page) {
-    const path = `docs/verification/UI-POINTS-CART-${name}-2026-11-05.png`;
+    const path = `docs/verification/UI-CLOUD-POINTS-CART-${name}-2026-11-05.png`;
     if (!name.startsWith('MINI-') && !name.endsWith('MOBILE'))
       await p.evaluate(() => {
         window.scrollTo(0, 0);
@@ -128,7 +128,11 @@ try {
   await shot('MINI-DETAIL');
   await page.goto('http://127.0.0.1:5188/?mini&view=cart');
   await page.getByRole('button', { name: '去兑换', exact: true }).waitFor();
-  await page.getByRole('button', { name: '＋', exact: true }).nth(1).click();
+  await page
+    .locator('.points-cart-row')
+    .filter({ hasText: '合成第二款商品' })
+    .getByRole('button', { name: '＋', exact: true })
+    .click();
   await page.getByText('合计 520 积分', { exact: true }).waitFor();
   assert.equal(
     await page.getByText('购物车保存在本机，加入时不锁定库存或积分。', { exact: true }).count(),
@@ -245,6 +249,150 @@ try {
     .first()
     .waitFor();
   await shot('ADMIN-ORDERS');
+
+  // A separate browser context has no local cart, yet restores the same account cart.
+  const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await secondContext.addInitScript((v) => {
+    const key = 'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1';
+    if (!localStorage.getItem(key))
+      localStorage.setItem(key, JSON.stringify({ token: v.token, expiresAt: v.expiresAt }));
+  }, f.identity);
+  const secondPage = await secondContext.newPage();
+  secondPage.on('pageerror', (e) => errors.push(e.message));
+  const cartUrl = 'http://127.0.0.1:5188/?mini&view=cart';
+  await secondPage.goto(cartUrl);
+  await secondPage.getByText('合计 200 积分', { exact: true }).waitFor();
+  await shot('MINI-SECOND-DEVICE', secondPage);
+  await page.evaluate(
+    (v) =>
+      localStorage.setItem(
+        'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1',
+        JSON.stringify({ token: v.token, expiresAt: v.expiresAt }),
+      ),
+    f.identity,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(cartUrl);
+  await page.getByText('合计 200 积分', { exact: true }).waitFor();
+  await secondPage.getByRole('button', { name: '＋', exact: true }).click();
+  await secondPage.getByText('合计 400 积分', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '＋', exact: true }).click();
+  await page.getByText('购物车已在其他设备更新，请重新读取后操作', { exact: true }).waitFor();
+  await shot('MINI-VERSION-CONFLICT');
+  await page.getByRole('button', { name: '重新读取', exact: true }).click();
+  await page.getByText('合计 400 积分', { exact: true }).waitFor();
+  await secondPage.evaluate(
+    (v) => {
+      const prefix = 'yumi.points-cart.v1:http://127.0.0.1:3000/api/v1:';
+      localStorage.setItem(prefix + 'guest', JSON.stringify([{ rewardId: v.first, quantity: 1 }]));
+      localStorage.setItem(prefix + v.user, JSON.stringify([{ rewardId: v.second, quantity: 1 }]));
+    },
+    { first: f.rewardId, second: f.secondRewardId, user: f.identity.user.id },
+  );
+  await secondPage.reload();
+  await secondPage.getByRole('button', { name: '导入本机账号商品', exact: true }).click();
+  await secondPage.getByText('合计 600 积分', { exact: true }).waitFor();
+  await shot('MINI-LEGACY-IMPORTED', secondPage);
+  let mergeDropped = false;
+  await secondPage.route('**/api/v1/consumer/points-cart', async (route) => {
+    if (route.request().method() !== 'POST' || mergeDropped) {
+      await route.continue();
+      return;
+    }
+    mergeDropped = true;
+    const response = await route.fetch();
+    assert.equal(response.status(), 200);
+    await route.abort('failed');
+  });
+  await secondPage.getByRole('button', { name: '导入未登录时加入的商品', exact: true }).click();
+  await secondPage.getByRole('button', { name: '重新读取', exact: true }).waitFor();
+  await shot('MINI-MERGE-UNKNOWN', secondPage);
+  await secondPage.evaluate(
+    (v) =>
+      localStorage.setItem(
+        'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1',
+        JSON.stringify({ token: v.token, expiresAt: v.expiresAt }),
+      ),
+    f.identityB,
+  );
+  await secondPage.reload();
+  await secondPage.getByRole('button', { name: '导入未登录时加入的商品', exact: true }).click();
+  await secondPage
+    .getByText('未登录商品有原账号导入结果待核实，请恢复原账号处理', { exact: true })
+    .waitFor();
+  await shot('MINI-PENDING-MERGE-ACCOUNT-GUARD', secondPage);
+  await secondPage.evaluate(
+    (v) =>
+      localStorage.setItem(
+        'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1',
+        JSON.stringify({ token: v.token, expiresAt: v.expiresAt }),
+      ),
+    f.identity,
+  );
+  await secondPage.reload();
+  await secondPage.getByText('合计 720 积分', { exact: true }).waitFor();
+  assert.equal(
+    await secondPage.getByRole('button', { name: '导入未登录时加入的商品', exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await secondPage.getByRole('button', { name: '导入本机账号商品', exact: true }).count(),
+    0,
+  );
+  await secondPage.reload();
+  await secondPage.getByText('合计 720 积分', { exact: true }).waitFor();
+  await shot('MINI-MERGE-RECOVERED', secondPage);
+  await secondPage.unroute('**/api/v1/consumer/points-cart');
+  await secondPage.route('**/api/v1/consumer/points-cart', (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'UI_TEST', message: '合成账号购物车读取失败' } }),
+    }),
+  );
+  await secondPage.reload();
+  await secondPage.getByText('合成账号购物车读取失败', { exact: true }).waitFor();
+  assert.equal(await secondPage.getByText('购物车还是空的', { exact: true }).count(), 0);
+  assert.equal(await secondPage.locator('.points-cart-row').count(), 0);
+  await shot('MINI-CLOUD-READ-ERROR', secondPage);
+  await secondPage.unroute('**/api/v1/consumer/points-cart');
+  await secondPage.evaluate(
+    (v) =>
+      localStorage.setItem(
+        'yumi.consumer-session.v1:http://127.0.0.1:3000/api/v1',
+        JSON.stringify({ token: v.token, expiresAt: v.expiresAt }),
+      ),
+    f.identityB,
+  );
+  await secondPage.reload();
+  await secondPage.getByText('购物车还是空的', { exact: true }).waitFor();
+  await shot('MINI-SECOND-DEVICE-ACCOUNT-B', secondPage);
+
+  let addDropped = false;
+  await secondPage.route('**/api/v1/consumer/points-cart', async (route) => {
+    if (route.request().method() !== 'POST' || addDropped) {
+      await route.continue();
+      return;
+    }
+    addDropped = true;
+    assert.equal((await route.fetch()).status(), 200);
+    await route.abort('failed');
+  });
+  await secondPage.goto('http://127.0.0.1:5188/?mini&id=' + f.secondRewardId);
+  await secondPage.getByRole('button', { name: '加入购物车', exact: true }).click();
+  await secondPage.getByText('保存结果待核实，请重新读取购物车', { exact: true }).waitFor();
+  await secondPage.getByRole('button', { name: '加入购物车', exact: true }).click();
+  await secondPage.getByText('上次加购结果待核实，请先到购物车重新读取', { exact: true }).waitFor();
+  await shot('MINI-ADD-UNKNOWN-GUARD', secondPage);
+  await secondPage.getByRole('button', { name: '查看购物车', exact: true }).click();
+  assert.equal(
+    await secondPage.evaluate(() => window.__lastNavigation),
+    '/pages/points-cart/index',
+  );
+  await secondPage.goto(cartUrl);
+  await secondPage.getByText('合计 200 积分', { exact: true }).waitFor();
+  await shot('MINI-ADD-RECOVERED', secondPage);
+  await secondContext.close();
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

@@ -90,6 +90,7 @@ const expressShipment = {
     carrierName: text,
     trackingNo: text,
     shippedAt: text,
+    receivedAt: nullable,
     correctionVersion: integer,
     correctedAt: nullable,
   }),
@@ -208,7 +209,16 @@ export class RedemptionController {
   @HttpCode(200)
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   @ApiBody({
-    schema: object({ quoteIds: { type: 'array', minItems: 1, maxItems: 20, items: text } }),
+    schema: object(
+      {
+        quoteIds: { type: 'array', minItems: 1, maxItems: 20, items: text },
+        consumeCart: {
+          type: 'boolean',
+          description: '可选；购物车结算时在同一事务扣减已购数量，默认false',
+        },
+      },
+      ['quoteIds'],
+    ),
   })
   @ApiResult(
     object({ id: text, orderIds: { type: 'array', items: text }, totalPoints: text }),
@@ -243,16 +253,24 @@ export class RedemptionController {
     return success(r, await this.service.create(r, key(r), b));
   }
   @Get('redemptions')
+  @Header('Cache-Control', 'no-store')
+  @ApiQuery({
+    name: 'keyword',
+    required: false,
+    schema: { type: 'string', maxLength: 80 },
+    description: '按本人订单商品标题或订单号搜索，不区分大小写；特殊字符按字面匹配',
+  })
   @ApiQuery({
     name: 'fulfillment',
     required: false,
-    enum: ['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED'],
+    enum: ['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED', 'EXPRESS_WAIT_RECEIPT', 'EXPRESS_RECEIVED'],
   })
   @ApiResult(paged(consumerOrder), errors)
   async list(@Req() r: ApiRequest, @Query() q: unknown) {
     return success(r, await this.service.list(r, q));
   }
   @Get('redemptions/:id')
+  @Header('Cache-Control', 'no-store')
   @ApiResult(consumerOrder, errors)
   async detail(@Req() r: ApiRequest, @Param('id') id: string, @Query() q: unknown) {
     fields(q, []);

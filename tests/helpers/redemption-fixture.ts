@@ -153,6 +153,8 @@ export async function seedCancelledRedemptions(
           warehouseId: original.warehouseId,
           skuId: original.skuId,
           orderNo: 'R' + id.replaceAll('-', '').toUpperCase(),
+          deliveryMode: original.deliveryMode,
+          executionMode: original.executionMode,
           status: 'CANCELED',
           title: original.title,
           name: original.name,

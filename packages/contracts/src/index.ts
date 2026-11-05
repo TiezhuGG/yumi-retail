@@ -1103,6 +1103,7 @@ export const EXPRESS_CARRIERS = {
   OTHER: '其他快递',
 } as const;
 export interface RedemptionExpressShipmentView {
+  receivedAt: string | null;
   carrierCode: string;
   carrierName: string;
   trackingNo: string;
@@ -1225,4 +1226,13 @@ export interface RedemptionReturnPage {
   unitPoints: string;
   enabled: boolean;
   items: RedemptionReturnView[];
+}
+
+export interface RewardCartLine {
+  rewardId: string;
+  quantity: number;
+}
+export interface RewardCart {
+  version: number;
+  items: RewardCartLine[];
 }

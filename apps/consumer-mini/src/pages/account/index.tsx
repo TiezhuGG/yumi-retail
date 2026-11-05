@@ -93,8 +93,8 @@ export default function Account() {
 
   const orders = [
     ['待发货', 'EXPRESS_WAIT_SHIP', 'waiting'],
-    ['已发货', 'EXPRESS_SHIPPED', 'shipped'],
-    ['已取消', 'CANCELED', 'canceled'],
+    ['待收货', 'EXPRESS_WAIT_RECEIPT', 'shipped'],
+    ['已完成', 'EXPRESS_RECEIVED', 'completed'],
   ];
   const protectedOpen = (url: string) => (profile ? open(url) : open('login/index'));
   const viewOrders = (status?: string, afterSales = false) =>

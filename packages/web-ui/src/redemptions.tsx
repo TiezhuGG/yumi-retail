@@ -8,7 +8,8 @@ import { RedemptionPrintDialog } from './redemption-print.js';
 const fulfillmentTabs = [
   { value: '', label: '全部兑换订单' },
   { value: 'EXPRESS_WAIT_SHIP', label: '待发货' },
-  { value: 'EXPRESS_SHIPPED', label: '已发货' },
+  { value: 'EXPRESS_WAIT_RECEIPT', label: '待收货' },
+  { value: 'EXPRESS_RECEIVED', label: '已完成' },
 ];
 export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
   const [selected, setSelected] = useState<string[]>([]),
@@ -102,7 +103,9 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
               ? '已取消 · 已退积分'
               : detail.deliveryMode === 'EXPRESS'
                 ? detail.expressShipment
-                  ? '已快递发货'
+                  ? detail.expressShipment.receivedAt
+                    ? '已完成 · 用户确认收货'
+                    : '已快递发货 · 待收货'
                   : '待快递发货 · 商家承担运费'
                 : detail.deliveryExceptionReported
                   ? '配送异常待处理'
@@ -217,7 +220,9 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
               >
                 <option value="">全部方式与阶段</option>
                 <option value="EXPRESS_WAIT_SHIP">待快递发货</option>
-                <option value="EXPRESS_SHIPPED">已快递发货</option>
+                <option value="EXPRESS_SHIPPED">全部已发货</option>
+                <option value="EXPRESS_WAIT_RECEIPT">待收货</option>
+                <option value="EXPRESS_RECEIVED">已完成（用户确认）</option>
                 <option value="LOCAL">原小区配送</option>
               </select>
             </label>
@@ -310,7 +315,9 @@ export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
                             ? '已取消'
                             : o.deliveryMode === 'EXPRESS'
                               ? o.expressShipment
-                                ? '已快递发货'
+                                ? o.expressShipment.receivedAt
+                                  ? '已完成 · 用户确认收货'
+                                  : '已快递发货 · 待收货'
                                 : '待快递发货'
                               : o.fulfillmentState === 'DELIVERED'
                                 ? '骑手已确认送达。'

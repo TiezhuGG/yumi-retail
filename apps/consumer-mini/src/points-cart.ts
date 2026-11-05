@@ -48,6 +48,7 @@ export function addPointsCart(rewardId: string, quantity: number, userId?: strin
 }
 export type PointsCheckoutIntent = {
   cartMode: boolean;
+  cloudCart?: boolean;
   userId: string;
   key: string;
   quoteIds: string[];
@@ -63,6 +64,7 @@ export function readPointsIntent(): PointsCheckoutIntent | null {
     /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(s);
   if (
     typeof raw.cartMode !== 'boolean' ||
+    (raw.cloudCart !== undefined && typeof raw.cloudCart !== 'boolean') ||
     !uuid(raw.userId) ||
     !uuid(raw.key) ||
     !Array.isArray(raw.quoteIds) ||
@@ -86,19 +88,18 @@ export function readPointsIntent(): PointsCheckoutIntent | null {
 }
 
 export function consumePointsCart(intent: PointsCheckoutIntent) {
-  if (!intent.cartMode) return;
-  const saved = Taro.getStorageSync(pointsCartKey(intent.userId));
+  if (!intent.cartMode || intent.cloudCart) return;
+  consumeLocalPointsCart(intent.key, intent.items, intent.userId);
+}
+export function consumeLocalPointsCart(key: string, purchased: PointsCartLine[], userId?: string) {
+  const saved = Taro.getStorageSync(pointsCartKey(userId));
   const completed: string[] = Array.isArray(saved?.completed) ? saved.completed : [];
-  if (completed.includes(intent.key)) return;
-  const items = readPointsCart(intent.userId)
+  if (completed.includes(key)) return;
+  const items = readPointsCart(userId)
     .map((i) => ({
       ...i,
-      quantity: i.quantity - (intent.items.find((o) => o.rewardId === i.rewardId)?.quantity ?? 0),
+      quantity: i.quantity - (purchased.find((o) => o.rewardId === i.rewardId)?.quantity ?? 0),
     }))
     .filter((i) => i.quantity > 0);
-  // The subtraction and receipt marker are one atomic local storage write.
-  Taro.setStorageSync(pointsCartKey(intent.userId), {
-    items,
-    completed: [...completed.slice(-99), intent.key],
-  });
+  Taro.setStorageSync(pointsCartKey(userId), { items, completed: [...completed.slice(-99), key] });
 }

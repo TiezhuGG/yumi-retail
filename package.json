@@ -227,7 +227,17 @@
     "check:wechat:login": "node --env-file-if-exists=.env scripts/check-wechat-login.mjs",
     "precheck:wechat:login": "npm run build:server",
     "test:wechat-readiness": "node --test tests/wechat-login-readiness.test.mjs",
-    "pretest:wechat-readiness": "npm run build:server"
+    "pretest:wechat-readiness": "npm run build:server",
+    "pretest:reward-cart": "npm run build:server",
+    "test:reward-cart": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/reward-cart.integration.test.ts",
+    "pretest:express-receipt": "npm run build:server",
+    "test:express-receipt": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/express-receipt.integration.test.ts",
+    "preverify:express-receipt:ui": "npm run build:server",
+    "verify:express-receipt:ui": "node --env-file=.env --import tsx scripts/ui/verify-express-receipt.mjs",
+    "pretest:redemption-search": "npm run build:server",
+    "test:redemption-search": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-search.integration.test.ts",
+    "preverify:redemption-search:ui": "npm run build:server",
+    "verify:redemption-search:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-search.mjs"
   },
   "pnpm": {
     "overrides": {

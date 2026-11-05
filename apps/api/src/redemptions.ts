@@ -1,3 +1,4 @@
+import { RewardCartService } from './reward-cart.js';
 import { PointsExpressGate, type ExecutionMode } from './points-express-gate.js';
 import { expressShipmentInclude, expressShipmentView } from './express-shipment-view.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -537,70 +538,87 @@ export class RedemptionService {
     };
   }
   async createCart(r: ApiRequest, key: string, body: unknown) {
-    const b = fields(body, ['quoteIds']);
+    const b = fields(body, ['quoteIds', 'consumeCart']);
+    if (b.consumeCart !== undefined && typeof b.consumeCart !== 'boolean')
+      throw failure(400, 'VALIDATION_ERROR', '购物车来源无效');
     if (!Array.isArray(b.quoteIds) || b.quoteIds.length < 1 || b.quoteIds.length > 20)
       throw failure(400, 'VALIDATION_ERROR', '一次请选择1至20种商品');
     const quoteIds = b.quoteIds.map((v) => uuid(v)).sort();
     if (new Set(quoteIds).size !== quoteIds.length)
       throw failure(400, 'VALIDATION_ERROR', '报价不能重复');
-    return this.run(r, key, 'CART_CREATE', { quoteIds }, async (tx, userId) => {
-      await this.gate(tx, userId, 'EXPRESS');
-      await this.account(tx, userId);
-      const quotes = await tx.redemptionQuote.findMany({ where: { id: { in: quoteIds }, userId } });
-      if (quotes.length !== quoteIds.length)
-        throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人全部报价');
-      const snapshots = quotes.map((q) => q.snapshot as unknown as RedemptionSnapshot);
-      if (
-        new Set(snapshots.map((s) => s.rewardId)).size !== quotes.length ||
-        new Set(snapshots.map((s) => s.skuId)).size !== quotes.length
-      )
-        throw failure(400, 'VALIDATION_ERROR', '同一商品请合并数量');
-      if (
-        snapshots.some(
-          (s) =>
-            s.deliveryMode !== 'EXPRESS' ||
-            s.addressId !== snapshots[0]!.addressId ||
-            s.addressVersion !== snapshots[0]!.addressVersion ||
-            s.areaVersion !== snapshots[0]!.areaVersion,
+    return this.run(
+      r,
+      key,
+      'CART_CREATE',
+      { quoteIds, ...(b.consumeCart ? { consumeCart: true } : {}) },
+      async (tx, userId) => {
+        await this.gate(tx, userId, 'EXPRESS');
+        await this.account(tx, userId);
+        const quotes = await tx.redemptionQuote.findMany({
+          where: { id: { in: quoteIds }, userId },
+        });
+        if (quotes.length !== quoteIds.length)
+          throw failure(404, 'QUOTE_NOT_FOUND', '未找到本人全部报价');
+        const snapshots = quotes.map((q) => q.snapshot as unknown as RedemptionSnapshot);
+        if (
+          new Set(snapshots.map((s) => s.rewardId)).size !== quotes.length ||
+          new Set(snapshots.map((s) => s.skuId)).size !== quotes.length
         )
-      )
-        throw failure(409, 'QUOTE_CHANGED', '购物车商品必须使用同一快递地址与寄送规则');
-      // Lock every reward, then metadata and inventory in global order before creating any child.
-      for (const id of snapshots.map((s) => s.rewardId).sort()) await this.reward(tx, id);
-      await this.address(tx, userId, snapshots[0]!);
-      await metadataLocks(
-        tx,
-        snapshots.map((s) => s.skuId),
-      );
-      await inventoryLocks(
-        tx,
-        this.warehouse(),
-        snapshots.map((s) => s.skuId),
-      );
-      const orderIds: string[] = [];
-      for (const id of quoteIds)
-        orderIds.push((await this.createInTransaction(tx, userId, r, id)).id);
-      const final = await this.clock(tx);
-      const lots = await tx.redemptionAllocation.findMany({
-        where: { orderId: { in: orderIds } },
-        select: { lotId: true },
-      });
-      if (
-        quotes.some((q) => q.expiresAt <= final) ||
-        (await tx.stockLot.count({
-          where: { id: { in: lots.map((l) => l.lotId) }, expiresAt: { lte: final } },
-        })) ||
-        (await tx.rewardProduct.count({
-          where: { id: { in: snapshots.map((s) => s.rewardId) }, endsAt: { lte: final } },
-        }))
-      )
-        throw failure(409, 'QUOTE_EXPIRED', '报价、活动或批次已过期，整次兑换已回滚');
-      return {
-        id: orderIds[0]!,
-        orderIds,
-        totalPoints: snapshots.reduce((sum, s) => sum + BigInt(s.totalPoints), 0n).toString(),
-      };
-    });
+          throw failure(400, 'VALIDATION_ERROR', '同一商品请合并数量');
+        if (
+          snapshots.some(
+            (s) =>
+              s.deliveryMode !== 'EXPRESS' ||
+              s.addressId !== snapshots[0]!.addressId ||
+              s.addressVersion !== snapshots[0]!.addressVersion ||
+              s.areaVersion !== snapshots[0]!.areaVersion,
+          )
+        )
+          throw failure(409, 'QUOTE_CHANGED', '购物车商品必须使用同一快递地址与寄送规则');
+        // Lock every reward, then metadata and inventory in global order before creating any child.
+        for (const id of snapshots.map((s) => s.rewardId).sort()) await this.reward(tx, id);
+        await this.address(tx, userId, snapshots[0]!);
+        await metadataLocks(
+          tx,
+          snapshots.map((s) => s.skuId),
+        );
+        await inventoryLocks(
+          tx,
+          this.warehouse(),
+          snapshots.map((s) => s.skuId),
+        );
+        const orderIds: string[] = [];
+        for (const id of quoteIds)
+          orderIds.push((await this.createInTransaction(tx, userId, r, id)).id);
+        if (b.consumeCart)
+          await new RewardCartService(this.catalog).consume(
+            tx,
+            r,
+            userId,
+            snapshots.map((s) => ({ rewardId: s.rewardId, quantity: s.quantity })),
+          );
+        const final = await this.clock(tx);
+        const lots = await tx.redemptionAllocation.findMany({
+          where: { orderId: { in: orderIds } },
+          select: { lotId: true },
+        });
+        if (
+          quotes.some((q) => q.expiresAt <= final) ||
+          (await tx.stockLot.count({
+            where: { id: { in: lots.map((l) => l.lotId) }, expiresAt: { lte: final } },
+          })) ||
+          (await tx.rewardProduct.count({
+            where: { id: { in: snapshots.map((s) => s.rewardId) }, endsAt: { lte: final } },
+          }))
+        )
+          throw failure(409, 'QUOTE_EXPIRED', '报价、活动或批次已过期，整次兑换已回滚');
+        return {
+          id: orderIds[0]!,
+          orderIds,
+          totalPoints: snapshots.reduce((sum, s) => sum + BigInt(s.totalPoints), 0n).toString(),
+        };
+      },
+    );
   }
   async cancel(r: ApiRequest, key: string, id: string, body: unknown) {
     const b = fields(body, ['version']),
@@ -853,10 +871,7 @@ export class RedemptionService {
     };
   }
   async list(r: ApiRequest, q: unknown, admin = false, id?: string) {
-    const b = fields(
-      q,
-      admin ? ['cursor', 'status', 'keyword', 'fulfillment'] : ['cursor', 'status', 'fulfillment'],
-    );
+    const b = fields(q, ['cursor', 'status', 'keyword', 'fulfillment']);
     const cursor = b.cursor === undefined ? null : uuid(b.cursor),
       status = b.status === undefined ? null : str(b.status, 16);
     if (status && !['ACTIVE', 'CANCELED'].includes(status))
@@ -864,11 +879,29 @@ export class RedemptionService {
     const fulfillment = b.fulfillment === undefined ? '' : str(b.fulfillment, 24);
     if (
       fulfillment &&
-      !['EXPRESS_WAIT_SHIP', 'EXPRESS_SHIPPED', ...(admin ? ['LOCAL'] : [])].includes(fulfillment)
+      ![
+        'EXPRESS_WAIT_SHIP',
+        'EXPRESS_SHIPPED',
+        'EXPRESS_WAIT_RECEIPT',
+        'EXPRESS_RECEIVED',
+        ...(admin ? ['LOCAL'] : []),
+      ].includes(fulfillment)
     )
       throw failure(400, 'VALIDATION_ERROR', '履约筛选无效');
-    const keyword = b.keyword === undefined ? '' : str(b.keyword, 80);
+    const keyword =
+      b.keyword === undefined || (!admin && typeof b.keyword === 'string' && !b.keyword.trim())
+        ? ''
+        : str(b.keyword, 80);
     if (keyword.length > 80) throw failure(400, 'VALIDATION_ERROR', '搜索词过长');
+    // Consumer keywords use literal matching rather than SQL wildcard patterns.
+    const escape = '\\';
+    const search = admin
+      ? keyword
+      : keyword
+          .replaceAll(escape, escape + escape)
+          .replaceAll('%', escape + '%')
+          .replaceAll('_', escape + '_');
+    const searchMode = admin ? {} : { mode: 'insensitive' as const };
     return this.catalog.db.$transaction(async (tx) => {
       const userId = admin ? undefined : await this.checkout.session(tx, r),
         warehouseId = admin ? await this.staff.authorize(r, tx) : undefined;
@@ -882,12 +915,24 @@ export class RedemptionService {
             ? {
                 deliveryMode: 'EXPRESS',
                 AND: [{ status: 'ACTIVE' }],
-                expressShipment: fulfillment === 'EXPRESS_WAIT_SHIP' ? null : { isNot: null },
+                expressShipment:
+                  fulfillment === 'EXPRESS_WAIT_SHIP'
+                    ? null
+                    : fulfillment === 'EXPRESS_WAIT_RECEIPT'
+                      ? { is: { receipt: null } }
+                      : fulfillment === 'EXPRESS_RECEIVED'
+                        ? { is: { receipt: { isNot: null } } }
+                        : { isNot: null },
               }
             : {}),
         ...(id ? { id } : {}),
         ...(keyword
-          ? { OR: [{ orderNo: { contains: keyword } }, { title: { contains: keyword } }] }
+          ? {
+              OR: [
+                { orderNo: { contains: search, ...searchMode } },
+                { title: { contains: search, ...searchMode } },
+              ],
+            }
           : {}),
       };
       if (cursor && !(await tx.redemptionOrder.findFirst({ where: { ...where, id: cursor } })))

@@ -197,6 +197,7 @@ export default function PointsCheckout() {
           throw Error('请重新核验有效报价');
         original = {
           cartMode: !params.id,
+          cloudCart: !params.id,
           userId: who.profile.user.id,
           key: addressOperationKey(),
           quoteIds: quote.quotes.map((q) => q.id),
@@ -209,7 +210,7 @@ export default function PointsCheckout() {
         const result = await addressRequest<{ orderIds: string[]; totalPoints: string }>(
           who,
           '/consumer/redemption-cart-orders',
-          { quoteIds: original.quoteIds },
+          { quoteIds: original.quoteIds, ...(original.cloudCart ? { consumeCart: true } : {}) },
           original.key,
         );
         original = { ...original, result };

@@ -1041,3 +1041,28 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 ## 2026-11-05 售后待办指标（OpenAPI 0.63.0）
 
 `GET /admin/redemption-express-readiness` 的 `metrics` 追加非负整数 `returnsRequested`（待审核）、`returnsWaitingReceipt`（待退货验收）、`returnsReadyToRefund`（待退积分）、`inconsistentReturns`（存在售后事实/退积分流水差异的申请数）。前三项与 `GET /admin/redemption-returns?status=REQUESTED|WAIT_RETURN|READY_TO_REFUND` 共用状态过滤逻辑，不受列表20条分页上限影响。当前仓、员工Cookie/points.read、未知查询参数拒绝、no-store及事务内复核权限保持不变，不返回申请ID、正文、个人资料或积分流水明细。`INVARIANTS` 同时纳入售后差异，`canLaunch` 仍固定false。前后端需匹配构建；旧客户端可忽略新增字段。
+
+
+## 2026-11-05 积分账号购物车（OpenAPI 0.64.0）
+
+新增 `GET /consumer/points-cart`，返回 `{version, items:[{rewardId,quantity}]}`，无记录返回版本0和空数组，不在GET中写库。新增 `POST /consumer/points-cart`，请求 `{action:REPLACE|MERGE, version, items}`，必须携带UUID `Idempotency-Key`；响应同GET。两者均要求消费者Bearer会话、仅本人资源、拒绝未知参数、响应no-store。每项quantity整数1至100000，最多20种且rewardId不能重复；保存只保存引用和数量，不信任价格、不预占库存/积分，失效引用可保留删除。合并累加数量，容量超出409；版本冲突409/CART_VERSION_CONFLICT；同键异内容409/IDEMPOTENCY_CONFLICT，同键重放返回原操作结果，客户端再GET最新版本。权限/会话失效401，格式400。
+
+`POST /consumer/redemption-cart-orders` 追加可选布尔 `consumeCart`（默认false）。true时在同一交易事务按本人报价原商品/数量扣减账号积分购物车，成功原键重放不二次扣减；失败全部回滚。省略/false沿用原请求摘要兼容旧未决请求，true计入摘要禁止中途更改来源。新小程序使用checkout intent的cloudCart标记，仅新账号购物车订单发送true；旧intent不补该标记、不改变原键/摘要。先迁移数据库并部署兼容API，再更新小程序；旧客户端可继续使用本机购物车并随后明确导入。
+
+
+## 2026-11-05 快递收货确认（OpenAPI 0.65.0）
+
+新增 `POST /consumer/redemptions/:id/confirm-receipt`：消费者Bearer会话、UUID Idempotency-Key、请求 `{received:true}`，拒绝未知查询/字段，返回 `{receivedAt}` ISO时间，no-store。必须是本人ACTIVE、已具快递发货事实且Outbox为EXPRESS_SHIPPED的订单；未发货/已取消409，他人或不存在404，无消费者身份401，非明确确认/非法输入400，作业门禁关闭503。重复同键或不同键均返回原确认时间，不新增第二份事实；成功原键在作业暂停时仍可恢复。
+
+共享 `RedemptionExpressShipmentView` 追加 `receivedAt:string|null`；历史未确认默认null，列表、详情、后台快递面板与打印预览契约一致。原订单status与fulfillmentState保持既有语义，收货状态单独读取此字段，不把已有快递出库状态改成新通用状态。消费者订单列表/详情响应追加no-store。
+
+订单列表fulfillment增加 `EXPRESS_WAIT_RECEIPT`（ACTIVE已发货且无收货确认）、`EXPRESS_RECEIVED`（ACTIVE已发货且有确认），消费者和本仓后台共用条件；旧 `EXPRESS_SHIPPED` 保持所有已发货语义，含已确认，用于历史客户端/售后列表。游标仍须属于相同用户/仓库和当前筛选，状态改变后返回409/CURSOR_INVALID，客户端重新读取。
+
+兼容顺序：先第61项迁移和API，再小程序/后台。旧客户端可忽略receivedAt，原已发货筛选继续可用，不能把历史发货记录自动回填成签收。
+
+
+## 2026-11-06 消费者订单搜索（OpenAPI 0.66.0）
+
+`GET /consumer/redemptions` 新增可选 `keyword`（string，trim后最多80字符；省略/空白视为无关键词），按本人订单快照title或orderNo不区分大小写部分匹配。消费者搜索对LIKE特殊字符百分号、下划线及反斜线转义为字面文本，不扩大匹配；员工原搜索语义保持。与status/fulfillment取交集，仍每页20条及nextCursor，游标须属于本人、关键词和状态范围，否则409/CURSOR_INVALID。重复参数、非字符串、超长和未知字段400，未登录401；不允许传userId切换资源归属。
+
+返回结构与no-store不变，不新增写接口；旧客户端省略keyword行为保持。客户端固定已提交关键词处理刷新、分页及重试，切换查询重置游标并隔离迟到响应。API/小程序匹配构建更新，无迁移。

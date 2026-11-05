@@ -1,5 +1,5 @@
 import { LoadingState } from '../../components/LoadingState';
-import { View, Text, Button } from '@tarojs/components';
+import { View, Text, Button, Input } from '@tarojs/components';
 import Taro, {
   useDidShow,
   useDidHide,
@@ -22,29 +22,42 @@ export default function Redemptions() {
   const filters = [
     { label: '全部', query: '' },
     { label: '待发货', query: 'fulfillment=EXPRESS_WAIT_SHIP' },
-    { label: '已发货', query: 'fulfillment=EXPRESS_SHIPPED' },
+    { label: '待收货', query: 'fulfillment=EXPRESS_WAIT_RECEIPT' },
+    { label: '已完成', query: 'fulfillment=EXPRESS_RECEIVED' },
     { label: '已取消', query: 'status=CANCELED' },
   ];
   const [filter, setFilter] = useState(() =>
-    afterSales || params.fulfillment === 'EXPRESS_SHIPPED'
+    afterSales || ['EXPRESS_SHIPPED', 'EXPRESS_WAIT_RECEIPT'].includes(params.fulfillment ?? '')
       ? 2
       : params.fulfillment === 'EXPRESS_WAIT_SHIP'
         ? 1
-        : params.status === 'CANCELED'
+        : params.fulfillment === 'EXPRESS_RECEIVED'
           ? 3
-          : 0,
+          : params.status === 'CANCELED'
+            ? 4
+            : 0,
   );
   const [items, setItems] = useState<RedemptionOrderView[]>([]),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
-    [guest, setGuest] = useState(false);
+    [guest, setGuest] = useState(false),
+    [keyword, setKeyword] = useState(''),
+    [searchTerm, setSearchTerm] = useState('');
   const seq = useRef(0),
     activeLoad = useRef<number | null>(null),
     pending = useRef<string | undefined>(undefined),
-    owner = useRef('');
-  async function load(next?: string, selected = filter) {
+    owner = useRef(''),
+    applied = useRef({ filter, serviceOnly: afterSales, keyword: '' });
+  async function load(
+    next?: string,
+    selected = applied.current.filter,
+    serviceOnly = applied.current.serviceOnly,
+    term = applied.current.keyword,
+    restoreSearch = false,
+  ) {
     if (next && activeLoad.current !== null) return;
+    applied.current = { filter: selected, serviceOnly, keyword: term };
     const n = ++seq.current;
     activeLoad.current = n;
     pending.current = next;
@@ -59,13 +72,43 @@ export default function Redemptions() {
       if (n !== seq.current) return;
       setGuest(!who);
       if (!who) {
+        owner.current = '';
+        applied.current = { filter: 0, serviceOnly: false, keyword: '' };
+        setKeyword('');
+        setSearchTerm('');
+        setFilter(0);
+        setAfterSales(false);
         setItems([]);
         setCursor(null);
         return;
       }
-      if (next && owner.current !== who.profile.user.id) throw Error('账号已变化，请重新读取');
+      const changed = !!owner.current && owner.current !== who.profile.user.id;
       owner.current = who.profile.user.id;
-      const query = [filters[selected]?.query, next ? 'cursor=' + encodeURIComponent(next) : '']
+      if (changed) {
+        selected = 0;
+        serviceOnly = false;
+        term = '';
+        applied.current = { filter: 0, serviceOnly: false, keyword: '' };
+        setFilter(0);
+        setAfterSales(false);
+        setKeyword('');
+        setSearchTerm('');
+        setItems([]);
+        setCursor(null);
+        if (next) {
+          pending.current = undefined;
+          throw Error('账号已变化，请重新读取');
+        }
+      }
+      if (!changed && restoreSearch) {
+        setKeyword(term);
+        setSearchTerm(term);
+      }
+      const query = [
+        serviceOnly ? 'fulfillment=EXPRESS_SHIPPED' : filters[selected]?.query,
+        next ? 'cursor=' + encodeURIComponent(next) : '',
+        term ? 'keyword=' + encodeURIComponent(term) : '',
+      ]
         .filter(Boolean)
         .join('&');
       const p = await addressRequest<RedemptionOrderPage>(
@@ -84,7 +127,14 @@ export default function Redemptions() {
           setGuest(true);
           setItems([]);
           setCursor(null);
-        } else setError(e instanceof Error ? e.message : '兑换单读取失败');
+        } else {
+          if (e instanceof AddressRequestError && e.code === 'CURSOR_INVALID') {
+            pending.current = undefined;
+            setItems([]);
+            setCursor(null);
+          }
+          setError(e instanceof Error ? e.message : '订单读取失败');
+        }
       }
     } finally {
       if (activeLoad.current === n) {
@@ -100,18 +150,26 @@ export default function Redemptions() {
       ? 2
       : view?.status === 'EXPRESS_WAIT_SHIP'
         ? 1
-        : view?.status === 'EXPRESS_SHIPPED'
+        : ['EXPRESS_SHIPPED', 'EXPRESS_WAIT_RECEIPT'].includes(view?.status ?? '')
           ? 2
-          : view?.status === 'CANCELED'
+          : view?.status === 'EXPRESS_RECEIVED'
             ? 3
-            : filter;
+            : view?.status === 'CANCELED'
+              ? 4
+              : view
+                ? 0
+                : applied.current.filter;
+    const serviceOnly = view ? view.service === 'after-sales' : applied.current.serviceOnly;
+    const term = view ? '' : applied.current.keyword;
+    setAfterSales(serviceOnly);
     if (view) {
-      setAfterSales(view.service === 'after-sales');
+      setKeyword('');
+      setSearchTerm('');
       setFilter(nextFilter);
-    } else setAfterSales(false);
+    }
     setItems([]);
     setCursor(null);
-    void load(undefined, nextFilter);
+    void load(undefined, nextFilter, serviceOnly, term, true);
   });
   useReachBottom(() => {
     if (cursor && !loading && !error) void load(cursor);
@@ -122,6 +180,8 @@ export default function Redemptions() {
   useDidHide(() => {
     seq.current++;
     activeLoad.current = null;
+    setKeyword('');
+    setSearchTerm('');
     setItems([]);
     setCursor(null);
   });
@@ -131,12 +191,35 @@ export default function Redemptions() {
     },
     [],
   );
+  function search(value = keyword) {
+    const term = value.trim();
+    setKeyword(term);
+    setSearchTerm(term);
+    void load(undefined, applied.current.filter, applied.current.serviceOnly, term);
+  }
   return (
     <View className="account-page reward-detail-page redemption-list-page">
       <View className="account-hero">
         <Text className="account-name">{afterSales ? '兑换售后' : '订单'}</Text>
       </View>
       <View className="account-content">
+        <View className="reward-search redemption-search">
+          <Input
+            aria-label="搜索订单"
+            value={keyword}
+            maxlength={80}
+            placeholder="商品名或订单号"
+            confirmType="search"
+            onInput={(e) => setKeyword(e.detail.value)}
+            onConfirm={() => search()}
+          />
+          {!!keyword && (
+            <Button className="redemption-search-clear" onClick={() => search('')}>
+              清除
+            </Button>
+          )}
+          <Button onClick={() => search()}>搜索</Button>
+        </View>
         {!afterSales && (
           <View className="reward-categories">
             {filters.map(({ label }, index) => (
@@ -177,13 +260,19 @@ export default function Redemptions() {
         )}
         {!loading && !guest && !error && !items.length && (
           <View className="account-card redemption-empty">
-            <Text>暂无订单</Text>
-            <Button
-              className="account-link"
-              onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}
-            >
-              去逛商城 ›
-            </Button>
+            <Text>{searchTerm ? '没有找到相关订单' : '暂无订单'}</Text>
+            {searchTerm ? (
+              <Button className="account-link" onClick={() => search('')}>
+                清除搜索
+              </Button>
+            ) : (
+              <Button
+                className="account-link"
+                onClick={() => void Taro.switchTab({ url: '/pages/index/index' })}
+              >
+                去逛商城 ›
+              </Button>
+            )}
           </View>
         )}
         {items.map((o) => {
@@ -192,7 +281,9 @@ export default function Redemptions() {
               ? '已取消 · 积分已退还'
               : o.deliveryMode === 'EXPRESS'
                 ? o.expressShipment
-                  ? `已发货 · ${o.expressShipment.carrierName}`
+                  ? o.expressShipment.receivedAt
+                    ? '已完成 · 已确认收货'
+                    : `待收货 · ${o.expressShipment.carrierName}`
                   : '待发货'
                 : o.deliveryExceptionReported
                   ? '配送异常待处理'

@@ -152,7 +152,16 @@ export function ExpressShippingPanel({
           </div>
           {view.shipment && (
             <div className="picking-pack-proof">
-              <h4>已快递发货</h4>
+              <h4>{view.shipment.receivedAt ? '已完成 · 用户确认收货' : '已快递发货'}</h4>
+              {view.shipment.receivedAt && (
+                <p>
+                  用户确认收货时间：
+                  {new Date(view.shipment.receivedAt).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                  })}
+                  （北京时间）
+                </p>
+              )}
               <p>
                 {view.shipment.carrierName} · 运单号：{view.shipment.trackingNo}
               </p>

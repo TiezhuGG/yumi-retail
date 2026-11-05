@@ -6,7 +6,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { RedemptionOrderView } from '../../../../../packages/contracts/src/index';
 import { cartIdentity } from '../../account-cart';
 import { addressRequest, addressOperationKey } from '../../address-api';
-import { acknowledgeRedemption, redemptionCancelKey } from '../../redemption-storage';
+import {
+  acknowledgeRedemption,
+  redemptionCancelKey,
+  redemptionReceiptKey,
+} from '../../redemption-storage';
 import { formatRedemptionAddress } from '../../redemption-address';
 import { RedemptionAfterSales } from '../../redemption-after-sales';
 export default function RedemptionDetail() {
@@ -14,7 +18,8 @@ export default function RedemptionDetail() {
   const [order, setOrder] = useState<RedemptionOrderView | null>(null),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [receiptPending, setReceiptPending] = useState(false);
   const seq = useRef(0),
     writing = useRef(false);
   async function load() {
@@ -29,6 +34,9 @@ export default function RedemptionDetail() {
       const o = await addressRequest<RedemptionOrderView>(who, '/consumer/redemptions/' + id);
       if (n !== seq.current) return;
       setOrder(o);
+      const receiptKey = redemptionReceiptKey(who.profile.user.id, o.id);
+      if (o.expressShipment?.receivedAt) Taro.removeStorageSync(receiptKey);
+      setReceiptPending(!!Taro.getStorageSync(receiptKey));
       acknowledgeRedemption(who.profile.user.id, o.id);
       if (o.status === 'CANCELED')
         Taro.removeStorageSync(redemptionCancelKey(who.profile.user.id, o.id));
@@ -85,6 +93,46 @@ export default function RedemptionDetail() {
       if (n === seq.current || n + 1 === seq.current) setBusy(false);
     }
   }
+  async function confirmReceipt() {
+    if (writing.current || !order) return;
+    writing.current = true;
+    setBusy(true);
+    setError('');
+    const n = seq.current;
+    try {
+      const who = await cartIdentity();
+      if (!who) throw Error('请先登录');
+      const storage = redemptionReceiptKey(who.profile.user.id, order.id);
+      let intent = Taro.getStorageSync(storage) as { key: string } | undefined;
+      if (!intent) {
+        const result = await Taro.showModal({
+          title: '确认已收到全部商品？',
+          content: '确认后订单显示已完成，售后入口仍保留。',
+          confirmText: '确认收货',
+        });
+        if (!result.confirm || n !== seq.current) return;
+        intent = { key: addressOperationKey() };
+        Taro.setStorageSync(storage, intent);
+      }
+      if (!/^[a-f0-9-]{36}$/i.test(intent.key)) throw Error('收货确认记录无法读取，请保留并核实');
+      setReceiptPending(true);
+      await addressRequest(
+        who,
+        '/consumer/redemptions/' + order.id + '/confirm-receipt',
+        { received: true },
+        intent.key,
+      );
+      if (n === seq.current) await load();
+    } catch (e) {
+      if (n === seq.current)
+        setError(
+          (e instanceof Error ? e.message : '收货结果待核实') + '；请重新读取或核实原收货请求。',
+        );
+    } finally {
+      writing.current = false;
+      if (n === seq.current || n + 1 === seq.current) setBusy(false);
+    }
+  }
   return (
     <View className="account-page reward-detail-page redemption-order-page">
       <View className="account-hero">
@@ -111,7 +159,9 @@ export default function RedemptionDetail() {
                   ? '积分已退还，商品预占已释放。'
                   : order.deliveryMode === 'EXPRESS'
                     ? order.expressShipment
-                      ? '已快递发货'
+                      ? order.expressShipment.receivedAt
+                        ? '已完成 · 已确认收货'
+                        : '待收货'
                       : '待快递发货 · 商家承担运费'
                     : order.deliveryExceptionReported
                       ? '配送异常待处理'
@@ -198,6 +248,27 @@ export default function RedemptionDetail() {
                 >
                   复制运单号
                 </Button>
+              </View>
+            )}
+            {order.status === 'ACTIVE' && order.expressShipment && (
+              <View className="account-card">
+                {order.expressShipment.receivedAt ? (
+                  <Text className="account-copy">
+                    确认收货时间：
+                    {new Date(order.expressShipment.receivedAt).toLocaleString('zh-CN', {
+                      timeZone: 'Asia/Shanghai',
+                    })}
+                    （北京时间）
+                  </Text>
+                ) : (
+                  <Button
+                    className="points-action"
+                    disabled={busy || loading}
+                    onClick={() => void confirmReceipt()}
+                  >
+                    {receiptPending ? '核实收货结果' : '确认收货'}
+                  </Button>
+                )}
               </View>
             )}
             <View className="account-card">
