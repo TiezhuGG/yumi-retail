@@ -1,5 +1,5 @@
 import { View, Text, Button, Input, Textarea } from '@tarojs/components';
-import Taro, { useDidHide } from '@tarojs/taro';
+import Taro, { useDidHide, useDidShow } from '@tarojs/taro';
 import { useEffect, useRef, useState } from 'react';
 import type { RedemptionReturnPage } from '../../../packages/contracts/src/index';
 import { cartIdentity } from './account-cart';
@@ -13,14 +13,15 @@ const states = {
   REJECTED: '申请未通过',
   CANCELED: '申请已撤销',
 };
-export function RedemptionReturns({ orderId }: { orderId: string }) {
+export function RedemptionReturns({ orderId, returnId }: { orderId: string; returnId?: string }) {
   const [page, setPage] = useState<RedemptionReturnPage | null>(null),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [quantity, setQuantity] = useState('1'),
     [reason, setReason] = useState(''),
-    [pending, setPending] = useState(false);
+    [pending, setPending] = useState(false),
+    [recoverHere, setRecoverHere] = useState(true);
   const seq = useRef(0),
     writing = useRef(false),
     owner = useRef('');
@@ -43,9 +44,14 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
       if (!who) throw Error('请先登录查看本人售后');
       if (n !== seq.current) return;
       owner.current = who.profile.user.id;
-      setPending(!!stored(owner.current));
+      const original = stored(owner.current);
+      setPending(!!original);
+      setRecoverHere(!returnId || original?.id === returnId);
       const p = await addressRequest<RedemptionReturnPage>(who, prefix);
-      if (n === seq.current) setPage(p);
+      if (n === seq.current) {
+        if (returnId && !p.items.some((v) => v.id === returnId)) throw Error('未找到本人售后申请');
+        setPage(p);
+      }
     } catch (e) {
       if (n === seq.current) setError(e instanceof Error ? e.message : '售后读取失败');
     } finally {
@@ -57,7 +63,10 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
     return () => {
       seq.current++;
     };
-  }, [orderId]);
+  }, [orderId, returnId]);
+  useDidShow(() => {
+    if (returnId) void load();
+  });
   useDidHide(() => {
     seq.current++;
     setPage(null);
@@ -80,6 +89,7 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
       };
       Taro.setStorageSync(storage(owner.current), intent);
       setPending(true);
+      setRecoverHere(true);
       await addressRequest(
         who,
         prefix + (intent.id ? '/' + intent.id + '/cancel' : ''),
@@ -102,7 +112,11 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
             setReason('');
           }
         }
-        setError(e instanceof Error ? e.message : '提交结果未知，请使用原请求核实');
+        setError(
+          e instanceof Error && !(e instanceof TypeError)
+            ? e.message
+            : '提交结果暂未确认，请使用原请求核实',
+        );
       }
     } finally {
       writing.current = false;
@@ -116,9 +130,11 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
   return (
     <View className="account-card return-card">
       <Text className="account-card-title">退货 / 退积分</Text>
-      <Text className="account-copy">
-        按原兑换积分价申请，由门店审核。需要退货时，请先联系门店确认寄回方式。
-      </Text>
+      {!returnId && (
+        <Text className="account-copy">
+          按原兑换积分价申请，由门店审核。需要退货时，请先联系门店确认寄回方式。
+        </Text>
+      )}
       {loading && <Text className="account-copy">正在读取售后申请…</Text>}
       {error && (
         <View className="account-error">
@@ -126,48 +142,68 @@ export function RedemptionReturns({ orderId }: { orderId: string }) {
         </View>
       )}
       {pending && (
-        <Button className="points-action" disabled={busy} onClick={() => void write()}>
-          使用原请求核实售后
+        <Button
+          className="points-action"
+          disabled={busy || loading}
+          onClick={() =>
+            recoverHere
+              ? void write()
+              : void Taro.navigateTo({ url: '/pages/redemption/index?id=' + orderId })
+          }
+        >
+          {recoverHere ? '使用原请求核实售后' : '到订单核实原售后'}
         </Button>
       )}
-      {page?.items.map((v) => (
-        <View className="after-sales-event" key={v.id}>
-          <Text className="account-card-title">{states[v.state]}</Text>
-          <Text className="account-copy">
-            {v.quantity} 件 · {v.points} 积分
-          </Text>
-          <Text className="account-copy">申请说明：{v.reason}</Text>
-          {v.events.map((e) => (
-            <View key={e.kind}>
-              <Text className="account-copy">
-                {new Date(e.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} ·{' '}
-                {e.kind === 'REFUND'
-                  ? '已原额退积分'
-                  : e.kind === 'RECEIVE'
-                    ? '门店已核验退货'
-                    : e.kind === 'APPROVE'
-                      ? v.requiresReturn
-                        ? '请联系门店寄回商品'
-                        : '无需退货，等待退积分'
-                      : e.kind === 'REJECT'
-                        ? '审核未通过'
-                        : '已撤销'}
-              </Text>
-              <Text className="account-copy">{e.reason}</Text>
-            </View>
-          ))}
-          {v.state === 'REQUESTED' && (
-            <Button
-              className="account-link"
-              disabled={busy || pending || !page.enabled}
-              onClick={() => void write(v.id)}
-            >
-              撤销本次申请
-            </Button>
-          )}
-        </View>
-      ))}
-      {page && page.remainingQuantity > 0 && !pending && (
+      {page?.items
+        .filter((v) => !returnId || v.id === returnId)
+        .map((v) => (
+          <View className="after-sales-event" key={v.id}>
+            <Text className="account-card-title">{states[v.state]}</Text>
+            {returnId && (
+              <>
+                <Text className="account-copy">{v.title}</Text>
+                <Text className="account-copy">订单号：{v.orderNo}</Text>
+                <Text className="account-copy">
+                  申请时间：
+                  {new Date(v.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
+                </Text>
+              </>
+            )}
+            <Text className="account-copy">
+              {v.quantity} 件 · {v.points} 积分
+            </Text>
+            <Text className="account-copy">申请说明：{v.reason}</Text>
+            {v.events.map((e) => (
+              <View key={e.kind}>
+                <Text className="account-copy">
+                  {new Date(e.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} ·{' '}
+                  {e.kind === 'REFUND'
+                    ? '已原额退积分'
+                    : e.kind === 'RECEIVE'
+                      ? '门店已核验退货'
+                      : e.kind === 'APPROVE'
+                        ? v.requiresReturn
+                          ? '请联系门店寄回商品'
+                          : '无需退货，等待退积分'
+                        : e.kind === 'REJECT'
+                          ? '审核未通过'
+                          : '已撤销'}
+                </Text>
+                <Text className="account-copy">{e.reason}</Text>
+              </View>
+            ))}
+            {v.state === 'REQUESTED' && (
+              <Button
+                className="account-link"
+                disabled={busy || pending || !page.enabled}
+                onClick={() => void write(v.id)}
+              >
+                撤销本次申请
+              </Button>
+            )}
+          </View>
+        ))}
+      {page && !returnId && page.remainingQuantity > 0 && !pending && (
         <>
           <Text className="account-card-title">申请售后</Text>
           <Text className="account-copy">

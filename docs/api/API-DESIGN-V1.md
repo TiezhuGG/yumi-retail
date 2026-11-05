@@ -1066,3 +1066,10 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 `GET /consumer/redemptions` 新增可选 `keyword`（string，trim后最多80字符；省略/空白视为无关键词），按本人订单快照title或orderNo不区分大小写部分匹配。消费者搜索对LIKE特殊字符百分号、下划线及反斜线转义为字面文本，不扩大匹配；员工原搜索语义保持。与status/fulfillment取交集，仍每页20条及nextCursor，游标须属于本人、关键词和状态范围，否则409/CURSOR_INVALID。重复参数、非字符串、超长和未知字段400，未登录401；不允许传userId切换资源归属。
 
 返回结构与no-store不变，不新增写接口；旧客户端省略keyword行为保持。客户端固定已提交关键词处理刷新、分页及重试，切换查询重置游标并隔离迟到响应。API/小程序匹配构建更新，无迁移。
+
+
+## 2026-11-06 消费者售后汇总（OpenAPI 0.67.0）
+
+新增 `GET /consumer/redemption-returns`，消费者Bearer身份、no-store；只读本人申请且其订单也须归本人。可选status为PROCESSING、REFUNDED、CLOSED，省略为全部；PROCESSING对应REQUESTED/WAIT_RETURN/READY_TO_REFUND，CLOSED对应REJECTED/CANCELED。可选keyword为trim后最多80字符的商品标题/订单号、不区分大小写部分匹配，LIKE特殊字符按字面转义。cursor为UUID，同本人/当前关键词/状态范围校验，失效409/CURSOR_INVALID；未知/重复/非法参数400，未登录401，服务不可用503。
+
+返回 `{items,nextCursor}`，每页20条；摘要包含id/orderId/orderNo/title/quantity/points/state/createdAt/requiresReturn，points按原订单单件积分价乘本申请件数并以字符串返回。摘要不解密申请原因、不返回处理历史或员工身份；详情沿用本人订单既有售后读取接口，仅在页面展示指定申请，无新增写接口。读取使用RepeatableRead并在事务首尾核验会话。旧接口与客户端兼容，无迁移，先更新API再小程序。

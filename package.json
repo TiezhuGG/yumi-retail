@@ -237,7 +237,11 @@
     "pretest:redemption-search": "npm run build:server",
     "test:redemption-search": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/redemption-search.integration.test.ts",
     "preverify:redemption-search:ui": "npm run build:server",
-    "verify:redemption-search:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-search.mjs"
+    "verify:redemption-search:ui": "node --env-file=.env --import tsx scripts/ui/verify-redemption-search.mjs",
+    "pretest:consumer-return-list": "npm run build:server",
+    "test:consumer-return-list": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-return-list.integration.test.ts",
+    "preverify:consumer-return-list:ui": "npm run build:server",
+    "verify:consumer-return-list:ui": "node --env-file=.env --import tsx scripts/ui/verify-consumer-return-list.mjs"
   },
   "pnpm": {
     "overrides": {

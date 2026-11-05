@@ -1236,3 +1236,20 @@ export interface RewardCart {
   version: number;
   items: RewardCartLine[];
 }
+
+export type RedemptionReturnSummary = Pick<
+  RedemptionReturnView,
+  | 'id'
+  | 'orderId'
+  | 'orderNo'
+  | 'title'
+  | 'quantity'
+  | 'points'
+  | 'state'
+  | 'createdAt'
+  | 'requiresReturn'
+>;
+export interface ConsumerReturnList {
+  items: RedemptionReturnSummary[];
+  nextCursor: string | null;
+}

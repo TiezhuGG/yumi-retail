@@ -179,7 +179,7 @@ export default function Account() {
                 <Text>{label}</Text>
               </Button>
             ))}
-            <Button className="member-order-link" onClick={() => viewOrders(undefined, true)}>
+            <Button className="member-order-link" onClick={() => protectedOpen('returns/index')}>
               <View className="member-order-icon member-order-icon-service" />
               <Text>售后服务</Text>
             </Button>

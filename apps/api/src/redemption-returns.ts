@@ -20,7 +20,11 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import type { Prisma } from '@yumi/database';
-import type { RedemptionReturnPage, RedemptionReturnView } from '@yumi/contracts';
+import type {
+  RedemptionReturnPage,
+  RedemptionReturnView,
+  ConsumerReturnList,
+} from '@yumi/contracts';
 import { RedemptionAfterSalesService } from './redemption-after-sales.js';
 import { Consumer, Permissions } from './staff-guard.js';
 import { fields, integer, key, str, uuid } from './catalog-input.js';
@@ -68,6 +72,24 @@ export function redemptionReturnStateWhere(status: string): Prisma.RedemptionRet
             }
           : {};
 }
+function returnState(
+  events: Array<{ kind: string; requiresReturn: boolean | null }>,
+): RedemptionReturnView['state'] {
+  const approved = events.find((e) => e.kind === 'APPROVE');
+  return events.some((e) => e.kind === 'REFUND')
+    ? 'REFUNDED'
+    : events.some((e) => e.kind === 'REJECT')
+      ? 'REJECTED'
+      : events.some((e) => e.kind === 'CANCEL')
+        ? 'CANCELED'
+        : events.some((e) => e.kind === 'RECEIVE')
+          ? 'READY_TO_REFUND'
+          : approved
+            ? approved.requiresReturn
+              ? 'WAIT_RETURN'
+              : 'READY_TO_REFUND'
+            : 'REQUESTED';
+}
 export class RedemptionReturnsService {
   constructor(readonly base: RedemptionAfterSalesService) {}
   get catalog() {
@@ -91,19 +113,7 @@ export class RedemptionReturnsService {
       .reduce((sum, x) => sum + x.quantity, 0);
     const items: RedemptionReturnView[] = rows.map((x) => {
       const approved = x.events.find((e) => e.kind === 'APPROVE');
-      const state = x.events.some((e) => e.kind === 'REFUND')
-        ? 'REFUNDED'
-        : x.events.some((e) => e.kind === 'REJECT')
-          ? 'REJECTED'
-          : x.events.some((e) => e.kind === 'CANCEL')
-            ? 'CANCELED'
-            : x.events.some((e) => e.kind === 'RECEIVE')
-              ? 'READY_TO_REFUND'
-              : approved
-                ? approved.requiresReturn
-                  ? 'WAIT_RETURN'
-                  : 'READY_TO_REFUND'
-                : 'REQUESTED';
+      const state = returnState(x.events);
       return {
         id: x.id,
         orderId,
@@ -135,6 +145,77 @@ export class RedemptionReturnsService {
         : this.base.enabled,
       items,
     };
+  }
+  async consumerList(r: ApiRequest, input: unknown): Promise<ConsumerReturnList> {
+    const b = fields(input, ['cursor', 'status', 'keyword']);
+    const cursor = b.cursor === undefined ? null : uuid(b.cursor),
+      status = b.status === undefined ? '' : str(b.status, 20);
+    if (status && !['PROCESSING', 'REFUNDED', 'CLOSED'].includes(status))
+      throw failure(400, 'VALIDATION_ERROR', '售后筛选状态无效');
+    const keyword =
+      b.keyword === undefined || (typeof b.keyword === 'string' && !b.keyword.trim())
+        ? ''
+        : str(b.keyword, 80);
+    const escape = String.fromCharCode(92),
+      term = keyword
+        .replaceAll(escape, escape + escape)
+        .replaceAll('%', escape + '%')
+        .replaceAll('_', escape + '_');
+    const states =
+      status === 'PROCESSING'
+        ? ['REQUESTED', 'WAIT_RETURN', 'READY_TO_REFUND']
+        : status === 'CLOSED'
+          ? ['REJECTED', 'CANCELED']
+          : status
+            ? [status]
+            : [];
+    return this.catalog.db.$transaction(
+      async (tx) => {
+        const user = await this.base.consumer(tx, r);
+        const where: Prisma.RedemptionReturnWhereInput = {
+          userId: user,
+          order: {
+            userId: user,
+            ...(term
+              ? {
+                  OR: [
+                    { title: { contains: term, mode: 'insensitive' } },
+                    { orderNo: { contains: term, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          ...(states.length ? { OR: states.map(redemptionReturnStateWhere) } : {}),
+        };
+        if (cursor && !(await tx.redemptionReturn.findFirst({ where: { ...where, id: cursor } })))
+          throw failure(409, 'CURSOR_INVALID', '售后列表已变化，请重新读取');
+        const rows = await tx.redemptionReturn.findMany({
+          where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
+          orderBy: { id: 'asc' },
+          take: 21,
+          include: {
+            order: { select: { orderNo: true, title: true, pointsPrice: true } },
+            events: { select: { kind: true, requiresReturn: true } },
+          },
+        });
+        const items = rows
+          .slice(0, 20)
+          .map((x) => ({
+            id: x.id,
+            orderId: x.orderId,
+            orderNo: x.order.orderNo,
+            title: x.order.title,
+            quantity: x.quantity,
+            points: (BigInt(x.quantity) * x.order.pointsPrice).toString(),
+            state: returnState(x.events),
+            createdAt: x.createdAt.toISOString(),
+            requiresReturn: x.events.find((e) => e.kind === 'APPROVE')?.requiresReturn ?? null,
+          }));
+        await this.base.consumer(tx, r);
+        return { items, nextCursor: rows.length > 20 ? items.at(-1)!.id : null };
+      },
+      { isolationLevel: 'RepeatableRead', timeout: 15000 },
+    );
   }
   async consumerRead(r: ApiRequest, id: string) {
     return this.catalog.db.$transaction(async (tx) => {
@@ -496,5 +577,51 @@ export class AdminReturnsController {
   ) {
     fields(q, []);
     return success(r, await this.service.action(r, uuid(id), str(a, 20), key(r), b));
+  }
+}
+
+@ApiTags('本人售后进度')
+@ApiBearerAuth('consumerSession')
+@Consumer()
+@Controller('consumer/redemption-returns')
+export class ConsumerReturnListController {
+  constructor(@Inject(RedemptionReturnsService) readonly service: RedemptionReturnsService) {}
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  @ApiQuery({ name: 'status', required: false, enum: ['PROCESSING', 'REFUNDED', 'CLOSED'] })
+  @ApiQuery({ name: 'keyword', required: false, schema: { type: 'string', maxLength: 80 } })
+  @ApiQuery({ name: 'cursor', required: false, schema: { type: 'string', format: 'uuid' } })
+  @ApiResult(
+    object({
+      items: {
+        type: 'array',
+        items: object({
+          id: text,
+          orderId: text,
+          orderNo: text,
+          title: text,
+          quantity: { type: 'integer', minimum: 1 },
+          points: text,
+          state: {
+            type: 'string',
+            enum: [
+              'REQUESTED',
+              'WAIT_RETURN',
+              'READY_TO_REFUND',
+              'REFUNDED',
+              'REJECTED',
+              'CANCELED',
+            ],
+          },
+          createdAt: text,
+          requiresReturn: { type: 'boolean', nullable: true },
+        }),
+      },
+      nextCursor: { ...text, nullable: true },
+    }),
+    [400, 401, 409, 500, 503],
+  )
+  async list(@Req() r: ApiRequest, @Query() q: unknown) {
+    return success(r, await this.service.consumerList(r, q));
   }
 }
