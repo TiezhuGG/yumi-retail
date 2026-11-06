@@ -66,6 +66,14 @@ export class PaymentReadinessService {
                   : '已配置有效范围；真实地址与配送能力仍需验收。',
             },
             {
+              code: 'JSAPI_PROTOCOL',
+              title: 'JSAPI下单与调起签名',
+              group: 'IMPLEMENTATION',
+              status: 'UNVERIFIED',
+              detail:
+                '请求签名、应答验签和小程序调起参数已实现并做离线验证；尚未接入真实商户凭据、HTTP下单或订单入账。',
+            },
+            {
               code: 'PROVIDER',
               title: '支付渠道实现',
               group: 'IMPLEMENTATION',
@@ -99,7 +107,8 @@ export class PaymentReadinessService {
               title: '真实微信身份',
               group: 'ACCEPTANCE',
               status: 'UNVERIFIED',
-              detail: '当前仅有本机开发身份，真实微信登录和支付用户身份尚未接入。',
+              detail:
+                '真实微信登录代码已实现，当前账号/环境未验收；支付所需原始OpenID的服务端安全绑定尚未完成，不能使用开发身份或身份哈希替代。',
             },
             {
               code: 'HTTPS_DEVICE',
@@ -131,7 +140,7 @@ export class PaymentReadinessController {
       warehouse: object({ id: { type: 'string', format: 'uuid' }, name: text }),
       checks: {
         type: 'array',
-        maxItems: 11,
+        maxItems: 12,
         items: object({
           code: text,
           title: text,

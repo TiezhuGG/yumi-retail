@@ -6,6 +6,11 @@ export interface HealthResponse {
 // Extend with generated OpenAPI contracts as business endpoints are implemented.
 export const applicationStage = 'S1' as const;
 
+export interface ConsumerNicknameInput {
+  displayName: string;
+  expectedDisplayName: string;
+}
+
 export interface StaffProfile {
   id: string;
   loginName: string;

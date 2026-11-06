@@ -113,6 +113,11 @@ export default function Account() {
               </Text>
             </View>
           )}
+          {profile && (
+            <Button className="member-edit-profile" onClick={() => open('profile/index')}>
+              修改昵称 ›
+            </Button>
+          )}
         </View>
         {!profile && !busy && phase === 'guest' && (
           <Button className="member-login" onClick={() => open('login/index')}>

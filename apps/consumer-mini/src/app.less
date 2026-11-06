@@ -4205,6 +4205,86 @@ button[disabled] {
   word-break: break-word;
   white-space: normal;
 }
+.member-simple .member-edit-profile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 36px;
+  flex-shrink: 0;
+  margin: 0 0 0 auto;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: #ffffffb3;
+  color: #536346;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.profile-label {
+  display: block;
+  color: #303328;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.profile-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border: 1px solid #e5e5dd;
+  border-radius: 12px;
+  background: #fafbf7;
+}
+.profile-input-row input {
+  box-sizing: border-box;
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 48px;
+  color: #303328;
+}
+.profile-input-row:focus-within {
+  border-color: #9b9f8c;
+}
+.profile-page button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border: 0;
+  line-height: 1.4;
+}
+.profile-count {
+  flex-shrink: 0;
+  color: #8b907f;
+  font-size: 12px;
+}
+.profile-count.invalid {
+  color: #ac4937;
+}
+.profile-current {
+  display: block;
+  margin: 12px 0 24px;
+  color: #737b67;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.profile-success {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid #d5ddc9;
+  border-radius: 12px;
+  background: #f1f6eb;
+  color: #536346;
+  font-size: 14px;
+}
 .member-simple button,
 .category-popup button,
 .reward-filter-bar button {

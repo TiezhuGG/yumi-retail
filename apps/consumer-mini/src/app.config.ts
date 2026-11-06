@@ -6,6 +6,7 @@ export default {
     'pages/points-cart/index',
     'pages/points-checkout/index',
     'pages/account/index',
+    'pages/profile/index',
     'pages/login/index',
     'pages/points/index',
     'pages/rewards/index',

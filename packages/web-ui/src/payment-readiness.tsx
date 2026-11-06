@@ -157,9 +157,11 @@ function ReadinessReport({ warehouseId }: { warehouseId: string }) {
                   <p>
                     {group === 'CONFIGURATION'
                       ? '仅返回检查状态，不显示AppID、商户号或通知地址的原值。'
-                      : group === 'ACCEPTANCE'
-                        ? '未经实际联通与验收的项目始终保持待验证。'
-                        : '配置存在与业务能力可用分别记录。'}
+                      : group === 'IMPLEMENTATION'
+                        ? '离线协议验证与真实渠道联通分别验收，签名参数不代表支付成功。'
+                        : group === 'ACCEPTANCE'
+                          ? '未经实际联通与验收的项目始终保持待验证。'
+                          : '配置存在与业务能力可用分别记录。'}
                   </p>
                 </div>
               </div>

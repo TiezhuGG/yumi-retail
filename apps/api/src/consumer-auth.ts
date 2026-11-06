@@ -249,4 +249,54 @@ export class ConsumerAuthService {
       });
     });
   }
+  async updateNickname(request: ApiRequest, input: unknown) {
+    const b = fields(input, ['displayName', 'expectedDisplayName']);
+    if (typeof b.displayName !== 'string') throw failure(400, 'VALIDATION_ERROR', '请填写昵称');
+    const displayName = b.displayName.trim().normalize('NFC');
+    if (
+      !displayName ||
+      Array.from(displayName).length > 20 ||
+      /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(displayName) ||
+      !/[\p{L}\p{N}\p{P}\p{S}]/u.test(displayName)
+    )
+      throw failure(400, 'VALIDATION_ERROR', '昵称须为1至20个可见字符，不含换行或隐藏字符');
+    if (
+      typeof b.expectedDisplayName !== 'string' ||
+      !b.expectedDisplayName ||
+      Array.from(b.expectedDisplayName).length > 80
+    )
+      throw failure(400, 'VALIDATION_ERROR', '请重新读取当前昵称后保存');
+    const expectedDisplayName = b.expectedDisplayName;
+    const context = request.consumerContext!;
+    return this.db.$transaction(async (tx) => {
+      // Hold the current session before the user row, so concurrent logout and
+      // profile changes cannot commit after revocation or overwrite another name.
+      const sessions = await tx.$queryRaw<Array<{ expires_at: Date; auth_version: number }>>`
+        SELECT expires_at,auth_version FROM consumer_sessions
+        WHERE id=${context.sessionId}::uuid AND user_id=${context.userId}::uuid
+          AND revoked_at IS NULL AND expires_at>clock_timestamp() FOR SHARE`;
+      const users = await tx.$queryRaw<
+        Array<{ display_name: string; provider: string; auth_version: number; enabled: boolean }>
+      >`
+        SELECT display_name,provider,auth_version,enabled FROM consumer_users
+        WHERE id=${context.userId}::uuid FOR NO KEY UPDATE`;
+      const s = sessions[0],
+        u = users[0];
+      if (!s || !u?.enabled || s.auth_version !== u.auth_version)
+        throw failure(401, 'SESSION_EXPIRED', '登录已失效，请重新登录');
+      if (u.display_name !== displayName && u.display_name !== expectedDisplayName)
+        throw failure(409, 'PROFILE_CHANGED', '昵称已在其他设备修改，请核对最新昵称后保存');
+      if (u.display_name !== displayName)
+        await tx.consumerUser.update({ where: { id: context.userId }, data: { displayName } });
+      const valid = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM consumer_sessions WHERE id=${context.sessionId}::uuid
+          AND revoked_at IS NULL AND expires_at>clock_timestamp()`;
+      if (!valid.length)
+        throw failure(401, 'SESSION_EXPIRED', '登录在保存期间失效，请重新登录后核实');
+      return {
+        user: { id: context.userId, displayName, provider: u.provider as 'DEVELOPMENT' | 'WECHAT' },
+        expiresAt: s.expires_at.toISOString(),
+      };
+    });
+  }
 }

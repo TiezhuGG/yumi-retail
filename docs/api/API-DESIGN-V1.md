@@ -1,3 +1,11 @@
+## 2026-11-06 支付检查C1（OpenAPI0.70.0）
+
+GET /admin/payment-readiness新增JSAPI_PROTOCOL检查项，IMPLEMENTATION/UNVERIFIED，仅说明JSAPI签名协议已完成离线实现、实际商户/HTTP下单和订单入账未接入；总检查项12，maxItems由11更新12。原角色/仓库权限、状态枚举、channel=DISABLED及canStartPayment=false保持。内部协议不提供公开签名/凭据/支付参数接口，不改变消费者准备单契约，无迁移。支付用户身份项反映原始OpenID安全绑定仍缺，不将已有登录代码误称未实现。
+
+## 2026-11-06 本人昵称（OpenAPI 0.69.0）
+
+新增 POST /consumer/profile/nickname，消费者Bearer/no-store，body为displayName和expectedDisplayName两个字符串，不接受顾客编号或查询参数。目标去除首尾空白并NFC规范化后限制1至20个Unicode码点，拒绝不可见控制/格式字符；expectedDisplayName原样取自GET /consumer/me的当前值，最长80码点。只更新会话本人显示名，返回与GET /consumer/me相同的user/当前会话expiresAt，不发新token。当前值等于原昵称或已等于目标时成功，其他情况409/PROFILE_CHANGED；输入400、无有效身份401。使用当前值比对而非历史版本号；重复请求只能写相同目标，没有财务动作或新幂等键契约。GET /consumer/me新增no-store，其他消费者契约保持，无迁移。
+
 
 
 ## 2026-11-06 消费者售后反馈列表（OpenAPI 0.68.0）

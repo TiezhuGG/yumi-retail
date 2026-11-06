@@ -68,6 +68,7 @@ export class ConsumerController {
   }
   @Consumer()
   @Get('me')
+  @Header('Cache-Control', 'no-store')
   @ApiBearerAuth('consumerSession')
   @ApiOperation({ summary: '仅返回当前消费者身份；不接受用户编号' })
   @ApiResult(object({ user: userSchema, expiresAt }), [400, 401, 500])
@@ -78,6 +79,23 @@ export class ConsumerController {
       user: { id: context.userId, displayName: context.displayName, provider: context.provider },
       expiresAt: context.expiresAt,
     });
+  }
+  @Consumer()
+  @Post('profile/nickname')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiBearerAuth('consumerSession')
+  @ApiOperation({ summary: '修改本人昵称；相同目标可重试，原昵称变化时拒绝覆盖' })
+  @ApiBody({
+    schema: object({
+      displayName: { type: 'string', minLength: 1, maxLength: 20 },
+      expectedDisplayName: { type: 'string', minLength: 1, maxLength: 80 },
+    }),
+  })
+  @ApiResult(object({ user: userSchema, expiresAt }), [400, 401, 409, 500])
+  async nickname(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    noFields(q);
+    return success(r, await this.auth.updateNickname(r, b));
   }
   @Consumer()
   @Post('auth/logout')

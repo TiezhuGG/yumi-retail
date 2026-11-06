@@ -43,7 +43,7 @@ export function paymentConfiguration(env: NodeJS.ProcessEnv): PaymentReadinessCh
     ),
   ];
 }
-function notificationUrl(s: string) {
+export function notificationUrl(s: string) {
   if (
     s.length > 512 ||
     s !== s.trim() ||

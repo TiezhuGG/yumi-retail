@@ -1,4 +1,5 @@
-import { constants, createDecipheriv, verify } from 'node:crypto';
+import { verifyWechatSignature, WechatSignatureError } from './wechat-signature.js';
+import { createDecipheriv } from 'node:crypto';
 import type { KeyObject } from 'node:crypto';
 import { TextDecoder } from 'node:util';
 export type NotificationFailure =
@@ -76,63 +77,12 @@ export function verifyPaymentNotification(input: {
   expected: ExpectedPayment;
   nowSeconds: number;
 }): DecodedPaymentNotification {
-  const headers = new Map<string, string>();
-  for (const [name, value] of Object.entries(input.headers)) {
-    const lower = name.toLowerCase();
-    if (!lower.startsWith('wechatpay-')) continue;
-    if (
-      headers.has(lower) ||
-      typeof value !== 'string' ||
-      !value.length ||
-      value.length > 1024 ||
-      Array.from(value).some((c) => c.charCodeAt(0) < 33 || c.charCodeAt(0) > 126)
-    )
-      return reject('HEADER_INVALID');
-    headers.set(lower, value);
+  try {
+    verifyWechatSignature(input);
+  } catch (e) {
+    if (e instanceof WechatSignatureError) return reject(e.code);
+    throw e;
   }
-  const timestamp = headers.get('wechatpay-timestamp'),
-    nonce = headers.get('wechatpay-nonce'),
-    serial = headers.get('wechatpay-serial'),
-    signature = headers.get('wechatpay-signature');
-  if (
-    !timestamp ||
-    !/^\d{10}$/.test(timestamp) ||
-    !nonce ||
-    nonce.length > 128 ||
-    !serial ||
-    !/^[A-Za-z0-9_]{1,128}$/.test(serial) ||
-    !signature ||
-    signature.startsWith('WECHATPAY/SIGNTEST/') ||
-    (headers.has('wechatpay-signature-type') &&
-      headers.get('wechatpay-signature-type') !== 'WECHATPAY2-SHA256-RSA2048')
-  )
-    return reject('HEADER_INVALID');
-  if (
-    !Number.isSafeInteger(input.nowSeconds) ||
-    Math.abs(input.nowSeconds - Number(timestamp)) > 300
-  )
-    return reject('TIME_WINDOW');
-  const key = input.trustedKeys.get(serial);
-  if (
-    !key ||
-    key.type !== 'public' ||
-    key.asymmetricKeyType !== 'rsa' ||
-    key.asymmetricKeyDetails?.modulusLength !== 2048
-  )
-    return reject('KEY_UNKNOWN');
-  const decodedSignature = base64(signature, 1024, 'SIGNATURE_INVALID');
-  if (decodedSignature.length !== 256) return reject('SIGNATURE_INVALID');
-  if (!Buffer.isBuffer(input.rawBody) || !input.rawBody.length || input.rawBody.length > 65536)
-    return reject('BODY_INVALID');
-  const message = Buffer.concat([
-    Buffer.from(timestamp + '\n' + nonce + '\n'),
-    input.rawBody,
-    Buffer.from('\n'),
-  ]);
-  if (
-    !verify('RSA-SHA256', message, { key, padding: constants.RSA_PKCS1_PADDING }, decodedSignature)
-  )
-    return reject('SIGNATURE_INVALID');
   const body = parse(input.rawBody, 'BODY_INVALID'),
     notificationId = text(body.id, 128, 'BODY_INVALID');
   if (body.event_type !== 'TRANSACTION.SUCCESS' || body.resource_type !== 'encrypt-resource')
