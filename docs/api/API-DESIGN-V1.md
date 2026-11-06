@@ -1,3 +1,11 @@
+## 2026-11-06 运营商城（OpenAPI0.73.0）
+
+新增POST /admin/mall-products：员工Cookie/Origin/CSRF/UUID Idempotency-Key，catalog.write与points.write并校验当前运营/管理员及经营仓权限。输入categoryId/name/description?/单元素skus[]（沿用编码/规格/单位/整数分/效期）/pointsPrice?（null或1至10亿整数字符串）/reason；不接受任意状态或库存。事务创建商品/SKU与可选兑换草稿，商品/兑换审计及幂等记录一起提交。返回id/skuId/rewardId（可空），同键恢复，改内容409，分类/价格无效400，权限403，冲突可重试503。原POST /admin/products等接口保持兼容。
+
+新增GET /admin/customers：points.read、当前角色/会话/经营仓复验；keyword（80字）、provider=WECHAT/DEVELOPMENT、enabled=true/false、UUID cursor。每页20条，按UUID升序，包含零余额/停用账号；游标须符合相同筛选，否则409。列表仅id/displayName/provider/enabled/createdAt/balance，未知/重复参数400。GET /admin/customers/:id返回user及lastLoginAt、当前仓orders/redemptions/pendingGrants/pendingCorrections，缺失404；不返回subject/OpenID、会话、地址、手机号或密文。
+
+GET /admin/rewards后台列表新增priceCents（整数分），与pointsPrice并列；匿名/rewards原契约保持，不新增现金字段。GET /admin/points/grants、/corrections和/corrections/sources新增可选UUID userId过滤，原仓授权和写动作不变；不新增余额修改、任意扣分或绕过审批接口。顾客页定向操作仅预选目标，财务正确性仍由原服务校验。
+
 ## 2026-11-06 请求层C3a（OpenAPI0.72.0）
 
 GET /admin/payment-readiness新增IMPLEMENTATION/JSAPI_TRANSPORT，UNVERIFIED；总项数及maxItems为14。显示私有凭据/固定HTTPS请求层本地已验证，订单尝试持久化/恢复/取消保护未接入；真实商户、公钥来源及灾备仍未验收。原权限、仓库范围、channel=DISABLED与canStartPayment=false保持。

@@ -1,3 +1,4 @@
+import { CustomersWorkbench } from './customers.js';
 import { RedemptionReturnsWorkbench, type ReturnQueueStatus } from './redemption-returns.js';
 import { RedemptionDeliveryWorkbench } from './redemption-delivery.js';
 import { RedemptionPickingWorkbench } from './redemption-picking.js';
@@ -28,6 +29,7 @@ import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 import { NavIcon } from './nav-icon.js';
 export type WorkspaceView =
+  | 'customers'
   | 'redemption-delivery'
   | 'redemption-picking'
   | 'express-readiness'
@@ -67,6 +69,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'customers',
+    name: '顾客管理',
+    glyph: '◇',
+    hint: '查看顾客资料与积分操作',
+    permission: 'points.read',
+  },
   {
     id: 'express-readiness',
     name: '积分快递首发检查',
@@ -301,6 +310,7 @@ const operationsNavigation: { label: string; views: WorkspaceView[] }[] = [
   {
     label: '积分与快递',
     views: [
+      'customers',
       'points',
       'points-grants',
       'points-corrections',
@@ -624,6 +634,8 @@ function WorkspaceSession({
             <PointsGrants key="corrections" profile={profile} correction />
           ) : activeView === 'points-grants' ? (
             <PointsGrants key="grants" profile={profile} />
+          ) : activeView === 'customers' ? (
+            <CustomersWorkbench profile={profile} />
           ) : activeView === 'points' ? (
             <PointsWorkbench />
           ) : activeView === 'service-area' ? (

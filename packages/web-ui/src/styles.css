@@ -4482,3 +4482,18 @@ button:disabled {
 .express-readiness-metrics article .secondary-button {
   margin-top: 14px;
 }
+
+/* Ledger explanation is content, unlike the narrow action column on account lists. */
+.points-ledger-table {
+  min-width: 640px;
+  table-layout: fixed;
+}
+.points-ledger-table :is(th, td):first-child {
+  width: 30%;
+}
+.points-ledger-table :is(th, td):nth-child(2) {
+  width: 20%;
+}
+.points-ledger-table td:last-child {
+  width: auto;
+}

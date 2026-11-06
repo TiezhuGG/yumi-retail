@@ -12,10 +12,10 @@ type Entry = {
 };
 type Page<T> = { items: T[]; nextCursor: string | null };
 type Intent = { account: Account | null; keyword: string; cursor?: string };
-export function PointsWorkbench() {
+export function PointsWorkbench({ account }: { account?: Account } = {}) {
   const [accounts, setAccounts] = useState<Account[]>([]),
     [entries, setEntries] = useState<Entry[]>([]);
-  const [selected, setSelected] = useState<Account | null>(null),
+  const [selected, setSelected] = useState<Account | null>(account ?? null),
     [keyword, setKeyword] = useState('');
   const [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
@@ -74,11 +74,14 @@ export function PointsWorkbench() {
   const rows = selected ? entries : accounts;
   return (
     <section className="points-workbench" aria-label="积分账户查询">
-      <div className="notice">查询账户余额与积分流水。发放与误发冲正请前往对应审批入口。</div>
+      {!account && (
+        <div className="notice">查询账户余额与积分流水。发放与误发冲正请前往对应审批入口。</div>
+      )}
       {selected ? (
         <div className="points-toolbar">
           <button
             className="secondary-button"
+            hidden={!!account}
             onClick={() => {
               setSelected(null);
               setEntries([]);
@@ -87,13 +90,14 @@ export function PointsWorkbench() {
             返回账户列表
           </button>
           <div>
-            <h2>{selected.displayName} · 积分明细</h2>
+            <h2>{account ? '积分明细' : selected.displayName + ' · 积分明细'}</h2>
             <p>
               列表查询时余额：<strong>{selected.balance}</strong> 积分
             </p>
           </div>
           <button
             className="secondary-button"
+            style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
             disabled={loading}
             onClick={() => void load({ account: selected, keyword: applied.current })}
           >
@@ -183,7 +187,7 @@ export function PointsWorkbench() {
       )}
       {selected && entries.length > 0 && (
         <div className="points-table-wrap">
-          <table className="points-table">
+          <table className="points-table points-ledger-table">
             <thead>
               <tr>
                 <th>时间（北京时间）</th>

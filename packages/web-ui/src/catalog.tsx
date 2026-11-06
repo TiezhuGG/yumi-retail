@@ -1,3 +1,4 @@
+import { ProductCreator } from './product-creator.js';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Category, Product, Receipt, StaffProfile, WarehouseSummary } from '@yumi/contracts';
@@ -980,12 +981,18 @@ export function CatalogWorkbench({
           }}
         />
       )}
-      {modal && (
-        <Modal
-          busy={busy}
-          title={modal === 'product' ? '新增商品' : '新增分类'}
+      {modal === 'product' && (
+        <ProductCreator
+          profile={profile}
           onClose={closeModal}
-        >
+          onSaved={() => {
+            closeModal();
+            void productsPage().catch(() => {});
+          }}
+        />
+      )}
+      {modal === 'category' && (
+        <Modal busy={busy} title="新增分类" onClose={closeModal}>
           <form
             className="business-form"
             onSubmit={(event) => {
@@ -999,25 +1006,6 @@ export function CatalogWorkbench({
                   closeModal();
                   await categoriesPage().catch(() => {
                     throw new Error('分类已保存，列表刷新失败，请重试刷新。');
-                  });
-                } else if (modal === 'product') {
-                  await action('/admin/products', {
-                    categoryId: data.get('categoryId'),
-                    name: data.get('name'),
-                    description: data.get('description') || undefined,
-                    skus: [
-                      {
-                        code: data.get('code'),
-                        spec: data.get('spec'),
-                        unit: data.get('unit'),
-                        priceCents: Math.round(Number(data.get('price')) * 100),
-                        expiryManaged: data.get('expiryManaged') === 'on',
-                      },
-                    ],
-                  });
-                  closeModal();
-                  await productsPage().catch(() => {
-                    throw new Error('商品已保存，列表刷新失败，请重试刷新。');
                   });
                 }
               });
@@ -1035,7 +1023,7 @@ export function CatalogWorkbench({
               </button>
             )}
             <fieldset disabled={busy} style={{ display: 'contents' }}>
-              {modal === 'category' ? (
+              {
                 <>
                   <label className="full">
                     分类名称
@@ -1055,68 +1043,7 @@ export function CatalogWorkbench({
                     </select>
                   </label>
                 </>
-              ) : (
-                <>
-                  <label className="full">
-                    商品名称
-                    <input name="name" required maxLength={120} placeholder="例如 柔软抽纸" />
-                  </label>
-                  <label>
-                    商品分类
-                    <select name="categoryId" required>
-                      <option value="">请选择分类</option>
-                      {categories.map((c) => (
-                        <option key={c.id} value={c.id} disabled={!categoryUsable(c)}>
-                          {c.name}
-                          {!categoryUsable(c) ? '（不可用或父分类未载入）' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    SKU编码
-                    <input
-                      name="code"
-                      pattern="[A-Za-z0-9][A-Za-z0-9_-]*"
-                      maxLength={64}
-                      required
-                      placeholder="例如 PAPER-001"
-                    />
-                  </label>
-                  <label>
-                    规格
-                    <input name="spec" required maxLength={100} placeholder="例如 3包装" />
-                  </label>
-                  <label>
-                    单位
-                    <input name="unit" required maxLength={16} placeholder="例如 包" />
-                  </label>
-                  <label>
-                    售价（元）
-                    <input
-                      name="price"
-                      type="number"
-                      required
-                      min="0.01"
-                      max="1000000"
-                      step="0.01"
-                      placeholder="0.00"
-                    />
-                  </label>
-                  <label style={{ alignSelf: 'center' }}>
-                    <input name="expiryManaged" type="checkbox" /> 管理生产与到期时间
-                  </label>
-                  <label className="full">
-                    商品说明
-                    <textarea
-                      name="description"
-                      maxLength={2000}
-                      rows={3}
-                      placeholder="介绍商品的材质、用途与特点"
-                    />
-                  </label>
-                </>
-              )}
+              }
             </fieldset>
             {message && (
               <p
@@ -1136,7 +1063,7 @@ export function CatalogWorkbench({
                 取消
               </button>
               <button className="primary-button" disabled={busy}>
-                {busy ? '正在保存…' : modal === 'product' ? '保存商品草稿' : '保存分类'}
+                {busy ? '正在保存…' : '保存分类'}
               </button>
             </footer>
           </form>

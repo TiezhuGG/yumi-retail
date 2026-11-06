@@ -1,3 +1,8 @@
+import {
+  AdminMallService,
+  AdminCustomersController,
+  AdminMallProductController,
+} from './admin-mall.js';
 import { ExpressReceiptController, ExpressReceiptService } from './express-receipt.js';
 import { RewardCartController, RewardCartService } from './reward-cart.js';
 import {
@@ -190,6 +195,8 @@ export async function createApplication(
   }
   @Module({
     controllers: [
+      AdminCustomersController,
+      AdminMallProductController,
       HealthController,
       RedemptionPickingController,
       RedemptionDeliveryController,
@@ -313,6 +320,7 @@ export async function createApplication(
       },
       { provide: PointsCorrectionService, useValue: new PointsCorrectionService(catalog) },
       { provide: PointsGrantService, useValue: new PointsGrantService(catalog) },
+      { provide: AdminMallService, useValue: new AdminMallService(catalog) },
       { provide: PointsService, useValue: new PointsService(catalog) },
       { provide: StaffAuthService, useValue: auth },
       { provide: ConsumerAuthService, useValue: consumer },
@@ -448,7 +456,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。',
       )
-      .setVersion('0.72.0')
+      .setVersion('0.73.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

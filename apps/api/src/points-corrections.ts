@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCookieAuth, ApiHeader, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CatalogService } from './catalog-service.js';
 import { PointsGrantService } from './points-grants.js';
 import { fields, integer, key, str, uuid } from './catalog-input.js';
@@ -20,7 +20,8 @@ export class PointsCorrectionService {
   }
   async sources(r: ApiRequest, q: unknown) {
     const warehouse = await this.authorize(r);
-    const b = fields(q, ['cursor', 'keyword']);
+    const b = fields(q, ['cursor', 'keyword', 'userId']);
+    const userId = b.userId === undefined ? null : uuid(b.userId);
     const cursor = b.cursor === undefined ? null : uuid(b.cursor),
       keyword = b.keyword === undefined ? '' : str(b.keyword, 80);
     const rows = await this.catalog.db.$queryRaw<
@@ -32,12 +33,13 @@ export class PointsCorrectionService {
         reference: string;
         reason: string;
       }>
-    >`SELECT g.id,u.display_name AS "displayName",g.amount::text,(g.amount-COALESCE((SELECT SUM(c.amount) FROM points_corrections c WHERE c.grant_id=g.id AND c.status IN ('SUBMITTED','APPROVED')),0))::text AS "remainingAmount",g.reference,g.reason FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND g.status='APPROVED' AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) AND strpos(lower(u.display_name),lower(${keyword}))>0 ORDER BY g.id LIMIT 21`;
+    >`SELECT g.id,u.display_name AS "displayName",g.amount::text,(g.amount-COALESCE((SELECT SUM(c.amount) FROM points_corrections c WHERE c.grant_id=g.id AND c.status IN ('SUBMITTED','APPROVED')),0))::text AS "remainingAmount",g.reference,g.reason FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR g.user_id=${userId}::uuid) AND g.status='APPROVED' AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) AND strpos(lower(u.display_name),lower(${keyword}))>0 ORDER BY g.id LIMIT 21`;
     return { items: rows.slice(0, 20), nextCursor: rows.length > 20 ? rows[19]!.id : null };
   }
   async read(r: ApiRequest, q: unknown) {
     const warehouse = await this.authorize(r);
-    const b = fields(q, ['cursor']);
+    const b = fields(q, ['cursor', 'userId']);
+    const userId = b.userId === undefined ? null : uuid(b.userId);
     const cursor = b.cursor === undefined ? null : uuid(b.cursor);
     const rows = await this.catalog.db.$queryRaw<
       Array<{
@@ -54,7 +56,7 @@ export class PointsCorrectionService {
         version: number;
         decisionReason: string | null;
       }>
-    >`SELECT c.id,c.grant_id AS "grantId",u.display_name AS "displayName",c.amount::text,g.amount::text AS "sourceAmount",g.reference AS "sourceReference",c.reference,c.reason,c.creator_id AS "creatorId",c.status,c.version,c.decision_reason AS "decisionReason" FROM points_corrections c JOIN points_grants g ON g.id=c.grant_id JOIN consumer_users u ON u.id=c.user_id WHERE c.warehouse_id=${warehouse}::uuid AND (${cursor}::uuid IS NULL OR c.id>${cursor}::uuid) ORDER BY c.id LIMIT 21`;
+    >`SELECT c.id,c.grant_id AS "grantId",u.display_name AS "displayName",c.amount::text,g.amount::text AS "sourceAmount",g.reference AS "sourceReference",c.reference,c.reason,c.creator_id AS "creatorId",c.status,c.version,c.decision_reason AS "decisionReason" FROM points_corrections c JOIN points_grants g ON g.id=c.grant_id JOIN consumer_users u ON u.id=c.user_id WHERE c.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR c.user_id=${userId}::uuid) AND (${cursor}::uuid IS NULL OR c.id>${cursor}::uuid) ORDER BY c.id LIMIT 21`;
     return {
       policy: null,
       items: rows.slice(0, 20),
@@ -191,6 +193,7 @@ const correctionSchema = object({
 export class PointsCorrectionController {
   constructor(@Inject(PointsCorrectionService) readonly service: PointsCorrectionService) {}
   @Get()
+  @ApiQuery({ name: 'userId', required: false, type: String, description: '仅查看指定顾客的申请' })
   @ApiResult(
     object({
       policy: { type: 'object', nullable: true },
@@ -202,6 +205,12 @@ export class PointsCorrectionController {
     return success(r, await this.service.read(r, q));
   }
   @Get('sources')
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    type: String,
+    description: '仅选择指定顾客的原发放记录',
+  })
   @ApiResult(
     object({
       items: { type: 'array', items: sourceSchema },

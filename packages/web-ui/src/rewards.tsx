@@ -1,3 +1,4 @@
+import { ProductCreator } from './product-creator.js';
 import { useEffect, useRef, useState } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
@@ -10,6 +11,7 @@ type Reward = {
   spec: string;
   unit: string;
   pointsPrice: string;
+  priceCents: number;
   status: string;
   version: number;
   sortOrder: number;
@@ -29,6 +31,7 @@ const statuses: Record<string, string> = {
 const beijing = (s: string | null) =>
   s ? new Date(Date.parse(s) + 8 * 3600000).toISOString().slice(0, 16) : '';
 export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
+  const [creatingProduct, setCreatingProduct] = useState(false);
   const [items, setItems] = useState<Reward[]>([]),
     [selected, setSelected] = useState<Reward | null>(null),
     [editing, setEditing] = useState<Reward | null | undefined>(undefined);
@@ -109,7 +112,12 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
               <h2>兑换商品</h2>
               <p>按商品规格管理积分价格和上架状态</p>
             </div>
-            <button type="button" className="primary-button" onClick={() => setEditing(null)}>
+            {profile.permissions.includes('catalog.write') && (
+              <button className="primary-button" onClick={() => setCreatingProduct(true)}>
+                创建全新商品
+              </button>
+            )}
+            <button type="button" className="secondary-button" onClick={() => setEditing(null)}>
               新增兑换商品
             </button>
           </div>
@@ -146,7 +154,7 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
                 <thead>
                   <tr>
                     <th>商品 / 规格</th>
-                    <th>所需积分</th>
+                    <th>售价 / 兑换积分</th>
                     <th>状态 / 可选数量</th>
                     <th>操作</th>
                   </tr>
@@ -160,7 +168,10 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
                           {r.name} · {r.spec}
                         </p>
                       </td>
-                      <td>{r.pointsPrice}</td>
+                      <td>
+                        ¥{(r.priceCents / 100).toFixed(2)}
+                        <p>{r.pointsPrice} 积分</p>
+                      </td>
                       <td>
                         <span className={r.status === 'PUBLISHED' ? 'badge green' : 'badge amber'}>
                           {statuses[r.status]}
@@ -203,6 +214,16 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
         <button className="secondary-button" disabled={loading} onClick={() => void load(cursor)}>
           加载更多
         </button>
+      )}
+      {creatingProduct && (
+        <ProductCreator
+          profile={profile}
+          onClose={() => setCreatingProduct(false)}
+          onSaved={() => {
+            setCreatingProduct(false);
+            void load();
+          }}
+        />
       )}
       {editing !== undefined && (
         <RewardEditor

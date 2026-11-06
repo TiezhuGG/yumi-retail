@@ -162,23 +162,26 @@ export class CatalogService {
     });
   }
   createProduct(request: ApiRequest, key: string, input: ProductInput) {
-    return this.write(request, 'PRODUCT_CREATE', 'catalog', key, input, async (tx) => {
-      const category = await this.lockCategoryTree(tx, input.categoryId);
-      if (!category?.enabled || category.parent?.enabled === false)
-        throw failure(400, 'VALIDATION_ERROR', '分类不可用');
-      const row = await tx.product.create({
-        data: {
-          id: randomUUID(),
-          categoryId: input.categoryId,
-          name: input.name,
-          description: input.description,
-          skus: { create: input.skus.map((sku) => ({ id: randomUUID(), ...sku })) },
-        },
-        include: { skus: true },
-      });
-      await this.audit(tx, request, 'PRODUCT_CREATE', row.id);
-      return row;
+    return this.write(request, 'PRODUCT_CREATE', 'catalog', key, input, (tx) =>
+      this.insertProduct(tx, request, input),
+    );
+  }
+  async insertProduct(tx: Tx, request: ApiRequest, input: ProductInput) {
+    const category = await this.lockCategoryTree(tx, input.categoryId);
+    if (!category?.enabled || category.parent?.enabled === false)
+      throw failure(400, 'VALIDATION_ERROR', '分类不可用');
+    const row = await tx.product.create({
+      data: {
+        id: randomUUID(),
+        categoryId: input.categoryId,
+        name: input.name,
+        description: input.description,
+        skus: { create: input.skus.map((sku) => ({ id: randomUUID(), ...sku })) },
+      },
+      include: { skus: true },
     });
+    await this.audit(tx, request, 'PRODUCT_CREATE', row.id);
+    return row;
   }
   updateProductDetails(request: ApiRequest, key: string, id: string, input: ProductDetailsInput) {
     return this.write(request, 'PRODUCT_UPDATE_DETAILS', id, key, input, async (tx) => {

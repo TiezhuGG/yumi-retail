@@ -21,6 +21,7 @@ export type Reward = {
   categoryId: string;
   imageUrl: string | null;
   pointsPrice: string;
+  priceCents: number;
   status: string;
   sortOrder: number;
   perUserLimit: number;
@@ -55,6 +56,17 @@ const rewardSchema = object({
 });
 const pageSchema = object({
   items: { type: 'array', items: rewardSchema },
+  nextCursor: nullableText,
+});
+const adminPageSchema = object({
+  items: {
+    type: 'array',
+    items: {
+      ...rewardSchema,
+      properties: { ...rewardSchema.properties, priceCents: number },
+      required: [...rewardSchema.required!, 'priceCents'],
+    },
+  },
   nextCursor: nullableText,
 });
 const detailsSchema = object(
@@ -108,14 +120,19 @@ export class RewardService {
       if (!anchor) throw failure(409, 'CURSOR_INVALID', '商品列表已变化，请重新查询');
     }
     const rows = await this.catalog.db.$queryRaw<Reward[]>(Prisma.sql`
-   SELECT rp.id,rp.sku_id AS "skuId",rp.title,p.name,s.spec,s.unit,p.description,p.category_id AS "categoryId",v."imageUrl",rp.points_price::text AS "pointsPrice",rp.status,rp.sort_order AS "sortOrder",rp.per_user_limit AS "perUserLimit",rp.total_quota AS "totalQuota",rp.starts_at AS "startsAt",rp.ends_at AS "endsAt",rp.version,
+   SELECT rp.id,rp.sku_id AS "skuId",rp.title,p.name,s.spec,s.unit,p.description,p.category_id AS "categoryId",v."imageUrl",rp.points_price::text AS "pointsPrice",s.price_cents::int AS "priceCents",rp.status,rp.sort_order AS "sortOrder",rp.per_user_limit AS "perUserLimit",rp.total_quota AS "totalQuota",rp.starts_at AS "startsAt",rp.ends_at AS "endsAt",rp.version,
    COALESCE(v.available,0)::int AS available
    FROM reward_products rp JOIN skus s ON s.id=rp.sku_id JOIN products p ON p.id=s.product_id JOIN categories c ON c.id=p.category_id LEFT JOIN (${visible}) v ON v.id=s.id
    WHERE ${where} AND (${cursor}::uuid IS NULL OR (rp.sort_order,rp.id)>(${anchor?.sort_order ?? 0},${cursor}::uuid))
    ORDER BY rp.sort_order,rp.id LIMIT 21`);
-    const items = rows
-      .slice(0, 20)
-      .map((row) => ({ ...row, redemptionEnabled: this.redemptionEnabled }));
+    const items = rows.slice(0, 20).map((row) => {
+      const { priceCents, ...publicRow } = row;
+      return {
+        ...publicRow,
+        ...(r ? { priceCents } : {}),
+        redemptionEnabled: this.redemptionEnabled,
+      };
+    });
     if (id && !items.length) throw failure(404, 'REWARD_UNAVAILABLE', '兑换商品暂不可用');
     return { items, nextCursor: rows.length > 20 ? items.at(-1)!.id : null };
   }
@@ -278,7 +295,7 @@ export class PublicRewardController {
 export class AdminRewardController {
   constructor(@Inject(RewardService) readonly service: RewardService) {}
   @Get()
-  @ApiResult(pageSchema, [400, 401, 403, 409, 500, 503])
+  @ApiResult(adminPageSchema, [400, 401, 403, 409, 500, 503])
   async list(@Req() r: ApiRequest, @Query() q: unknown) {
     return success(r, await this.service.list(q, r));
   }

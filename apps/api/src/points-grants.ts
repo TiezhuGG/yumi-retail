@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiHeader, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiCookieAuth, ApiHeader, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Prisma } from '@yumi/database';
 import { CatalogService } from './catalog-service.js';
 import { fields, integer, key, str, uuid } from './catalog-input.js';
@@ -40,14 +40,15 @@ export class PointsGrantService {
   }
   async read(r: ApiRequest, q: unknown) {
     const warehouse = await this.authorize(r);
-    const row = fields(q, ['cursor']);
+    const row = fields(q, ['cursor', 'userId']);
+    const userId = row.userId === undefined ? null : uuid(row.userId);
     const cursor = row.cursor === undefined ? null : uuid(row.cursor);
     const policies = await this.catalog.db.$queryRaw<
       Array<{ enabled: boolean; singleLimit: string; dailyLimit: string; version: number }>
     >`SELECT enabled,single_limit::text AS "singleLimit",daily_limit::text AS "dailyLimit",version FROM points_grant_policies WHERE warehouse_id=${warehouse}::uuid`;
     const items = await this.catalog.db.$queryRaw<
       Grant[]
-    >`SELECT g.id,g.user_id AS "userId",u.display_name AS "displayName",g.amount::text,g.reason,g.reference,g.creator_id AS "creatorId",g.status,g.version,g.decision_reason AS "decisionReason" FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) ORDER BY g.id LIMIT 21`;
+    >`SELECT g.id,g.user_id AS "userId",u.display_name AS "displayName",g.amount::text,g.reason,g.reference,g.creator_id AS "creatorId",g.status,g.version,g.decision_reason AS "decisionReason" FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR g.user_id=${userId}::uuid) AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) ORDER BY g.id LIMIT 21`;
     return {
       policy: policies[0] ?? null,
       items: items.slice(0, 20),
@@ -175,6 +176,7 @@ export class PointsGrantService {
 export class PointsGrantController {
   constructor(@Inject(PointsGrantService) readonly service: PointsGrantService) {}
   @Get()
+  @ApiQuery({ name: 'userId', required: false, type: String, description: '仅查看指定顾客的申请' })
   @ApiResult(
     object({
       policy: {

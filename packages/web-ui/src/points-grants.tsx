@@ -29,9 +29,13 @@ const labels: Record<string, string> = {
 export function PointsGrants({
   profile,
   correction = false,
+  targetCustomer,
+  onPendingChange,
 }: {
   profile: StaffProfile;
   correction?: boolean;
+  targetCustomer?: { id: string; displayName: string };
+  onPendingChange?: (pending: boolean) => void;
 }) {
   const base = correction ? '/admin/points/corrections' : '/admin/points/grants';
   const statusLabel = (status: string) =>
@@ -68,12 +72,19 @@ export function PointsGrants({
     sequence = useRef(0),
     writing = useRef(false);
   const admin = profile.roles.includes('SUPER_ADMIN');
+  useEffect(() => {
+    onPendingChange?.(busy || unknown);
+    return () => onPendingChange?.(false);
+  }, [busy, unknown, onPendingChange]);
   async function load(cursor?: string) {
     const n = ++sequence.current;
     setLoading(true);
     setError('');
     try {
-      const d = await staffRequest<Data>(base + (cursor ? '?cursor=' + cursor : ''));
+      const q = new URLSearchParams();
+      if (cursor) q.set('cursor', cursor);
+      if (targetCustomer) q.set('userId', targetCustomer.id);
+      const d = await staffRequest<Data>(base + '?' + q);
       if (n === sequence.current)
         setData((old) => ({ ...d, items: cursor ? [...old.items, ...d.items] : d.items }));
     } catch (e) {
@@ -154,7 +165,8 @@ export function PointsGrants({
           ? '/admin/points/corrections/sources?keyword='
           : '/admin/points/accounts?keyword=') +
           encodeURIComponent(appliedSearch.current) +
-          (cursor ? '&cursor=' + cursor : ''),
+          (cursor ? '&cursor=' + cursor : '') +
+          (targetCustomer && correction ? '&userId=' + targetCustomer.id : ''),
       );
       if (n !== searchSequence.current) return;
       setUsers((old) => (cursor ? [...old, ...r.items] : r.items));
@@ -191,9 +203,9 @@ export function PointsGrants({
           className="primary-button"
           onClick={() => {
             setEditor('create');
-            setUsers([]);
+            setUsers(targetCustomer && !correction ? [targetCustomer] : []);
             setSourceCursor(null);
-            setUserId('');
+            setUserId(targetCustomer && !correction ? targetCustomer.id : '');
             setAmount('');
             setReference('');
             setReason('');
@@ -230,35 +242,48 @@ export function PointsGrants({
         <div className="points-empty">{correction ? '暂无冲正申请' : '暂无发放申请'}</div>
       )}
       {data.items.length > 0 && (
-      <div className="points-table-wrap">
-        <table className="points-table">
-          <thead>
-            <tr><th>用户</th><th>积分</th><th>申请原因</th><th>状态</th><th>操作</th></tr>
-          </thead>
-          <tbody>
-          {data.items.map((g) => (
-          <tr key={g.id}>
-            <td><strong>{g.displayName}</strong></td>
-            <td>{correction ? '−' : '+'}{g.amount} 积分</td>
-            <td>{g.reason}</td>
-            <td><span className="badge">{statusLabel(g.status)}</span></td>
-            <td>
-            <button
-              className="secondary-button"
-              onClick={() => {
-                setSelected(g);
-                setReason('');
-                setError('');
-              }}
-            >
-              查看申请
-            </button>
-            </td>
-          </tr>
-        ))}
-          </tbody>
-        </table>
-      </div>
+        <div className="points-table-wrap">
+          <table className="points-table">
+            <thead>
+              <tr>
+                <th>用户</th>
+                <th>积分</th>
+                <th>申请原因</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.items.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    <strong>{g.displayName}</strong>
+                  </td>
+                  <td>
+                    {correction ? '−' : '+'}
+                    {g.amount} 积分
+                  </td>
+                  <td>{g.reason}</td>
+                  <td>
+                    <span className="badge">{statusLabel(g.status)}</span>
+                  </td>
+                  <td>
+                    <button
+                      className="secondary-button"
+                      onClick={() => {
+                        setSelected(g);
+                        setReason('');
+                        setError('');
+                      }}
+                    >
+                      查看申请
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       {data.nextCursor && (
         <button
@@ -303,35 +328,43 @@ export function PointsGrants({
             )}
             {editor === 'create' && (
               <>
-                <label>
-                  搜索用户
-                  <input
-                    value={keyword}
-                    onChange={(e) => setKeyword(e.target.value)}
-                    disabled={busy || unknown}
-                  />
-                </label>
-                <button
-                  className="secondary-button"
-                  disabled={busy || unknown || searching || !keyword.trim()}
-                  onClick={() => void search()}
-                >
-                  {searching ? '正在查询…' : '查询用户'}
-                </button>
-                {sourceCursor && (
-                  <button
-                    className="secondary-button"
-                    disabled={busy || unknown || searching}
-                    onClick={() => void search(sourceCursor)}
-                  >
-                    {correction ? '更多原发放记录' : '更多用户'}
-                  </button>
+                {targetCustomer && <strong>当前顾客：{targetCustomer.displayName}</strong>}
+                {(!targetCustomer || correction) && (
+                  <>
+                    <label>
+                      搜索用户
+                      <input
+                        value={keyword}
+                        onChange={(e) => setKeyword(e.target.value)}
+                        disabled={busy || unknown}
+                      />
+                    </label>
+                    <button
+                      className="secondary-button"
+                      disabled={
+                        busy || unknown || searching || (!keyword.trim() && !targetCustomer)
+                      }
+                      onClick={() => void search()}
+                    >
+                      {searching ? '正在查询…' : '查询用户'}
+                    </button>
+                    {sourceCursor && (
+                      <button
+                        className="secondary-button"
+                        disabled={busy || unknown || searching}
+                        onClick={() => void search(sourceCursor)}
+                      >
+                        {correction ? '更多原发放记录' : '更多用户'}
+                      </button>
+                    )}
+                  </>
                 )}
                 <label>
                   {correction ? '原发放记录' : '发放对象'}
                   <select
+                    aria-label={correction ? '原发放记录' : '发放对象'}
                     value={userId}
-                    disabled={busy || unknown}
+                    disabled={busy || unknown || (!!targetCustomer && !correction)}
                     onChange={(e) => setUserId(e.target.value)}
                   >
                     <option value="">{correction ? '请选择原发放记录' : '请选择用户'}</option>
