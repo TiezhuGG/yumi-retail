@@ -1035,6 +1035,7 @@ export interface RedemptionDeliveryIncident {
 }
 
 export interface RedemptionPrintPreview {
+  consolidatedLines?: Array<{ title: string; spec: string; unit: string; quantity: number }>;
   generatedAt: string;
   items: Array<{
     id: string;

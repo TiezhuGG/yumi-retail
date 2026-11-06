@@ -1162,3 +1162,9 @@ GET支持cursor=原记录UUID，返回CustomerNotesPage{scopeId,items:[{id,messa
 POST严格body={scopeId,message}，scopeId须匹配当前服务端经营仓，不能借参数切换仓；不匹配409 SCOPE_CHANGED。message为trim后1至500 UTF-16单位文本，允许LF换行，拒绝其他C0/DEL控制字符。返回{id}，不把正文放入幂等结果。按员工/仓库/顾客/键串行，规范正文和范围哈希一致才可重放；改内容409 IDEMPOTENCY_CONFLICT，等待锁后/提交前复验当前权限，撤权不能通过历史请求读取旧成功结果。缺CSRF403，密钥未配置503 CUSTOMER_NOTES_UNAVAILABLE，已有记录不可解密503 CUSTOMER_NOTES_UNREADABLE，并发冲突503 RETRYABLE_CONFLICT。
 
 备注事件和幂等记录同事务，失败不留下部分备注，原键可恢复。记录可供后台为停用顾客跟进，不恢复该账号或旧会话，不改变积分、订单或售后事实。无通用编辑/删除接口，无旧接口字段变化，无迁移。
+
+## 2026-11-06 多订单汇总配货打印（0.79.0）
+
+`POST /api/v1/admin/redemptions/consolidated-print-preview`：当前经营仓SUPER_ADMIN/OPERATIONS及points.read权限，要求有效会话和CSRF，响应`Cache-Control: no-store`。请求仅`{ids: string[]}`，2–20个不重复UUID；未知字段、重复或数量错误400，缺单404，无权限403，已取消/非待发货/混顾客/混原地址/混运行模式409。无幂等键需求（纯读取）。
+
+响应沿用`RedemptionPrintPreview`的`generatedAt/items`，新增可选`consolidatedLines`（title/spec/unit/quantity）；该接口始终返回汇总行，旧逐单打印接口不返回。items保留请求顺序和原订单地址/备注/积分；不返回顾客UUID、地址密文或库存分配。比较联系人/电话/省市区/详情/地址备注，订单备注单独保留。按SKU+历史标题/规格/单位分组，合计积分采用BigInt。订单按UUID顺序FOR SHARE，串行于取消/发货操作，事务末重验当前权限。预览不授权未来操作；每次点击打印重新请求并在失败时清空旧预览。OpenAPI已同步，旧接口兼容。

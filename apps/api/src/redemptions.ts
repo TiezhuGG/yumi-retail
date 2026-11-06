@@ -718,10 +718,18 @@ export class RedemptionService {
       return { id };
     });
   }
-  async printPreview(r: ApiRequest, input: unknown): Promise<RedemptionPrintPreview> {
+  async printPreview(
+    r: ApiRequest,
+    input: unknown,
+    consolidated = false,
+  ): Promise<RedemptionPrintPreview> {
     const b = fields(input, ['ids']);
-    if (!Array.isArray(b.ids) || b.ids.length < 1 || b.ids.length > 20)
-      throw failure(400, 'VALIDATION_ERROR', '每批请选择1至20张订单');
+    if (!Array.isArray(b.ids) || b.ids.length < (consolidated ? 2 : 1) || b.ids.length > 20)
+      throw failure(
+        400,
+        'VALIDATION_ERROR',
+        consolidated ? '汇总配货请选择2至20张订单' : '每批请选择1至20张订单',
+      );
     const ids = b.ids.map((x) => uuid(x).toLowerCase());
     if (new Set(ids).size !== ids.length)
       throw failure(400, 'VALIDATION_ERROR', '订单不能重复选择');
@@ -732,7 +740,7 @@ export class RedemptionService {
         await tx.$queryRaw`SELECT id FROM redemption_orders WHERE warehouse_id=${warehouseId}::uuid AND id IN (${Prisma.join(ids.map((id) => Prisma.sql`${id}::uuid`))}) ORDER BY id FOR SHARE`;
         const rows = await tx.redemptionOrder.findMany({
           where: { id: { in: ids }, warehouseId },
-          include: { quote: true, expressShipment: expressShipmentInclude },
+          include: { quote: true, outbox: true, expressShipment: expressShipmentInclude },
         });
         if (rows.length !== ids.length)
           throw failure(
@@ -767,9 +775,58 @@ export class RedemptionService {
             ),
           };
         });
+        let consolidatedLines: RedemptionPrintPreview['consolidatedLines'];
+        if (consolidated) {
+          const first = rows[0]!;
+          const addressKey = (a: RedemptionOrderAddress) =>
+            'province' in a
+              ? JSON.stringify([
+                  a.contactName,
+                  a.phone,
+                  a.province,
+                  a.city,
+                  a.district,
+                  a.detailAddress,
+                  a.note,
+                ])
+              : null;
+          const originalAddress = addressKey(items[0]!.address);
+          if (
+            rows.some(
+              (o) => o.userId !== first.userId || o.executionMode !== first.executionMode,
+            ) ||
+            items.some(
+              (o) => o.deliveryMode !== 'EXPRESS' || addressKey(o.address) !== originalAddress,
+            ) ||
+            !originalAddress
+          )
+            throw failure(
+              409,
+              'CONSOLIDATED_PRINT_MISMATCH',
+              '请选择同一顾客、相同原收件信息及相同运行模式的快递订单',
+            );
+          if (rows.some((o) => o.outbox?.state !== 'EXPRESS_WAIT' || o.expressShipment))
+            throw failure(
+              409,
+              'CONSOLIDATED_PRINT_UNAVAILABLE',
+              '汇总配货仅支持未发货的有效快递订单，请重新查询',
+            );
+          const lines = new Map<
+            string,
+            NonNullable<RedemptionPrintPreview['consolidatedLines']>[number]
+          >();
+          for (const o of rows) {
+            const key = JSON.stringify([o.skuId, o.title, o.spec, o.unit]);
+            const line = lines.get(key);
+            if (line) line.quantity += o.quantity;
+            else
+              lines.set(key, { title: o.title, spec: o.spec, unit: o.unit, quantity: o.quantity });
+          }
+          consolidatedLines = [...lines.values()];
+        }
         const generatedAt = (await this.clock(tx)).toISOString();
         await this.staff.authorize(r, tx);
-        return { generatedAt, items };
+        return { generatedAt, items, ...(consolidatedLines ? { consolidatedLines } : {}) };
       },
       { timeout: 15000 },
     );

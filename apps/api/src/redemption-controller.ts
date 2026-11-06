@@ -394,6 +394,48 @@ export class AdminRedemptionController {
     fields(q, []);
     return success(r, await this.shipping.ship(r, uuid(id), key(r), b));
   }
+  @Post('consolidated-print-preview')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      ids: { type: 'array', minItems: 2, maxItems: 20, uniqueItems: true, items: text },
+    }),
+  })
+  @ApiResult(
+    object({
+      generatedAt: text,
+      items: {
+        type: 'array',
+        items: object({
+          id: text,
+          orderNo: text,
+          createdAt: text,
+          title: text,
+          spec: text,
+          unit: text,
+          quantity: integer,
+          pointsPrice: text,
+          totalPoints: text,
+          deliveryMode: text,
+          executionMode: text,
+          address,
+          expressShipment,
+        }),
+      },
+      consolidatedLines: {
+        type: 'array',
+        items: object({ title: text, spec: text, unit: text, quantity: integer }),
+      },
+    }),
+    errors,
+  )
+  async consolidatedPrintPreview(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.service.printPreview(r, b, true));
+  }
+
   @Post('print-preview')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

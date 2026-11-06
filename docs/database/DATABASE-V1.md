@@ -947,3 +947,7 @@ RepeatableRead单次事务统一快照，事务首尾校验经营仓及当前角
 正文复用OrderPrivateData AES-256-GCM及既有ADDRESS_ENCRYPTION_KEY，AAD绑定顾客与customer-note:warehouseId:noteId上下文，不能把密文复制到其他顾客/仓库/记录后读取。密钥仍需随既有资料加密恢复方案备份，丢失/变更不自动生成新密钥；读取失败503，不伪造空记录。不把正文写入审计reason、日志或idempotency结果。
 
 新备注取得顾客FOR KEY SHARE保证存在性，仅追加审计及原请求记录，不更新consumer_users或资产。幂等scope含员工/仓库/顾客，保存正文与范围的SHA-256请求哈希，返回结果仅ID；权限及范围检查在重放路径同样执行。读取为RepeatableRead，新增为ReadCommitted，均在事务内首尾校验会话/经营仓授权。既有业务审计不可改删触发器保持，不新增未经测量的索引。
+
+## 2026-11-06 汇总配货打印
+
+无新增表、字段或迁移（仍62项）。仅读取本经营仓redemption_orders、原quote snapshot、加密address_payload、outbox及expressShipment；订单排序共享锁和现有写操作互斥。原地址解密后在服务端比较，既有AAD绑定和加密格式不变。汇总不持久化，不创建包裹/运单/审计，不写积分、库存、分配、任务或幂等记录；后续合包发货需要独立状态模型和验收。

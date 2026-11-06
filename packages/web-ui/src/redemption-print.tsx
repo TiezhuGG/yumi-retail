@@ -11,7 +11,7 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
   d.title = '积分兑换订单配货单';
   const style = d.createElement('style');
   style.textContent = `
- *{box-sizing:border-box}body{margin:0;padding:20px;background:#f6f6ef;font-family:Arial,"Microsoft YaHei",sans-serif;color:#23251f;font-size:14px;line-height:1.65}.sheet{background:white;max-width:760px;padding:30px;margin:0 auto 20px;border:1px solid #e8e8e0;border-radius:12px;overflow-wrap:anywhere}.brand{color:#282c23;letter-spacing:2px;font-weight:bold}h1{font-size:24px;margin:8px 0}h2{font-size:16px;margin:22px 0 8px}p{margin:8px 0}.meta{color:#62665a}.recipient{border:1px solid #e8e8e0;padding:16px;border-radius:8px}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #e8e8e0}th{background:#f5f6ef}.total{text-align:right;font-weight:bold;font-size:17px}.foot{margin-top:24px;padding-top:12px;border-top:1px solid #e8e8e0;color:#62665a;font-size:12px}tr{break-inside:avoid}@page{size:A4 portrait;margin:14mm}@media print{body{padding:0;background:white;color:#111}.sheet{max-width:none;padding:0;margin:0;border:0;border-radius:0;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}.brand{color:#111}th{background:white}.recipient{break-inside:avoid}}@media screen and (max-width:500px){body{padding:8px}.sheet{padding:16px}th,td{padding:8px 3px}}
+ *{box-sizing:border-box}body{margin:0;padding:20px;background:#f6f6ef;font-family:Arial,"Microsoft YaHei",sans-serif;color:#23251f;font-size:14px;line-height:1.65}.sheet{background:white;max-width:760px;padding:30px;margin:0 auto 20px;border:1px solid #e8e8e0;border-radius:12px;overflow-wrap:anywhere}.brand{color:#282c23;letter-spacing:2px;font-weight:bold}h1{font-size:24px;margin:8px 0}h2{font-size:16px;margin:22px 0 8px}p{margin:8px 0}.meta{color:#62665a}.recipient{border:1px solid #e8e8e0;padding:16px;border-radius:8px}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #e8e8e0}th{background:#f5f6ef}.total{text-align:right;font-weight:bold;font-size:17px}.foot{margin-top:24px;padding-top:12px;border-top:1px solid #e8e8e0;color:#62665a;font-size:12px}tr{break-inside:avoid}@page{size:A4 portrait;margin:14mm}@media print{body{padding:0;background:white;color:#111}.sheet{max-width:none;padding:0;margin:0;border:0;border-radius:0;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}.brand{color:#111}th{background:white}.recipient{break-inside:avoid}}@media screen and (max-width:500px){body{padding:8px}.sheet{padding:16px}th,td{padding:8px 3px;font-size:12px}th{white-space:nowrap}}
  `;
   d.head.replaceChildren(style);
   d.body.replaceChildren();
@@ -23,28 +23,78 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
   };
   const stamp = (value: string) =>
     new Date(value).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
-  for (const o of preview.items) {
-    const sheet = node('article', undefined, 'sheet');
-    sheet.append(
-      node('div', '玉米百货 · 社区好生活', 'brand'),
-      node('h1', '积分兑换订单配货单'),
-      node('p', '兑换单号：' + o.orderNo),
+  let combined: HTMLElement | undefined;
+  if (preview.consolidatedLines) {
+    combined = node('article', undefined, 'sheet');
+    combined.append(node('div', '玉米百货 · 社区好生活', 'brand'), node('h1', '多订单汇总配货单'));
+    const a = preview.items[0]!.address;
+    combined.append(
+      node('p', a.contactName + ' · ' + a.phone),
+      node('p', formatRedemptionAddress(a)),
+    );
+    if (a.note) combined.append(node('p', '地址备注：' + a.note));
+    combined.append(
       node(
         'p',
-        o.executionMode === 'CONTROLLED'
-          ? '受控测试订单'
-          : o.executionMode === 'PRODUCTION'
-            ? '积分快递订单'
-            : '本地开发订单',
-      ),
-      node('p', '下单时间：' + stamp(o.createdAt) + '（北京时间）', 'meta'),
-      node(
-        'p',
-        '订单状态：有效兑换 · 配送方式：' +
-          (o.deliveryMode === 'EXPRESS' ? '快递发货 · 商家承担运费' : '小区配送（原流程）'),
-        'meta',
+        `共 ${preview.items.length} 单 · 商家承担运费 · ` +
+          (preview.items[0]!.executionMode === 'PRODUCTION'
+            ? '生产订单'
+            : preview.items[0]!.executionMode === 'CONTROLLED'
+              ? '受控测试订单'
+              : '本地开发订单'),
       ),
     );
+    const table = node('table'),
+      head = node('thead'),
+      hr = node('tr'),
+      body = node('tbody');
+    for (const x of ['商品 / 规格', '配货数量']) hr.append(node('th', x));
+    head.append(hr);
+    for (const line of preview.consolidatedLines) {
+      const row = node('tr');
+      row.append(
+        node('td', line.title + ' · ' + line.spec),
+        node('td', line.quantity + ' ' + line.unit),
+      );
+      body.append(row);
+    }
+    table.append(head, body);
+    combined.append(
+      table,
+      node(
+        'p',
+        '总计：' +
+          preview.items.reduce((n, o) => n + BigInt(o.totalPoints), 0n).toString() +
+          ' 积分',
+        'total',
+      ),
+      node('h2', '原订单明细'),
+    );
+    d.body.append(combined);
+  }
+  for (const o of preview.items) {
+    const sheet = node('article', undefined, combined ? 'order-detail' : 'sheet');
+    if (!combined)
+      sheet.append(
+        node('div', '玉米百货 · 社区好生活', 'brand'),
+        node('h1', '积分兑换订单配货单'),
+        node('p', '兑换单号：' + o.orderNo),
+        node(
+          'p',
+          o.executionMode === 'CONTROLLED'
+            ? '受控测试订单'
+            : o.executionMode === 'PRODUCTION'
+              ? '积分快递订单'
+              : '本地开发订单',
+        ),
+        node('p', '下单时间：' + stamp(o.createdAt) + '（北京时间）', 'meta'),
+        node(
+          'p',
+          '订单状态：有效兑换 · 配送方式：' +
+            (o.deliveryMode === 'EXPRESS' ? '快递发货 · 商家承担运费' : '小区配送（原流程）'),
+          'meta',
+        ),
+      );
     if (o.expressShipment)
       sheet.append(
         node(
@@ -64,7 +114,14 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
     );
     if (o.address.note) recipient.append(node('p', '地址备注：' + o.address.note));
     if (o.address.orderNote) recipient.append(node('p', '订单备注：' + o.address.orderNote));
-    sheet.append(recipient);
+    if (!combined) sheet.append(recipient);
+    else {
+      sheet.append(
+        node('h2', '订单：' + o.orderNo),
+        node('p', '下单时间：' + stamp(o.createdAt), 'meta'),
+      );
+      if (o.address.orderNote) sheet.append(node('p', '订单备注：' + o.address.orderNote));
+    }
     const table = node('table'),
       head = node('thead'),
       hr = node('tr');
@@ -81,26 +138,39 @@ function renderSheets(frame: HTMLIFrameElement, preview: RedemptionPrintPreview)
       row.append(node('td', x));
     body.append(row);
     table.append(head, body);
-    sheet.append(
-      table,
-      node('p', '合计：' + o.totalPoints + ' 积分', 'total'),
+    sheet.append(table, node('p', '合计：' + o.totalPoints + ' 积分', 'total'));
+    if (!combined)
+      sheet.append(
+        node('p', '核对人：________________    核对日期：________________'),
+        node(
+          'p',
+          '本单为订单配货单，非快递电子面单。打印不代表已发货，发货状态以系统记录为准。',
+          'foot',
+        ),
+        node('p', '预览生成时间：' + stamp(preview.generatedAt) + '（北京时间）', 'meta'),
+      );
+    if (combined) combined.append(sheet);
+    else d.body.append(sheet);
+  }
+  if (combined)
+    combined.append(
       node('p', '核对人：________________    核对日期：________________'),
       node(
         'p',
-        '本单为订单配货单，非快递电子面单。打印不代表已发货，发货状态以系统记录为准。',
+        '仅汇总配货，尚未确认合包或统一运单发货。本单非快递电子面单。请按原订单核对；打印不改变库存、积分或订单状态。',
         'foot',
       ),
       node('p', '预览生成时间：' + stamp(preview.generatedAt) + '（北京时间）', 'meta'),
     );
-    d.body.append(sheet);
-  }
 }
 export function RedemptionPrintDialog({
   ids,
+  consolidated = false,
   profile,
   onClose,
 }: {
   ids: string[];
+  consolidated?: boolean;
   profile: StaffProfile;
   onClose: () => void;
 }) {
@@ -121,7 +191,9 @@ export function RedemptionPrintDialog({
     if (frame.current?.contentDocument) frame.current.contentDocument.body.replaceChildren();
     try {
       const result = await staffRequest<RedemptionPrintPreview>(
-        '/admin/redemptions/print-preview',
+        consolidated
+          ? '/admin/redemptions/consolidated-print-preview'
+          : '/admin/redemptions/print-preview',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': profile.csrfToken },
@@ -174,8 +246,11 @@ export function RedemptionPrintDialog({
       <div className="redemption-print-window">
         <div className="redemption-print-toolbar">
           <div>
-            <h2>订单打印预览</h2>
-            <p>已选择 {ids.length} 单 · A4 每单分页 · 打印不改变发货状态</p>
+            <h2>{consolidated ? '汇总配货打印预览' : '订单打印预览'}</h2>
+            <p>
+              已选择 {ids.length} 单 · {consolidated ? 'A4 汇总配货' : 'A4 每单分页'} ·
+              打印不改变发货状态
+            </p>
           </div>
           <div>
             <button className="secondary-button" onClick={close} autoFocus>

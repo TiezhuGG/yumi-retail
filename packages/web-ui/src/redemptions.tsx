@@ -19,7 +19,8 @@ export function RedemptionsWorkbench({
   initialFulfillment?: string;
 }) {
   const [selected, setSelected] = useState<string[]>([]),
-    [printIds, setPrintIds] = useState<string[] | null>(null);
+    [printIds, setPrintIds] = useState<string[] | null>(null),
+    [consolidated, setConsolidated] = useState(false);
   const [items, setItems] = useState<RedemptionOrderView[]>([]),
     [detail, setDetail] = useState<RedemptionOrderView | null>(null),
     [keyword, setKeyword] = useState(''),
@@ -37,6 +38,7 @@ export function RedemptionsWorkbench({
     setLoading(true);
     setError('');
     setPrintIds(null);
+    setConsolidated(false);
     setSelected([]);
     try {
       if (intent.id) {
@@ -76,7 +78,7 @@ export function RedemptionsWorkbench({
   return (
     <section aria-label="积分兑换订单">
       <div className="notice">
-        兑换订单支持单张或批量打印配货单，用于备货核对。打印不改变发货状态，配送方式以订单记录为准；积分兑换不计现金销售额。
+        支持逐单打印；同一顾客、相同原收件信息的待发货快递订单可汇总配货打印。汇总不代表已合包或统一运单发货。
       </div>
       <details className="express-policy-disclosure">
         <summary>快递范围与运费配置</summary>
@@ -266,9 +268,22 @@ export function RedemptionsWorkbench({
             <button
               className="primary-button"
               disabled={loading || !selected.length}
-              onClick={() => setPrintIds([...selected])}
+              onClick={() => {
+                setConsolidated(false);
+                setPrintIds([...selected]);
+              }}
             >
               批量打印订单
+            </button>
+            <button
+              className="secondary-button"
+              disabled={loading || selected.length < 2}
+              onClick={() => {
+                setConsolidated(true);
+                setPrintIds([...selected]);
+              }}
+            >
+              汇总配货打印
             </button>
           </div>
           {items.length > 0 && (
@@ -379,8 +394,12 @@ export function RedemptionsWorkbench({
         <RedemptionPrintDialog
           key={printIds.join(':')}
           ids={printIds}
+          consolidated={consolidated}
           profile={profile}
-          onClose={() => setPrintIds(null)}
+          onClose={() => {
+            setPrintIds(null);
+            setConsolidated(false);
+          }}
         />
       )}
       {loading && <p role="status">正在读取兑换订单…</p>}
