@@ -637,7 +637,7 @@ function WorkspaceSession({
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
           ) : activeView === 'points-report' ? (
-            <PointsReportWorkbench />
+            <PointsReportWorkbench profile={profile} />
           ) : activeView === 'mall-tasks' ? (
             <MallTasksWorkbench
               profile={profile}

@@ -1446,3 +1446,16 @@ export interface WaybillImportPreview {
     allocations: Array<{ batchNo: string; locationName: string; quantity: number }>;
   }>;
 }
+
+export { POINTS_REPORT_KIND_LABELS, pointsLedgerCsv, pointsDailyCsv } from './points-report-csv.js';
+export interface PointsReportExport {
+  id: string;
+  filename: string;
+  csv: string;
+  rowCount: number;
+  generatedAt: string;
+  dataset: 'LEDGER' | 'DAILY';
+  from: string;
+  to: string;
+  kind: PointsReportKind | null;
+}

@@ -967,3 +967,9 @@ RepeatableRead单次事务统一快照，事务首尾校验经营仓及当前角
 无迁移（仍63项），复用redemption_express_shipments（parcel_id保持NULL）、原allocations、stock/position ledger、outbox/events、business_audits及idempotency_records。新动作`REDEMPTION_EXPRESS_BATCH_SHIP`以随机批次UUID记整批审计和最小幂等结果；原`REDEMPTION_EXPRESS_SHIP`逐单审计继续保留。未新增文件存储表、临时库存或可随意改状态接口。
 
 一个批次至多20单，同事务先锁当前仓，再按SKU排序锁元数据及库存，按UUID排序锁全部订单和outbox；全批失败回滚。历史运单PK/claim和原库存/库位/积分平衡约束继续执行，重复身份不得通过CSV绕过。无原CSV、收件明文或客户端文件名落库，服务器只处理规范化业务参数；原地址继续从AAD绑定的原订单密文解密。
+
+## 2026-11-07 积分报表导出
+
+无迁移（仍63项）。抽取原报表规范source/ledger关联SQL供原查询及导出复用，不改变五类归属、应记金额、actor/退款凭据及issue判定。导出仅读取当前经营仓、期间实际入账记录，以RepeatableRead保持行与汇总快照一致，明细limit5001检查5000上限，日汇总不受明细行数上限影响。
+
+复用business_audits记录POINTS_REPORT_EXPORT，resource_id为本次生成UUID，details仅含dataset/from/to/kind/rowCount/generatedAt；原审计不可变规则继续生效。权限在事务前后校验，导出或审计失败回滚，不返回文件。不新增财务分录、文件表、外部存储、预占或幂等记录；CSV正文及顾客内容不持久化。旧报表GET仍无写入。

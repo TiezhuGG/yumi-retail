@@ -4972,3 +4972,23 @@ button:disabled {
     padding: 10px 6px;
   }
 }
+
+.points-report-export-button {
+  margin: 12px 0;
+}
+.points-export-scope {
+  margin: 20px 0;
+}
+.points-export-scope > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.points-export-scope dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.points-export-scope dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

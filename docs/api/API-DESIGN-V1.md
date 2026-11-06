@@ -1183,3 +1183,13 @@ POST严格body={scopeId,message}，scopeId须匹配当前服务端经营仓，�
 - `POST /api/v1/admin/redemptions/waybill-import/confirm`：points.write、当前SUPER_ADMIN/OPERATIONS仓权限、CSRF及Idempotency-Key。`{items:[{id,version,carrierCode,carrierName?,trackingNo}],dispatchConfirmed:true}`，1–20个不重复订单/运单。按订单ID排序及规范化运单生成请求哈希，作用域为操作者+动作+当前经营仓（改选订单不能复用原键），返回`{id,items:[{id,orderNo}]}`；id为整批审计/幂等结果标识。原始CSV、收件信息不存幂等记录。
 - 提交不依赖前端预检结果授权：按SKU排序锁元数据/库存，再按UUID排序锁全部订单/outbox，逐单重验版本/状态/当前模式/原预占及效期。调用原库存结算方法，不增加新状态迁移；运单、每单库存/库位凭据、逐单审计、整批审计及幂等同事务。最后重验权限和所有订单资格，任一失败整批回滚。不自动合包，不复用其他订单/包裹的原始或更正历史运单身份。
 - 400格式/数量/重复/实物确认缺失，403权限/CSRF，404授权范围内缺单，409订单/版本/库存/运单冲突，503作业暂停或可重试竞争；500为结果需核实。原键成功结果可在暂停后恢复，当前身份与仓权限仍重验。客户端收到401/403、5xx或网络失败保留原请求，不用新键重试；明确业务拒绝后清理预览，需重检。
+
+## 2026-11-07 积分报表导出（0.82.0）
+
+`POST /api/v1/admin/points/report/export`，points.read、当前SUPER_ADMIN/OPERATIONS经营仓权限及CSRF，no-store。请求`{from,to,dataset:'LEDGER'|'DAILY',kind?}`；按北京时间含首尾日期1–366天。LEDGER支持五类kind筛选；DAILY包含全部类型，传kind拒绝。禁止cursor/accountCursor/limit/view及未知字段，不能借导出扩大仓范围或导出全局账户。
+
+返回`PointsReportExport {id,filename,csv,rowCount,generatedAt,dataset,from,to,kind}`；csv为带BOM的UTF-8 CSV，文件名由固定文字/已校验日期/kind组成。明细按入账时间/业务关联键排序，最多5000行，查询上限+1判溢出后409 EXPORT_TOO_LARGE，超限不返回截断文件、不生成审计。每日按日期排序，有数据日最多366行。空文件只有表头；未归属流水和全历史业务差异不导出。CSV分隔/双引号转义，文本公式式前缀、控制字符及超15位整数加单引号；应记/实记值始终来自整数文本，不经浮点转换。
+
+同RepeatableRead事务复用原source/ledger关联与issue核验逻辑，按入账时间而非业务请求时间选取。写POINTS_REPORT_EXPORT审计：随机文件生成ID、当前仓/操作者/请求ID及dataset/from/to/kind/rowCount/generatedAt；不写文件正文、顾客昵称或依据到审计。事务末重验权限，审计/权限失败不给文件。重复请求可生成新的审计；这是数据读取加审计，无财务变更，不需要交易幂等键。客户端再次下载已生成的当前文件无需重调接口，关闭/刷新清理内存文件。
+
+400参数，401未登录/会话失效，403角色/仓范围/CSRF或事务内权限失效，409明细超限，500/503生成/事务失败。原GET报表响应和只读语义不变；新接口不修改积分、库存、订单，也不自动修复差异。

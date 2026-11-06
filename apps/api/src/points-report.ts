@@ -1,7 +1,14 @@
-import { Controller, Get, Header, Inject, Query, Req } from '@nestjs/common';
-import { ApiCookieAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Header, HttpCode, Inject, Post, Query, Req } from '@nestjs/common';
+import { ApiBody, ApiCookieAuth, ApiHeader, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@yumi/database';
-import type { PointsReport, PointsReportKind } from '@yumi/contracts';
+import {
+  pointsLedgerCsv,
+  pointsDailyCsv,
+  type PointsReport,
+  type PointsReportKind,
+  type PointsReportExport,
+} from '@yumi/contracts';
+import { randomUUID } from 'node:crypto';
 import { CatalogService } from './catalog-service.js';
 import { PointsGrantService } from './points-grants.js';
 import { fields, str, uuid } from './catalog-input.js';
@@ -32,10 +39,98 @@ function day(v: unknown) {
     throw failure(400, 'VALIDATION_ERROR', '日期须为有效的YYYY-MM-DD');
   return v;
 }
+function businessRows(w: string) {
+  return Prisma.sql`SELECT s.*,l.id AS ledger_id,l.delta,l.created_at AS ledger_at,u.display_name,
+    CASE WHEN s.expected AND l.id IS NULL THEN 'MISSING' WHEN NOT s.expected AND l.id IS NOT NULL THEN 'UNEXPECTED'
+    WHEN l.id IS NOT NULL AND (l.user_id<>s.user_id OR l.delta<>s.expected_points OR l.actor_id IS DISTINCT FROM s.expected_actor_id OR l.consumer_actor_id IS DISTINCT FROM s.expected_consumer_id OR l.redemption_id IS DISTINCT FROM s.redemption_id OR l.redemption_action IS DISTINCT FROM s.redemption_action OR (s.kind='RETURN' AND l.id IS DISTINCT FROM s.refund_ledger_id)) THEN 'INVALID' ELSE NULL END AS issue
+    FROM (${sources()}) s LEFT JOIN points_ledger l ON l.action_key=s.key JOIN consumer_users u ON u.id=s.user_id WHERE s.warehouse_id=${w}::uuid`;
+}
 export class PointsReportService {
   readonly auth: PointsGrantService;
+  private readonly exportLimit = 5000;
   constructor(readonly catalog: CatalogService) {
     this.auth = new PointsGrantService(catalog);
+  }
+  async export(r: ApiRequest, input: unknown): Promise<PointsReportExport> {
+    const b = fields(input, ['from', 'to', 'kind', 'dataset']);
+    const from = day(b.from),
+      to = day(b.to),
+      start = new Date(from + 'T00:00:00+08:00'),
+      end = new Date(new Date(to + 'T00:00:00+08:00').getTime() + 86400000);
+    if (end <= start || end.getTime() - start.getTime() > 366 * 86400000)
+      throw failure(400, 'VALIDATION_ERROR', '日期范围须为1至366天');
+    if (b.dataset !== 'LEDGER' && b.dataset !== 'DAILY')
+      throw failure(400, 'VALIDATION_ERROR', '请选择入账明细或每日汇总');
+    const dataset = b.dataset,
+      kind = b.kind === undefined ? null : str(b.kind, 20);
+    if (kind !== null && !kinds.includes(kind as PointsReportKind))
+      throw failure(400, 'VALIDATION_ERROR', '积分类型无效');
+    if (dataset === 'DAILY' && kind !== null)
+      throw failure(400, 'VALIDATION_ERROR', '每日汇总包含全部类型，请勿混用明细类型条件');
+    return this.catalog.db.$transaction(
+      async (tx) => {
+        const w = await this.auth.authorize(r, tx),
+          generatedAt = (
+            await tx.$queryRaw<Array<{ at: Date }>>`SELECT statement_timestamp() AS at`
+          )[0]!.at.toISOString();
+        const matched = businessRows(w);
+        let csv: string, rowCount: number;
+        if (dataset === 'LEDGER') {
+          const rows = await tx.$queryRaw<
+            Array<
+              Omit<PointsReport['items'][number], 'occurredAt' | 'ledgerAt'> & {
+                occurredAt: Date;
+                ledgerAt: Date;
+              }
+            >
+          >(
+            Prisma.sql`WITH m AS (${matched}) SELECT key,kind,source_id AS "sourceId",reference,display_name AS "displayName",(CASE WHEN expected THEN expected_points ELSE 0 END)::text AS "expectedPoints",delta::text AS "actualPoints",occurred_at AS "occurredAt",ledger_at AS "ledgerAt",issue FROM m WHERE ledger_at>=${start} AND ledger_at<${end} AND (${kind}::text IS NULL OR kind=${kind}) ORDER BY ledger_at,key LIMIT ${this.exportLimit + 1}`,
+          );
+          if (rows.length > this.exportLimit)
+            throw failure(
+              409,
+              'EXPORT_TOO_LARGE',
+              '入账明细超过5000行，请缩小日期范围或选择积分类型后重试',
+            );
+          csv = pointsLedgerCsv(
+            rows.map((x) => ({
+              ...x,
+              occurredAt: x.occurredAt.toISOString(),
+              ledgerAt: x.ledgerAt.toISOString(),
+            })),
+          );
+          rowCount = rows.length;
+        } else {
+          const rows = await tx.$queryRaw<PointsReport['daily']>(
+            Prisma.sql`WITH m AS (${matched}) SELECT to_char(ledger_at AT TIME ZONE 'Asia/Shanghai','YYYY-MM-DD') AS date,COALESCE(sum(delta) FILTER(WHERE delta>0),0)::text AS incoming,COALESCE(sum(-delta) FILTER(WHERE delta<0),0)::text AS outgoing,sum(delta)::text AS net FROM m WHERE ledger_at>=${start} AND ledger_at<${end} GROUP BY date ORDER BY date`,
+          );
+          csv = pointsDailyCsv(rows);
+          rowCount = rows.length;
+        }
+        const id = randomUUID();
+        await this.catalog.audit(tx, r, 'POINTS_REPORT_EXPORT', id, w, null, {
+          dataset,
+          from,
+          to,
+          kind,
+          rowCount,
+          generatedAt,
+        });
+        await this.auth.authorize(r, tx);
+        return {
+          id,
+          filename: `积分${dataset === 'LEDGER' ? '入账明细' : '每日汇总'}_${from}_${to}${kind ? '_' + kind : ''}.csv`,
+          csv,
+          rowCount,
+          generatedAt,
+          dataset,
+          from,
+          to,
+          kind: kind as PointsReportKind | null,
+        };
+      },
+      { isolationLevel: 'RepeatableRead', timeout: 15000 },
+    );
   }
   async read(r: ApiRequest, query: unknown): Promise<PointsReport> {
     const q = fields(query, ['from', 'to', 'kind', 'view', 'cursor', 'accountCursor']);
@@ -67,10 +162,7 @@ export class PointsReportService {
           await tx.$queryRaw<Array<{ now: Date }>>`SELECT statement_timestamp() AS now`
         )[0]!.now;
         const allSources = sources();
-        const matched = Prisma.sql`SELECT s.*,l.id AS ledger_id,l.delta,l.created_at AS ledger_at,u.display_name,
-    CASE WHEN s.expected AND l.id IS NULL THEN 'MISSING' WHEN NOT s.expected AND l.id IS NOT NULL THEN 'UNEXPECTED'
-    WHEN l.id IS NOT NULL AND (l.user_id<>s.user_id OR l.delta<>s.expected_points OR l.actor_id IS DISTINCT FROM s.expected_actor_id OR l.consumer_actor_id IS DISTINCT FROM s.expected_consumer_id OR l.redemption_id IS DISTINCT FROM s.redemption_id OR l.redemption_action IS DISTINCT FROM s.redemption_action OR (s.kind='RETURN' AND l.id IS DISTINCT FROM s.refund_ledger_id)) THEN 'INVALID' ELSE NULL END AS issue
-    FROM (${allSources}) s LEFT JOIN points_ledger l ON l.action_key=s.key JOIN consumer_users u ON u.id=s.user_id WHERE s.warehouse_id=${w}::uuid`;
+        const matched = businessRows(w);
         const totalsRaw = await tx.$queryRaw<
           Array<{ kind: PointsReportKind; count: number; points: string }>
         >(
@@ -162,6 +254,39 @@ const count = { type: 'integer' as const, minimum: 0 },
 @Controller('admin/points/report')
 export class PointsReportController {
   constructor(@Inject(PointsReportService) readonly service: PointsReportService) {}
+  @Post('export')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object(
+      {
+        from: text,
+        to: text,
+        kind: kindSchema,
+        dataset: { type: 'string', enum: ['LEDGER', 'DAILY'] },
+      },
+      ['from', 'to', 'dataset'],
+    ),
+  })
+  @ApiResult(
+    object({
+      id: text,
+      filename: text,
+      csv: text,
+      rowCount: count,
+      generatedAt: text,
+      dataset: { type: 'string', enum: ['LEDGER', 'DAILY'] },
+      from: text,
+      to: text,
+      kind: { ...kindSchema, nullable: true },
+    }),
+    [400, 401, 403, 409, 500, 503],
+  )
+  async export(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.service.export(r, b));
+  }
   @Get()
   @Header('Cache-Control', 'no-store')
   @ApiQuery({

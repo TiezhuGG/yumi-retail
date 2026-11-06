@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PointsReport, PointsReportKind } from '@yumi/contracts';
+import {
+  POINTS_REPORT_KIND_LABELS as labels,
+  type PointsReport,
+  type PointsReportKind,
+  type StaffProfile,
+} from '@yumi/contracts';
+import { PointsReportExportDialog, type PointsReportExportFilter } from './points-report-export.js';
 import { staffRequest } from './index.js';
 import { PointsWorkbench } from './points.js';
 import { Modal } from './modal.js';
-const labels: Record<PointsReportKind, string> = {
-  GRANT: '积分发放',
-  REDEEM: '商品兑换',
-  CANCEL: '取消退回',
-  RETURN: '售后退回',
-  CORRECTION: '误发冲正',
-};
 const issues = {
   MISSING: '缺少入账流水',
   INVALID: '金额或归属不符',
@@ -18,7 +17,8 @@ const issues = {
 const amount = (v: string) => BigInt(v).toLocaleString('zh-CN');
 const stamp = (v: string) => new Date(v).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 const today = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-export function PointsReportWorkbench() {
+export function PointsReportWorkbench({ profile }: { profile: StaffProfile }) {
+  const [exportFilter, setExportFilter] = useState<PointsReportExportFilter | null>(null);
   const [from, setFrom] = useState(() =>
       new Date(Date.parse(today() + 'T00:00:00Z') - 29 * 86400000).toISOString().slice(0, 10),
     ),
@@ -225,6 +225,13 @@ export function PointsReportWorkbench() {
           </section>
           <details className="surface points-report-section">
             <summary>每日积分变动（{data.daily.length} 个有流水日期）</summary>
+            <button
+              className="secondary-button points-report-export-button"
+              disabled={loading}
+              onClick={() => setExportFilter({ dataset: 'DAILY', from: data.from, to: data.to })}
+            >
+              导出每日汇总
+            </button>
             {data.daily.length === 0 ? (
               <p>所选期间暂无已入账流水</p>
             ) : (
@@ -287,6 +294,25 @@ export function PointsReportWorkbench() {
                 ))}
               </select>
             </div>
+            <button
+              className="secondary-button points-report-export-button"
+              disabled={loading || view !== 'LEDGER'}
+              title={
+                view === 'LEDGER' ? '导出全部匹配的入账明细' : '请切换到所选期间入账流水后导出'
+              }
+              onClick={() =>
+                setExportFilter({
+                  dataset: 'LEDGER',
+                  from: data.from,
+                  to: data.to,
+                  ...(applied.current.kind
+                    ? { kind: applied.current.kind as PointsReportKind }
+                    : {}),
+                })
+              }
+            >
+              导出入账明细
+            </button>
             {data.items.length === 0 ? (
               <div className="points-empty">
                 {data.view === 'ISSUES'
@@ -343,6 +369,13 @@ export function PointsReportWorkbench() {
             )}
           </section>
         </>
+      )}
+      {exportFilter && (
+        <PointsReportExportDialog
+          filter={exportFilter}
+          profile={profile}
+          onClose={() => setExportFilter(null)}
+        />
       )}
       {account && (
         <Modal title={account.displayName + ' · 账户流水'} onClose={() => setAccount(null)}>
