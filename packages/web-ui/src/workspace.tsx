@@ -1,3 +1,4 @@
+import { MallTasksWorkbench, type MallTaskCode } from './mall-tasks.js';
 import { CustomersWorkbench } from './customers.js';
 import { RedemptionReturnsWorkbench, type ReturnQueueStatus } from './redemption-returns.js';
 import { RedemptionDeliveryWorkbench } from './redemption-delivery.js';
@@ -29,6 +30,7 @@ import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 import { NavIcon } from './nav-icon.js';
 export type WorkspaceView =
+  | 'mall-tasks'
   | 'customers'
   | 'redemption-delivery'
   | 'redemption-picking'
@@ -69,6 +71,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'mall-tasks',
+    name: '商城待办',
+    glyph: '◇',
+    hint: '缺货与待处理事项',
+    permission: 'points.read',
+  },
   {
     id: 'customers',
     name: '顾客管理',
@@ -310,6 +319,7 @@ const operationsNavigation: { label: string; views: WorkspaceView[] }[] = [
   {
     label: '积分与快递',
     views: [
+      'mall-tasks',
       'customers',
       'points',
       'points-grants',
@@ -428,13 +438,18 @@ function WorkspaceSession({
     mobileWidth.addEventListener('change', reveal);
     return () => mobileWidth.removeEventListener('change', reveal);
   }, [view]);
+  const [mallTask, setMallTask] = useState<MallTaskCode | ''>('');
+  const [mallRewardId, setMallRewardId] = useState<string>();
   const [returnQueueStatus, setReturnQueueStatus] = useState<ReturnQueueStatus | ''>('');
   const activeView = allowed.some((r) => r.id === view) ? view : (allowed[0]?.id ?? 'overview');
   const navigate = (next: WorkspaceView) => {
+    if (next === activeView) return;
     if (allowed.some((r) => r.id === next)) {
       restore.current = undefined;
       setReturned(false);
       setReturnQueueStatus('');
+      setMallTask('');
+      setMallRewardId(undefined);
       setView(next);
     }
   };
@@ -611,6 +626,30 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'mall-tasks' ? (
+            <MallTasksWorkbench
+              profile={profile}
+              onReward={(id) => {
+                navigate('rewards');
+                setMallRewardId(id);
+              }}
+              onQueue={(code) => {
+                const dest: WorkspaceView =
+                  code === 'WAIT_SHIP'
+                    ? 'redemptions'
+                    : code === 'GRANTS'
+                      ? 'points-grants'
+                      : code === 'CORRECTIONS'
+                        ? 'points-corrections'
+                        : code.startsWith('FEEDBACK_')
+                          ? 'redemption-after-sales'
+                          : 'redemption-returns';
+                navigate(dest);
+                setMallTask(code);
+                if (['REQUESTED', 'WAIT_RETURN', 'READY_TO_REFUND'].includes(code))
+                  setReturnQueueStatus(code as ReturnQueueStatus);
+              }}
+            />
           ) : activeView === 'express-readiness' ? (
             <ExpressReadinessWorkbench
               onReturns={
@@ -625,15 +664,40 @@ function WorkspaceSession({
           ) : activeView === 'redemption-returns' ? (
             <RedemptionReturnsWorkbench profile={profile} initialStatus={returnQueueStatus} />
           ) : activeView === 'redemption-after-sales' ? (
-            <RedemptionAfterSalesWorkbench profile={profile} />
+            <RedemptionAfterSalesWorkbench
+              profile={profile}
+              initialStatus={
+                mallTask === 'FEEDBACK_OPEN'
+                  ? 'OPEN'
+                  : mallTask === 'FEEDBACK_PROCESSING'
+                    ? 'PROCESSING'
+                    : ''
+              }
+            />
           ) : activeView === 'redemptions' ? (
-            <RedemptionsWorkbench profile={profile} />
+            <RedemptionsWorkbench
+              profile={profile}
+              initialFulfillment={mallTask === 'WAIT_SHIP' ? 'EXPRESS_WAIT_SHIP' : ''}
+            />
           ) : activeView === 'rewards' ? (
-            <RewardsWorkbench profile={profile} onNavigate={navigate} />
+            <RewardsWorkbench
+              profile={profile}
+              onNavigate={navigate}
+              initialRewardId={mallRewardId}
+            />
           ) : activeView === 'points-corrections' ? (
-            <PointsGrants key="corrections" profile={profile} correction />
+            <PointsGrants
+              key="corrections"
+              profile={profile}
+              correction
+              initialStatus={mallTask === 'CORRECTIONS' ? 'SUBMITTED' : ''}
+            />
           ) : activeView === 'points-grants' ? (
-            <PointsGrants key="grants" profile={profile} />
+            <PointsGrants
+              key="grants"
+              profile={profile}
+              initialStatus={mallTask === 'GRANTS' ? 'SUBMITTED' : ''}
+            />
           ) : activeView === 'customers' ? (
             <CustomersWorkbench profile={profile} />
           ) : activeView === 'points' ? (

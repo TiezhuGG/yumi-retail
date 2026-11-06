@@ -31,8 +31,10 @@ export function PointsGrants({
   correction = false,
   targetCustomer,
   onPendingChange,
+  initialStatus = '',
 }: {
   profile: StaffProfile;
+  initialStatus?: string;
   correction?: boolean;
   targetCustomer?: { id: string; displayName: string };
   onPendingChange?: (pending: boolean) => void;
@@ -82,6 +84,7 @@ export function PointsGrants({
     setError('');
     try {
       const q = new URLSearchParams();
+      if (initialStatus) q.set('status', initialStatus);
       if (cursor) q.set('cursor', cursor);
       if (targetCustomer) q.set('userId', targetCustomer.id);
       const d = await staffRequest<Data>(base + '?' + q);
@@ -231,6 +234,7 @@ export function PointsGrants({
           刷新申请
         </button>
       </div>
+      {initialStatus === 'SUBMITTED' && <p className="notice">当前仅查看待审批申请</p>}
       {loading && <p role="status">{correction ? '正在读取冲正申请…' : '正在读取发放申请…'}</p>}
       {error && !editor && !selected && (
         <div role="alert" className="notice task-error">

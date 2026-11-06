@@ -1309,3 +1309,35 @@ export interface RewardReadiness {
       | null;
   }>;
 }
+
+/** Read-only, current warehouse operations snapshot; thresholds are view filters only. */
+export interface MallTasks {
+  checkedAt: string;
+  lowStockThreshold: number;
+  stock: {
+    outOfStock: number;
+    lowStock: number;
+    items: Array<{
+      id: string;
+      title: string;
+      name: string;
+      spec: string;
+      unit: string;
+      available: number;
+    }>;
+    nextCursor: string | null;
+  };
+  queues: Array<{
+    code:
+      | 'WAIT_SHIP'
+      | 'GRANTS'
+      | 'CORRECTIONS'
+      | 'FEEDBACK_OPEN'
+      | 'FEEDBACK_PROCESSING'
+      | 'REQUESTED'
+      | 'WAIT_RETURN'
+      | 'READY_TO_REFUND';
+    count: number;
+    oldestAt: string | null;
+  }>;
+}

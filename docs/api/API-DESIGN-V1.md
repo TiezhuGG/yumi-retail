@@ -1114,3 +1114,14 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 新增 `GET /consumer/redemption-returns`，消费者Bearer身份、no-store；只读本人申请且其订单也须归本人。可选status为PROCESSING、REFUNDED、CLOSED，省略为全部；PROCESSING对应REQUESTED/WAIT_RETURN/READY_TO_REFUND，CLOSED对应REJECTED/CANCELED。可选keyword为trim后最多80字符的商品标题/订单号、不区分大小写部分匹配，LIKE特殊字符按字面转义。cursor为UUID，同本人/当前关键词/状态范围校验，失效409/CURSOR_INVALID；未知/重复/非法参数400，未登录401，服务不可用503。
 
 返回 `{items,nextCursor}`，每页20条；摘要包含id/orderId/orderNo/title/quantity/points/state/createdAt/requiresReturn，points按原订单单件积分价乘本申请件数并以字符串返回。摘要不解密申请原因、不返回处理历史或员工身份；详情沿用本人订单既有售后读取接口，仅在页面展示指定申请，无新增写接口。读取使用RepeatableRead并在事务首尾核验会话。旧接口与客户端兼容，无迁移，先更新API再小程序。
+
+
+## 2026-11-06 商城待办（0.75.0）
+
+新增员工Cookie接口 `GET /api/v1/admin/mall-tasks`，`Cache-Control:no-store`，需要points.read及当前SUPER_ADMIN/OPERATIONS经营仓授权，事务首尾校验会话/角色/仓库；消费者或仓管不能访问，不接受客户端warehouseId。RepeatableRead只读事务，不创建库存、审批、审计或幂等记录。
+
+查询：threshold为0至1000的规范整数字符串，默认5，仅本次库存查看条件；stock为ALL（默认，缺货与低库存）/ZERO（缺货）/LOW（正库存且≤阈值）；cursor为UUID。未知参数/非法值400，无会话401，无权限403，经营仓未配置503。库存items按兑换商品UUID升序返回最多20条，nextCursor或null；统计不受cursor/stock影响，但lowStock随threshold变化。不是跨请求固定快照，库存变化后应刷新。
+
+返回 `MallTasks`：checkedAt、lowStockThreshold、stock{outOfStock,lowStock,items:[{id,title,name,spec,unit,available}],nextCursor}、queues:[{code,count,oldestAt}]。8个code固定为WAIT_SHIP/GRANTS/CORRECTIONS/FEEDBACK_OPEN/FEEDBACK_PROCESSING/REQUESTED/WAIT_RETURN/READY_TO_REFUND。无待办count=0、oldestAt=null；反馈时间为最近更新，退回/退分时间由APPROVE/RECEIVE事实确定。只返回数量、时间和商品展示信息，无顾客身份、电话、地址、内部成本或密钥。库存复用visibleSkus，限定当前开放的本仓上架兑换商品；冻结、盘点、安全量、预占、隔离、效期和库位均参与计算。
+
+兼容增加 `GET /admin/points/grants` 与 `/admin/points/corrections` 可选status=SUBMITTED/APPROVED/REJECTED/CANCELED，服务端在分页前筛选，可组合userId与cursor；不传保留原行为，非法400。前端待办带SUBMITTED进入，审批仍需原独立负责人及预算校验。现有订单/反馈/售后接口未改契约，仅新增前端初始筛选及商品详情定位。无新写接口，无迁移。

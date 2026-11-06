@@ -34,8 +34,10 @@ const beijing = (s: string | null) =>
 export function RewardsWorkbench({
   profile,
   onNavigate,
+  initialRewardId,
 }: {
   profile: StaffProfile;
+  initialRewardId?: string;
   onNavigate?: (view: RewardCheckDestination) => void;
 }) {
   const [creatingProduct, setCreatingProduct] = useState(false);
@@ -49,7 +51,8 @@ export function RewardsWorkbench({
     [error, setError] = useState('');
   const seq = useRef(0),
     applied = useRef({ keyword: '', status: '' }),
-    pending = useRef<string | undefined>(undefined);
+    pending = useRef<string | undefined>(undefined),
+    initialRead = useRef(false);
   async function load(next?: string) {
     const n = ++seq.current;
     pending.current = next;
@@ -61,6 +64,14 @@ export function RewardsWorkbench({
     if (next) q.set('cursor', next);
     try {
       const p = await staffRequest<Page<Reward>>('/admin/rewards?' + q);
+      if (initialRewardId && !initialRead.current) {
+        const report = await staffRequest<{ reward: Reward }>(
+          '/admin/rewards/' + initialRewardId + '/readiness',
+        );
+        if (n !== seq.current) return;
+        initialRead.current = true;
+        setSelected(report.reward);
+      }
       if (n !== seq.current) return;
       setItems((old) => (next ? [...old, ...p.items] : p.items));
       setCursor(p.nextCursor);

@@ -21,14 +21,20 @@ type Intent = {
   action: 'reply' | 'close';
   body: { version: number; message: string };
 };
-export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfile }) {
+export function RedemptionAfterSalesWorkbench({
+  profile,
+  initialStatus = '',
+}: {
+  profile: StaffProfile;
+  initialStatus?: string;
+}) {
   const [page, setPage] = useState<RedemptionAfterSalesPage>({ items: [], nextCursor: null }),
     [view, setView] = useState<RedemptionAfterSalesView | null>(null),
     [loading, setLoading] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [keyword, setKeyword] = useState(''),
-    [status, setStatus] = useState(''),
+    [status, setStatus] = useState(initialStatus),
     [message, setMessage] = useState(''),
     [action, setAction] = useState<'reply' | 'close'>('reply'),
     [confirmed, setConfirmed] = useState(false),
@@ -36,7 +42,7 @@ export function RedemptionAfterSalesWorkbench({ profile }: { profile: StaffProfi
   const seq = useRef(0),
     writing = useRef(false),
     current = useRef<{ id?: string; cursor?: string }>({}),
-    applied = useRef({ keyword: '', status: '' });
+    applied = useRef({ keyword: '', status: initialStatus });
   const storage = (id: string) => 'yumi.redemption-aftersales.staff.v1:' + profile.id + ':' + id;
   function stored(id: string): Intent | null {
     const raw = sessionStorage.getItem(storage(id));

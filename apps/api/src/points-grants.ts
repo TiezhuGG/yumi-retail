@@ -40,7 +40,10 @@ export class PointsGrantService {
   }
   async read(r: ApiRequest, q: unknown) {
     const warehouse = await this.authorize(r);
-    const row = fields(q, ['cursor', 'userId']);
+    const row = fields(q, ['cursor', 'userId', 'status']);
+    const status = row.status === undefined ? null : str(row.status, 16);
+    if (status !== null && !['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELED'].includes(status))
+      throw failure(400, 'VALIDATION_ERROR', '申请状态无效');
     const userId = row.userId === undefined ? null : uuid(row.userId);
     const cursor = row.cursor === undefined ? null : uuid(row.cursor);
     const policies = await this.catalog.db.$queryRaw<
@@ -48,7 +51,7 @@ export class PointsGrantService {
     >`SELECT enabled,single_limit::text AS "singleLimit",daily_limit::text AS "dailyLimit",version FROM points_grant_policies WHERE warehouse_id=${warehouse}::uuid`;
     const items = await this.catalog.db.$queryRaw<
       Grant[]
-    >`SELECT g.id,g.user_id AS "userId",u.display_name AS "displayName",g.amount::text,g.reason,g.reference,g.creator_id AS "creatorId",g.status,g.version,g.decision_reason AS "decisionReason" FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR g.user_id=${userId}::uuid) AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) ORDER BY g.id LIMIT 21`;
+    >`SELECT g.id,g.user_id AS "userId",u.display_name AS "displayName",g.amount::text,g.reason,g.reference,g.creator_id AS "creatorId",g.status,g.version,g.decision_reason AS "decisionReason" FROM points_grants g JOIN consumer_users u ON u.id=g.user_id WHERE g.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR g.user_id=${userId}::uuid) AND (${status}::text IS NULL OR g.status=${status}) AND (${cursor}::uuid IS NULL OR g.id>${cursor}::uuid) ORDER BY g.id LIMIT 21`;
     return {
       policy: policies[0] ?? null,
       items: items.slice(0, 20),
@@ -176,6 +179,11 @@ export class PointsGrantService {
 export class PointsGrantController {
   constructor(@Inject(PointsGrantService) readonly service: PointsGrantService) {}
   @Get()
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELED'],
+  })
   @ApiQuery({ name: 'userId', required: false, type: String, description: '仅查看指定顾客的申请' })
   @ApiResult(
     object({

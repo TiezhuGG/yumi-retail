@@ -38,7 +38,10 @@ export class PointsCorrectionService {
   }
   async read(r: ApiRequest, q: unknown) {
     const warehouse = await this.authorize(r);
-    const b = fields(q, ['cursor', 'userId']);
+    const b = fields(q, ['cursor', 'userId', 'status']);
+    const status = b.status === undefined ? null : str(b.status, 16);
+    if (status !== null && !['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELED'].includes(status))
+      throw failure(400, 'VALIDATION_ERROR', '申请状态无效');
     const userId = b.userId === undefined ? null : uuid(b.userId);
     const cursor = b.cursor === undefined ? null : uuid(b.cursor);
     const rows = await this.catalog.db.$queryRaw<
@@ -56,7 +59,7 @@ export class PointsCorrectionService {
         version: number;
         decisionReason: string | null;
       }>
-    >`SELECT c.id,c.grant_id AS "grantId",u.display_name AS "displayName",c.amount::text,g.amount::text AS "sourceAmount",g.reference AS "sourceReference",c.reference,c.reason,c.creator_id AS "creatorId",c.status,c.version,c.decision_reason AS "decisionReason" FROM points_corrections c JOIN points_grants g ON g.id=c.grant_id JOIN consumer_users u ON u.id=c.user_id WHERE c.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR c.user_id=${userId}::uuid) AND (${cursor}::uuid IS NULL OR c.id>${cursor}::uuid) ORDER BY c.id LIMIT 21`;
+    >`SELECT c.id,c.grant_id AS "grantId",u.display_name AS "displayName",c.amount::text,g.amount::text AS "sourceAmount",g.reference AS "sourceReference",c.reference,c.reason,c.creator_id AS "creatorId",c.status,c.version,c.decision_reason AS "decisionReason" FROM points_corrections c JOIN points_grants g ON g.id=c.grant_id JOIN consumer_users u ON u.id=c.user_id WHERE c.warehouse_id=${warehouse}::uuid AND (${userId}::uuid IS NULL OR c.user_id=${userId}::uuid) AND (${status}::text IS NULL OR c.status=${status}) AND (${cursor}::uuid IS NULL OR c.id>${cursor}::uuid) ORDER BY c.id LIMIT 21`;
     return {
       policy: null,
       items: rows.slice(0, 20),
@@ -193,6 +196,11 @@ const correctionSchema = object({
 export class PointsCorrectionController {
   constructor(@Inject(PointsCorrectionService) readonly service: PointsCorrectionService) {}
   @Get()
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELED'],
+  })
   @ApiQuery({ name: 'userId', required: false, type: String, description: '仅查看指定顾客的申请' })
   @ApiResult(
     object({

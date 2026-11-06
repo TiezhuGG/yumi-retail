@@ -909,3 +909,12 @@ RECEIVE是独立退货隔离保管台账，记录整项实物及位置，不冒�
 ## 2026-11-06 消费者售后进度查询
 
 无模型、索引、迁移或历史数据修改，仍61项迁移。汇总按redemption_returns及原订单双重消费者归属读取；按既有不可变审核/取消/验收/退积分事件推导六种状态，与后台共用状态筛选条件，不新增可任意修改状态字段。读取原订单快照标题、订单号和积分价，原因密文不解密，事件只选择kind/requiresReturn。RepeatableRead事务保持游标核验与页面读取一致，事务首尾核验消费者有效身份。只读汇总不触及积分、库存或审计写入；原按件申请与退积分事实约束保持。
+
+
+## 2026-11-06 商城待办只读投影
+
+无新表、列、迁移、种子或主库写入，迁移仍62项。新增MallTasksService在RepeatableRead事务读取当前经营仓的reward_products与visibleSkus库存投影，取当前开放的上架商品计算缺货/低库存；不把0库存等同于账面on_hand为0。阈值只在查询参数中，不建立未经确认的告警配置。库存分页按兑换商品UUID、每页20条，统计与分页分别查询，后续请求可见新事实，不承诺跨页历史快照。
+
+待办按redemption_orders+redemption_outbox（ACTIVE/EXPRESS/EXPRESS_WAIT）、points_grants/points_corrections（SUBMITTED）、redemption_after_sales（OPEN/PROCESSING）、redemption_returns与不可变事件聚合。退货排除REJECT/CANCEL/REFUND终态；未审核REQUESTED、批准需退且未验收WAIT_RETURN、无需退回或已验收READY_TO_REFUND，各申请最多进入一队列。APPROVE/RECEIVE时间是当前退回/退分阶段起点，反馈采用updated_at。正常业务数据与现有约束为前提；异常事实仍由首发检查核对，不自动修账。
+
+授权人员仍需有效会话、经营仓绑定及运营角色，事务首尾复验。输出无收件资料或密文、不修改库存、积分、经营开关或业务审计；处理页面继续走原业务动作。积分申请列表新增可选状态筛选，沿用现有仓库/UUID分页索引；经营规模扩大后需按真实查询计划再考虑索引，当前不新增迁移。

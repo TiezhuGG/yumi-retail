@@ -4497,3 +4497,142 @@ button:disabled {
 .points-ledger-table td:last-child {
   width: auto;
 }
+
+.mall-task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+}
+.mall-task-toolbar h2,
+.mall-task-stock h2 {
+  margin: 0 0 10px;
+}
+.mall-task-toolbar p {
+  margin: 0;
+}
+.mall-task-queues article {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.mall-task-queues small {
+  color: var(--muted);
+  line-height: 1.6;
+}
+.mall-task-stock {
+  margin-top: 24px;
+  padding: 24px;
+}
+.mall-task-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 24px 0 12px;
+}
+.mall-task-filters > label,
+.mall-task-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mall-task-filters input,
+.mall-task-filters select {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+.mall-stock-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 18px 0;
+}
+.mall-stock-summary strong {
+  font-size: 24px;
+}
+.mall-stock-name {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+}
+@media (max-width: 680px) {
+  .mall-task-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+  .mall-task-stock {
+    padding: 18px;
+  }
+  .mall-task-field,
+  .mall-task-filters > label,
+  .mall-task-filters button {
+    width: 100%;
+  }
+  .mall-task-filters input,
+  .mall-task-filters select {
+    box-sizing: border-box;
+    width: 100%;
+  }
+}
+.mall-task-queues {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 1100px) {
+  .mall-task-queues {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .mall-task-stock .points-table {
+    min-width: 0;
+    width: 100%;
+    display: block;
+  }
+  .mall-task-stock .points-table thead {
+    display: none;
+  }
+  .mall-task-stock .points-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .mall-task-stock .points-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    gap: 10px;
+  }
+  .mall-task-stock .points-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+    min-width: 0;
+  }
+  .mall-task-stock .points-table td:first-child {
+    grid-column: 1 / -1;
+  }
+  .mall-task-stock .points-table td:nth-child(2) {
+    grid-column: 1 / -1;
+    color: var(--muted);
+  }
+  .mall-task-stock .points-table td:last-child {
+    text-align: right;
+  }
+  .mall-task-stock .points-table-wrap {
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+  }
+}

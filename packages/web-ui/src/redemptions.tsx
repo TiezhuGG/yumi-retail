@@ -11,19 +11,25 @@ const fulfillmentTabs = [
   { value: 'EXPRESS_WAIT_RECEIPT', label: '待收货' },
   { value: 'EXPRESS_RECEIVED', label: '已完成' },
 ];
-export function RedemptionsWorkbench({ profile }: { profile: StaffProfile }) {
+export function RedemptionsWorkbench({
+  profile,
+  initialFulfillment = '',
+}: {
+  profile: StaffProfile;
+  initialFulfillment?: string;
+}) {
   const [selected, setSelected] = useState<string[]>([]),
     [printIds, setPrintIds] = useState<string[] | null>(null);
   const [items, setItems] = useState<RedemptionOrderView[]>([]),
     [detail, setDetail] = useState<RedemptionOrderView | null>(null),
     [keyword, setKeyword] = useState(''),
     [status, setStatus] = useState(''),
-    [fulfillment, setFulfillment] = useState(''),
+    [fulfillment, setFulfillment] = useState(initialFulfillment),
     [cursor, setCursor] = useState<string | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState('');
   const seq = useRef(0),
-    applied = useRef({ keyword: '', status: '', fulfillment: '' }),
+    applied = useRef({ keyword: '', status: '', fulfillment: initialFulfillment }),
     pending = useRef<{ cursor?: string; id?: string }>({});
   async function load(intent: { cursor?: string; id?: string } = {}) {
     const n = ++seq.current;
