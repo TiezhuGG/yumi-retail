@@ -9,6 +9,7 @@ import { Permissions, Public } from './staff-guard.js';
 import { failure, success } from './http.js';
 import type { ApiRequest } from './http.js';
 import { ApiResult, object, text } from './api-result.js';
+import { rewardReadiness, rewardReadinessSchema } from './reward-readiness.js';
 
 export type Reward = {
   id: string;
@@ -294,6 +295,12 @@ export class PublicRewardController {
 @Controller('admin/rewards')
 export class AdminRewardController {
   constructor(@Inject(RewardService) readonly service: RewardService) {}
+  @Get(':id/readiness')
+  @ApiResult(rewardReadinessSchema, [400, 401, 403, 404, 500, 503])
+  async readiness(@Req() r: ApiRequest, @Param('id') id: string, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await rewardReadiness(this.service, r, uuid(id)));
+  }
   @Get()
   @ApiResult(adminPageSchema, [400, 401, 403, 409, 500, 503])
   async list(@Req() r: ApiRequest, @Query() q: unknown) {

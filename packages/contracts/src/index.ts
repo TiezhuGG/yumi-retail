@@ -1258,3 +1258,54 @@ export interface ConsumerReturnList {
   items: RedemptionReturnSummary[];
   nextCursor: string | null;
 }
+
+export interface RewardReadiness {
+  checkedAt: string;
+  canPublish: boolean;
+  displayableNow: boolean;
+  inventoryAvailable: number;
+  submissionEnabled: boolean;
+  product: {
+    id: string;
+    version: number;
+    status: string;
+    categoryId: string;
+    parentCategoryId: string | null;
+    categoryToEditId: string;
+  };
+  reward: {
+    id: string;
+    skuId: string;
+    title: string;
+    name: string;
+    spec: string;
+    unit: string;
+    priceCents: number;
+    pointsPrice: string;
+    status: string;
+    version: number;
+    sortOrder: number;
+    perUserLimit: number;
+    totalQuota: number;
+    startsAt: string | null;
+    endsAt: string | null;
+    available: number;
+  };
+  checks: Array<{
+    code: string;
+    title: string;
+    status: 'READY' | 'WARNING' | 'BLOCKING' | 'INFO';
+    detail: string;
+    action:
+      | 'PRODUCT'
+      | 'CATEGORY'
+      | 'PUBLISH_SOURCE'
+      | 'SKU'
+      | 'IMAGE'
+      | 'REWARD'
+      | 'STOCK'
+      | 'SHIPPING'
+      | 'STORE'
+      | null;
+  }>;
+}

@@ -629,7 +629,7 @@ function WorkspaceSession({
           ) : activeView === 'redemptions' ? (
             <RedemptionsWorkbench profile={profile} />
           ) : activeView === 'rewards' ? (
-            <RewardsWorkbench profile={profile} />
+            <RewardsWorkbench profile={profile} onNavigate={navigate} />
           ) : activeView === 'points-corrections' ? (
             <PointsGrants key="corrections" profile={profile} correction />
           ) : activeView === 'points-grants' ? (

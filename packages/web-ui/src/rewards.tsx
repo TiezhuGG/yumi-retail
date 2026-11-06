@@ -1,4 +1,5 @@
 import { ProductCreator } from './product-creator.js';
+import { RewardReadinessPanel, type RewardCheckDestination } from './reward-readiness.js';
 import { useEffect, useRef, useState } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
@@ -30,7 +31,13 @@ const statuses: Record<string, string> = {
 };
 const beijing = (s: string | null) =>
   s ? new Date(Date.parse(s) + 8 * 3600000).toISOString().slice(0, 16) : '';
-export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
+export function RewardsWorkbench({
+  profile,
+  onNavigate,
+}: {
+  profile: StaffProfile;
+  onNavigate?: (view: RewardCheckDestination) => void;
+}) {
   const [creatingProduct, setCreatingProduct] = useState(false);
   const [items, setItems] = useState<Reward[]>([]),
     [selected, setSelected] = useState<Reward | null>(null),
@@ -104,6 +111,15 @@ export function RewardsWorkbench({ profile }: { profile: StaffProfile }) {
           <button className="primary-button" onClick={() => setEditing(selected)}>
             编辑与上下架
           </button>
+          <RewardReadinessPanel
+            id={selected.id}
+            profile={profile}
+            onNavigate={onNavigate}
+            onEditReward={() => setEditing(selected)}
+            onSnapshot={(snapshot) =>
+              setSelected((old) => (old?.id === snapshot.id ? { ...old, ...snapshot } : old))
+            }
+          />
         </div>
       ) : (
         <>

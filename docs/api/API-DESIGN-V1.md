@@ -1,3 +1,11 @@
+## 2026-11-06 商品上架检查（OpenAPI0.74.0）
+
+新增GET /admin/rewards/:id/readiness，points.write、员工会话及当前经营仓授权，UUID id，不接受任何查询参数。范围外商品和不存在404、无效输入400、身份/权限401/403、未配置经营仓503。RepeatableRead内读前后复验权限；不写商品/库存/积分/审计业务记录。
+
+返回checkedAt、canPublish（当前非已上架且无已有阻断）、displayableNow（当前上下架和时间满足公开展示条件，不承诺有库存）、inventoryAvailable（仅库存可用量，不因源商品草稿误报缺货）、submissionEnabled（现环境提交开关，不代表上线）、product最小维护定位和version、reward当前规则快照、10项checks。检查状态READY/WARNING/BLOCKING/INFO，action为固定维护类型或null，不接受客户端指定URL或经营状态。快照不含成本、顾客身份、图片对象键或密钥。封面仅检查有效元数据，文件实际加载须在原图片管理核验。
+
+原发布接口、版本/幂等、上下架门槛及匿名积分商品契约均不变。检查和提交之间可能变化，既有动作再次裁决；不得将canPublish当作授权令牌、库存预占或真实经营验收结果。
+
 ## 2026-11-06 运营商城（OpenAPI0.73.0）
 
 新增POST /admin/mall-products：员工Cookie/Origin/CSRF/UUID Idempotency-Key，catalog.write与points.write并校验当前运营/管理员及经营仓权限。输入categoryId/name/description?/单元素skus[]（沿用编码/规格/单位/整数分/效期）/pointsPrice?（null或1至10亿整数字符串）/reason；不接受任意状态或库存。事务创建商品/SKU与可选兑换草稿，商品/兑换审计及幂等记录一起提交。返回id/skuId/rewardId（可空），同键恢复，改内容409，分类/价格无效400，权限403，冲突可重试503。原POST /admin/products等接口保持兼容。

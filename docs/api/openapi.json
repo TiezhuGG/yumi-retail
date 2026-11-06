@@ -24287,6 +24287,472 @@
         ]
       }
     },
+    "/api/v1/admin/rewards/{id}/readiness": {
+      "get": {
+        "operationId": "AdminRewardController_readiness",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "checkedAt",
+                        "canPublish",
+                        "displayableNow",
+                        "inventoryAvailable",
+                        "submissionEnabled",
+                        "product",
+                        "reward",
+                        "checks"
+                      ],
+                      "properties": {
+                        "checkedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "canPublish": {
+                          "type": "boolean"
+                        },
+                        "displayableNow": {
+                          "type": "boolean"
+                        },
+                        "inventoryAvailable": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "submissionEnabled": {
+                          "type": "boolean"
+                        },
+                        "product": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "version",
+                            "status",
+                            "categoryId",
+                            "parentCategoryId",
+                            "categoryToEditId"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "categoryId": {
+                              "type": "string"
+                            },
+                            "parentCategoryId": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "categoryToEditId": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "reward": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "skuId",
+                            "title",
+                            "name",
+                            "spec",
+                            "unit",
+                            "pointsPrice",
+                            "status",
+                            "priceCents",
+                            "version",
+                            "sortOrder",
+                            "perUserLimit",
+                            "totalQuota",
+                            "startsAt",
+                            "endsAt",
+                            "available"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "skuId": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "spec": {
+                              "type": "string"
+                            },
+                            "unit": {
+                              "type": "string"
+                            },
+                            "pointsPrice": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "priceCents": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "sortOrder": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "perUserLimit": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "totalQuota": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "startsAt": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "endsAt": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "available": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "checks": {
+                          "type": "array",
+                          "maxItems": 10,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "title",
+                              "status",
+                              "detail",
+                              "action"
+                            ],
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "READY",
+                                  "WARNING",
+                                  "BLOCKING",
+                                  "INFO"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string",
+                                "nullable": true,
+                                "enum": [
+                                  "PRODUCT",
+                                  "CATEGORY",
+                                  "PUBLISH_SOURCE",
+                                  "SKU",
+                                  "IMAGE",
+                                  "REWARD",
+                                  "STOCK",
+                                  "SHIPPING",
+                                  "STORE",
+                                  null
+                                ]
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "兑换商品管理"
+        ]
+      }
+    },
     "/api/v1/admin/rewards": {
       "get": {
         "operationId": "AdminRewardController_list",
@@ -91279,7 +91745,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。",
-    "version": "0.73.0",
+    "version": "0.74.0",
     "contact": {}
   },
   "tags": [],
