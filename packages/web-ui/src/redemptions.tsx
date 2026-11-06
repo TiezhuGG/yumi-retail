@@ -3,6 +3,7 @@ import type { RedemptionOrderView, RedemptionOrderPage, StaffProfile } from '@yu
 import { staffRequest, StaffRequestError } from './index.js';
 import { ExpressShippingPanel } from './express-shipping.js';
 import { ExpressPolicyWorkbench } from './express-policy.js';
+import { WaybillImportDialog, waybillImportStorage } from './waybill-import.js';
 import { ExpressParcelDialog, pendingParcelIds, parcelStorage } from './express-parcel.js';
 import { RedemptionPrintDialog } from './redemption-print.js';
 
@@ -19,6 +20,9 @@ export function RedemptionsWorkbench({
   profile: StaffProfile;
   initialFulfillment?: string;
 }) {
+  const [importOpen, setImportOpen] = useState(
+    () => !!sessionStorage.getItem(waybillImportStorage(profile)),
+  );
   const [parcelIds, setParcelIds] = useState<string[] | null>(() => pendingParcelIds(profile));
   const [selected, setSelected] = useState<string[]>([]),
     [printIds, setPrintIds] = useState<string[] | null>(null),
@@ -240,7 +244,7 @@ export function RedemptionsWorkbench({
               查询兑换单
             </button>
           </form>
-          <div className="points-toolbar">
+          <div className="points-toolbar redemption-batch-toolbar">
             <label>
               <input
                 type="checkbox"
@@ -295,6 +299,15 @@ export function RedemptionsWorkbench({
               onClick={() => setParcelIds(pendingParcelIds(profile) ?? [...selected])}
             >
               {sessionStorage.getItem(parcelStorage(profile)) ? '核实待处理合包' : '合包发货'}
+            </button>
+            <button
+              className="secondary-button"
+              disabled={loading}
+              onClick={() => setImportOpen(true)}
+            >
+              {sessionStorage.getItem(waybillImportStorage(profile))
+                ? '核实待处理批量发货'
+                : '批量运单导入'}
             </button>
           </div>
           {items.length > 0 && (
@@ -400,6 +413,19 @@ export function RedemptionsWorkbench({
             </button>
           )}
         </div>
+      )}
+      {importOpen && (
+        <WaybillImportDialog
+          profile={profile}
+          orderNos={items
+            .filter((o) => selected.includes(o.id) && o.fulfillmentState === 'EXPRESS_WAIT_SHIP')
+            .map((o) => o.orderNo)}
+          onClose={() => setImportOpen(false)}
+          onDone={() => {
+            setImportOpen(false);
+            void load();
+          }}
+        />
       )}
       {parcelIds && (
         <ExpressParcelDialog

@@ -1418,3 +1418,31 @@ export interface CustomerNotesPage {
   items: Array<{ id: string; message: string; actorName: string; createdAt: string }>;
   nextCursor: string | null;
 }
+
+export {
+  parseWaybillCsv,
+  waybillCsvTemplate,
+  WAYBILL_CSV_HEADER,
+  WAYBILL_CSV_MAX_BYTES,
+} from './waybill-csv.js';
+export type { WaybillCsvRow } from './waybill-csv.js';
+export interface WaybillImportPreview {
+  canShip: boolean;
+  issues: Array<{ row: number; orderNo: string; message: string }>;
+  items: Array<{
+    row: number;
+    id: string;
+    orderNo: string;
+    version: number;
+    executionMode: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
+    title: string;
+    spec: string;
+    unit: string;
+    quantity: number;
+    address: RedemptionOrderAddress;
+    carrierCode: string;
+    carrierName: string;
+    trackingNo: string;
+    allocations: Array<{ batchNo: string; locationName: string; quantity: number }>;
+  }>;
+}

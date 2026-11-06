@@ -18,6 +18,7 @@ import {
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import { ExpressWaybillImportService } from './express-waybill-import.js';
 import { ExpressShippingService } from './express-shipping.js';
 import { RedemptionService } from './redemptions.js';
 import { Consumer, Permissions } from './staff-guard.js';
@@ -308,10 +309,13 @@ export class RedemptionController {
 @Permissions('points.read')
 @Controller('admin/redemptions')
 export class AdminRedemptionController {
+  readonly waybills: ExpressWaybillImportService;
   constructor(
     @Inject(RedemptionService) readonly service: RedemptionService,
     @Inject(ExpressShippingService) readonly shipping: ExpressShippingService,
-  ) {}
+  ) {
+    this.waybills = new ExpressWaybillImportService(shipping);
+  }
   @Get(':id/shipping')
   @Header('Cache-Control', 'no-store')
   @ApiResult(
@@ -406,6 +410,72 @@ export class AdminRedemptionController {
     fields(q, []);
     return success(r, await this.shipping.ship(r, uuid(id), key(r), b));
   }
+  @Post('waybill-import/preview')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({ schema: object({ csv: { type: 'string', maxLength: 32768 } }) })
+  @ApiResult(
+    object({
+      canShip: { type: 'boolean' },
+      issues: { type: 'array', items: object({ row: integer, orderNo: text, message: text }) },
+      items: {
+        type: 'array',
+        items: object({
+          row: integer,
+          id: text,
+          orderNo: text,
+          version: integer,
+          executionMode: text,
+          title: text,
+          spec: text,
+          unit: text,
+          quantity: integer,
+          address,
+          carrierCode: text,
+          carrierName: text,
+          trackingNo: text,
+          allocations: {
+            type: 'array',
+            items: object({ batchNo: text, locationName: text, quantity: integer }),
+          },
+        }),
+      },
+    }),
+    errors,
+  )
+  async previewWaybills(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.waybills.preview(r, b));
+  }
+  @Post('waybill-import/confirm')
+  @Permissions('points.write')
+  @HttpCode(200)
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object({
+      items: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 20,
+        items: object(
+          { id: text, version: integer, carrierCode: text, carrierName: text, trackingNo: text },
+          ['id', 'version', 'carrierCode', 'trackingNo'],
+        ),
+      },
+      dispatchConfirmed: { type: 'boolean', enum: [true] },
+    }),
+  })
+  @ApiResult(
+    object({ id: text, items: { type: 'array', items: object({ id: text, orderNo: text }) } }),
+    errors,
+  )
+  async confirmWaybills(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.waybills.confirm(r, key(r), b));
+  }
+
   @Post('parcel-preview')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

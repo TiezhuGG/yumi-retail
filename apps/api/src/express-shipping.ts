@@ -509,7 +509,8 @@ export class ExpressShippingService {
       },
     );
   }
-  private async consume(tx: Tx, r: ApiRequest, w: string, o: ReadyOrder, actor: { id: string }) {
+  // Internal shared transactional stock settlement; callers must validate and lock source orders.
+  async consume(tx: Tx, r: ApiRequest, w: string, o: ReadyOrder, actor: { id: string }) {
     for (const a of o.allocations) {
       const consumeLedgerId = randomUUID();
       await tx.stockPosition.update({

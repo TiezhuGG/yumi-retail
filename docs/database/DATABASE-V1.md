@@ -961,3 +961,9 @@ RepeatableRead单次事务统一快照，事务首尾校验经营仓及当前角
 服务端先按SKU排序锁元数据和库存，再按UUID排序锁全部订单/outbox；取消、单单发货、重叠合包竞争只允许完整的一方成功。任何后续审计、权限或效期失败整包回滚。CatalogService.write新增可选事务内validate钩子，仅合包/更正启用，用于读取幂等结果前和提交前重验当前权限；其他既有调用行为不变。
 
 此迁移会改变旧claim函数并去除一个唯一约束，不能简单删除parcel_id回滚；应停写并从已验证备份恢复，或另写能保存所有包裹/历史占用的前向迁移。旧版本代码不能安全处理合包运单更正，不能将旧服务直接回滚到含包裹数据的数据库。上线仍须独立迁移/备份演练与经营验收。
+
+## 2026-11-07 批量运单导入
+
+无迁移（仍63项），复用redemption_express_shipments（parcel_id保持NULL）、原allocations、stock/position ledger、outbox/events、business_audits及idempotency_records。新动作`REDEMPTION_EXPRESS_BATCH_SHIP`以随机批次UUID记整批审计和最小幂等结果；原`REDEMPTION_EXPRESS_SHIP`逐单审计继续保留。未新增文件存储表、临时库存或可随意改状态接口。
+
+一个批次至多20单，同事务先锁当前仓，再按SKU排序锁元数据及库存，按UUID排序锁全部订单和outbox；全批失败回滚。历史运单PK/claim和原库存/库位/积分平衡约束继续执行，重复身份不得通过CSV绕过。无原CSV、收件明文或客户端文件名落库，服务器只处理规范化业务参数；原地址继续从AAD绑定的原订单密文解密。

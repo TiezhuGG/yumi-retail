@@ -4930,3 +4930,45 @@ button:disabled {
 .parcel-order-list p {
   margin: 5px 0;
 }
+
+.waybill-file-label {
+  display: block;
+  margin: 16px 0;
+}
+.waybill-file-label input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 8px;
+}
+
+.waybill-file-label input {
+  font: inherit;
+  min-height: 44px;
+}
+.waybill-file-label input::file-selector-button {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f3f3e9;
+  color: var(--ink);
+  padding: 10px 14px;
+  margin-right: 10px;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .points-toolbar.redemption-batch-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .points-toolbar.redemption-batch-toolbar > label,
+  .points-toolbar.redemption-batch-toolbar > span {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .points-toolbar.redemption-batch-toolbar > button {
+    width: 100%;
+    white-space: nowrap;
+    padding: 10px 6px;
+  }
+}

@@ -1176,3 +1176,10 @@ POST严格body={scopeId,message}，scopeId须匹配当前服务端经营仓，�
 - 400参数/实物确认缺失，403权限/CSRF，404授权范围内缺单，409混顾客/原地址/模式、状态/版本/库存/运单占用冲突，503开关关闭或可重试竞争；500事务失败不允许前端宣称已发货。全部订单一次提交或全部回滚。
 - 现有`/:id/shipping-corrections`若属于合包，会排序锁整包订单并追加所有成员的同版本运单更正；原因和原始事实继续保留。原接口路径/参数不变，UI提前告知整包影响；任何成员不符合条件整包失败。原单更正语义不变。
 - `RedemptionExpressShipmentView`新增可选`parcel:{id,orderCount}`（旧单不附加），消费者只看到本人订单最新运单和同包数量，不暴露其他顾客、操作者或收件地址。收货与售后仍按原单处理，不自动批量确认。
+
+## 2026-11-07 批量运单导入（0.81.0）
+
+- `POST /api/v1/admin/redemptions/waybill-import/preview`：points.read、当前SUPER_ADMIN/OPERATIONS经营仓权限及CSRF；`{csv:string}`，UTF-8文本最多32768字节、1–20行数据；no-store。固定4列表头，BOM/CRLF/引号转义支持；订单号/代码/运单号规范化为大写，按真实carrier规则检查名称及单号。格式/重复订单或运单400。业务阻断返回200与`{canShip:false,items:[],issues:[{row,orderNo,message}]}`；不泄露部分地址。成功`canShip:true,issues:[]`，items包含row/id/orderNo/version/executionMode/title/spec/unit/quantity/address、规范化运单及原allocations的batchNo/locationName/quantity；均来自当前仓原单。不存在或不在授权范围内的单统一“未找到当前授权仓内的订单”。
+- `POST /api/v1/admin/redemptions/waybill-import/confirm`：points.write、当前SUPER_ADMIN/OPERATIONS仓权限、CSRF及Idempotency-Key。`{items:[{id,version,carrierCode,carrierName?,trackingNo}],dispatchConfirmed:true}`，1–20个不重复订单/运单。按订单ID排序及规范化运单生成请求哈希，作用域为操作者+动作+当前经营仓（改选订单不能复用原键），返回`{id,items:[{id,orderNo}]}`；id为整批审计/幂等结果标识。原始CSV、收件信息不存幂等记录。
+- 提交不依赖前端预检结果授权：按SKU排序锁元数据/库存，再按UUID排序锁全部订单/outbox，逐单重验版本/状态/当前模式/原预占及效期。调用原库存结算方法，不增加新状态迁移；运单、每单库存/库位凭据、逐单审计、整批审计及幂等同事务。最后重验权限和所有订单资格，任一失败整批回滚。不自动合包，不复用其他订单/包裹的原始或更正历史运单身份。
+- 400格式/数量/重复/实物确认缺失，403权限/CSRF，404授权范围内缺单，409订单/版本/库存/运单冲突，503作业暂停或可重试竞争；500为结果需核实。原键成功结果可在暂停后恢复，当前身份与仓权限仍重验。客户端收到401/403、5xx或网络失败保留原请求，不用新键重试；明确业务拒绝后清理预览，需重检。
