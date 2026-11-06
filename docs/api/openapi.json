@@ -22276,6 +22276,758 @@
         ]
       }
     },
+    "/api/v1/admin/mall/audits": {
+      "get": {
+        "operationId": "MallAuditController_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "REWARDS",
+                "POINTS",
+                "SHIPPING",
+                "RETURNS",
+                "CUSTOMERS",
+                "EXPORTS",
+                "SETTINGS"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "action",
+                              "group",
+                              "actorName",
+                              "createdAt",
+                              "sourceLabel"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string",
+                                "enum": [
+                                  "REWARD_CREATE",
+                                  "REWARD_UPDATE",
+                                  "REWARD_PUBLISH",
+                                  "REWARD_UNPUBLISH",
+                                  "POINTS_CREATE",
+                                  "POINTS_APPROVE",
+                                  "POINTS_REJECT",
+                                  "POINTS_CANCEL",
+                                  "POINTS_CORRECTION_CREATE",
+                                  "POINTS_CORRECTION_APPROVE",
+                                  "POINTS_CORRECTION_REJECT",
+                                  "POINTS_CORRECTION_CANCEL",
+                                  "REDEMPTION_EXPRESS_SHIP",
+                                  "REDEMPTION_EXPRESS_CORRECT",
+                                  "REDEMPTION_EXPRESS_PARCEL_SHIP",
+                                  "REDEMPTION_EXPRESS_BATCH_SHIP",
+                                  "REDEMPTION_AFTER_SALES_REPLIED",
+                                  "REDEMPTION_AFTER_SALES_CLOSED",
+                                  "RETURN_APPROVE",
+                                  "RETURN_REJECT",
+                                  "RETURN_RECEIVE",
+                                  "RETURN_REFUND",
+                                  "CUSTOMER_DISABLED",
+                                  "CUSTOMER_ENABLED",
+                                  "CUSTOMER_NOTE_ADDED",
+                                  "POINTS_REPORT_EXPORT",
+                                  "POINTS_POLICY",
+                                  "EXPRESS_POLICY"
+                                ]
+                              },
+                              "group": {
+                                "type": "string",
+                                "enum": [
+                                  "REWARDS",
+                                  "POINTS",
+                                  "SHIPPING",
+                                  "RETURNS",
+                                  "CUSTOMERS",
+                                  "EXPORTS",
+                                  "SETTINGS"
+                                ]
+                              },
+                              "actorName": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "sourceLabel": {
+                                "type": "string"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "nextCursor": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "商城操作记录"
+        ]
+      }
+    },
+    "/api/v1/admin/mall/audits/{id}": {
+      "get": {
+        "operationId": "MallAuditController_detail",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "action",
+                        "group",
+                        "actorName",
+                        "createdAt",
+                        "sourceLabel",
+                        "requestId",
+                        "orderNos",
+                        "exportSummary"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "REWARD_CREATE",
+                            "REWARD_UPDATE",
+                            "REWARD_PUBLISH",
+                            "REWARD_UNPUBLISH",
+                            "POINTS_CREATE",
+                            "POINTS_APPROVE",
+                            "POINTS_REJECT",
+                            "POINTS_CANCEL",
+                            "POINTS_CORRECTION_CREATE",
+                            "POINTS_CORRECTION_APPROVE",
+                            "POINTS_CORRECTION_REJECT",
+                            "POINTS_CORRECTION_CANCEL",
+                            "REDEMPTION_EXPRESS_SHIP",
+                            "REDEMPTION_EXPRESS_CORRECT",
+                            "REDEMPTION_EXPRESS_PARCEL_SHIP",
+                            "REDEMPTION_EXPRESS_BATCH_SHIP",
+                            "REDEMPTION_AFTER_SALES_REPLIED",
+                            "REDEMPTION_AFTER_SALES_CLOSED",
+                            "RETURN_APPROVE",
+                            "RETURN_REJECT",
+                            "RETURN_RECEIVE",
+                            "RETURN_REFUND",
+                            "CUSTOMER_DISABLED",
+                            "CUSTOMER_ENABLED",
+                            "CUSTOMER_NOTE_ADDED",
+                            "POINTS_REPORT_EXPORT",
+                            "POINTS_POLICY",
+                            "EXPRESS_POLICY"
+                          ]
+                        },
+                        "group": {
+                          "type": "string",
+                          "enum": [
+                            "REWARDS",
+                            "POINTS",
+                            "SHIPPING",
+                            "RETURNS",
+                            "CUSTOMERS",
+                            "EXPORTS",
+                            "SETTINGS"
+                          ]
+                        },
+                        "actorName": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "sourceLabel": {
+                          "type": "string"
+                        },
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "orderNos": {
+                          "type": "array",
+                          "maxItems": 20,
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "exportSummary": {
+                          "type": "object",
+                          "required": [
+                            "dataset",
+                            "from",
+                            "to",
+                            "kind",
+                            "rowCount",
+                            "generatedAt"
+                          ],
+                          "properties": {
+                            "dataset": {
+                              "type": "string",
+                              "enum": [
+                                "LEDGER",
+                                "DAILY"
+                              ]
+                            },
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "rowCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "generatedAt": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "错误码和可读信息；requestId关联日志",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "staffSession": []
+          }
+        ],
+        "tags": [
+          "商城操作记录"
+        ]
+      }
+    },
     "/api/v1/admin/mall-tasks": {
       "get": {
         "operationId": "MallTasksController_read",
@@ -97223,7 +97975,7 @@
   "info": {
     "title": "玉米百货 API",
     "description": "员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。",
-    "version": "0.82.0",
+    "version": "0.83.0",
     "contact": {}
   },
   "tags": [],

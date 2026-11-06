@@ -1459,3 +1459,12 @@ export interface PointsReportExport {
   to: string;
   kind: PointsReportKind | null;
 }
+
+export { MALL_AUDIT_GROUPS, MALL_AUDIT_ACTIONS } from './mall-audits.js';
+export type {
+  MallAuditGroup,
+  MallAuditAction,
+  MallAuditEntry,
+  MallAuditPage,
+  MallAuditDetail,
+} from './mall-audits.js';

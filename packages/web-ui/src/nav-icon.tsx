@@ -20,6 +20,7 @@ const paths = {
 };
 const icons: Record<WorkspaceView, keyof typeof paths> = {
   'points-report': 'history',
+  'mall-audits': 'history',
   'mall-tasks': 'alert',
   customers: 'account',
   overview: 'home',

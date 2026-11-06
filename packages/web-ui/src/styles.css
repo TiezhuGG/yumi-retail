@@ -4992,3 +4992,59 @@ button:disabled {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.mall-audit-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.mall-audit-table td {
+  overflow-wrap: anywhere;
+}
+.mall-audit-table small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+}
+.mall-audit-table th:first-child {
+  width: 150px;
+}
+.mall-audit-table th:last-child {
+  width: 100px;
+}
+.mall-audit-code,
+.mall-audit-orders {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .points-table.mall-audit-table {
+    min-width: 0;
+    display: block;
+  }
+  .mall-audit-table thead {
+    display: none;
+  }
+  .mall-audit-table tbody,
+  .mall-audit-table tr,
+  .mall-audit-table td {
+    display: block;
+    width: 100%;
+  }
+  .mall-audit-table tr {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .mall-audit-table td {
+    border: 0;
+    padding: 6px 0;
+  }
+  .mall-audit-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .mall-audit-table td button {
+    width: 100%;
+  }
+}

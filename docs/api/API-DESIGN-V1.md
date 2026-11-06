@@ -1,3 +1,14 @@
+## 2026-11-07 商城操作记录（API0.83.0）
+
+- `GET /api/v1/admin/mall/audits`：必填from/to，YYYY-MM-DD、北京时间含起止日，1–366日；可选group（REWARDS/POINTS/SHIPPING/RETURNS/CUSTOMERS/EXPORTS/SETTINGS）、actor（当前操作人名称的字面子串，最多80字符，%和_不作为通配符）、cursor（UUID）。拒绝未知参数。每页20条，按createdAt/id倒序，以nextCursor继续；游标须属于同一查询条件，失效/跨筛选返回400 INVALID_CURSOR。修改条件需从首页查询。
+- `GET /api/v1/admin/mall/audits/:id`：不接收查询参数；未知、非白名单、其他仓及无仓记录统一404。
+
+两接口均Cache-Control:no-store，沿用points.read及当前SUPER_ADMIN/OPERATIONS经营仓授权，RepeatableRead内开始和结束复核会话/权限。仅读取28项明确接入的审计动作，无仓/外仓/其他动作排除。读取不生成新审计或交易写入。
+
+列表返回items及nextCursor；条目为id/action/group/actorName/createdAt/sourceLabel。详情额外返回requestId、orderNos及exportSummary。内部resourceId/actorId、reason、原始details及隐私字段不返回；关联来源同仓验证，缺失时显示关联资料不可用，名称为当前名称。合包或批量发货仅返回已核验本仓订单号。
+
+exportSummary仅从积分报表导出审计中白名单提取dataset（LEDGER/DAILY）、有效日期范围、kind、rowCount及generatedAt；验证1–366日、合法类型、标准ISO时间及明细0–5000/汇总0–366行，汇总kind须null。不合法返回null，不返回额外JSON字段或文件正文。公开OpenAPI同步生成。
+
 ## 2026-11-06 商品上架检查（OpenAPI0.74.0）
 
 新增GET /admin/rewards/:id/readiness，points.write、员工会话及当前经营仓授权，UUID id，不接受任何查询参数。范围外商品和不存在404、无效输入400、身份/权限401/403、未配置经营仓503。RepeatableRead内读前后复验权限；不写商品/库存/积分/审计业务记录。
