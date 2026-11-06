@@ -1,6 +1,10 @@
 import { pointsExpressConfiguration } from './points-express-config.js';
 import { assertDisabledPaymentMode, paymentConfiguration } from './payment-config.js';
 import type { PaymentReadinessCheck } from '@yumi/contracts';
+import {
+  payerEncryptionConfiguration,
+  type WechatPayerEncryption,
+} from './wechat-payer-private.js';
 export interface ApplicationConfig {
   pointsExpress?: {
     mode: 'off' | 'controlled' | 'production';
@@ -27,6 +31,7 @@ export interface ApplicationConfig {
   wechatLogin?: boolean;
   wechatAppId?: string;
   wechatAppSecret?: string;
+  wechatPayerEncryption?: WechatPayerEncryption;
   consumerSessionSeconds?: number;
 }
 
@@ -150,6 +155,7 @@ export function applicationConfig(env: NodeJS.ProcessEnv = process.env): Applica
   )
     throw new Error('Invalid ORDER_DEV_HOLD_SECONDS.');
   return {
+    wechatPayerEncryption: payerEncryptionConfiguration(env),
     pointsExpress: pointsExpressConfiguration(env),
     notificationLabEnabled,
     pickingLabEnabled,

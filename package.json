@@ -241,7 +241,15 @@
     "pretest:consumer-return-list": "npm run build:server",
     "test:consumer-return-list": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/consumer-return-list.integration.test.ts",
     "preverify:consumer-return-list:ui": "npm run build:server",
-    "verify:consumer-return-list:ui": "node --env-file=.env --import tsx scripts/ui/verify-consumer-return-list.mjs"
+    "verify:consumer-return-list:ui": "node --env-file=.env --import tsx scripts/ui/verify-consumer-return-list.mjs",
+    "test:wechat-payer-private": "node --import tsx --test tests/wechat-payer-private.test.ts",
+    "pretest:wechat-payer": "npm run build:server",
+    "test:wechat-payer": "node --env-file=.env --import tsx --test --test-concurrency=1 tests/wechat-payer.integration.test.ts",
+    "test:wechat-credentials": "node --import tsx --test tests/wechat-credentials.test.ts",
+    "pretest:wechat-credentials": "npm run build:server",
+    "test:wechat-jsapi-transport": "node --import tsx --test tests/wechat-jsapi-transport.test.ts",
+    "precheck:wechat-pay-credentials": "npm run build:server",
+    "check:wechat-pay-credentials": "node --env-file=.env scripts/check-wechat-pay-credentials.mjs"
   },
   "pnpm": {
     "overrides": {

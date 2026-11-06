@@ -14,6 +14,7 @@ export async function addressFixture(
     pickingLab?: boolean;
     notificationLab?: boolean;
     wechatExchange?: WechatExchange;
+    payerEncryption?: { keyId: string; keyHex: string };
   } = {},
 ) {
   const url = new URL(process.env.TEST_DATABASE_URL ?? '');
@@ -62,6 +63,8 @@ export async function addressFixture(
         WECHAT_APP_ID: options.wechatExchange ? 'wx' + '0'.repeat(16) : undefined,
         WECHAT_APP_SECRET: options.wechatExchange ? randomBytes(16).toString('hex') : undefined,
         ADDRESS_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+        WECHAT_PAYER_KEY_ID: options.payerEncryption?.keyId,
+        WECHAT_PAYER_ENCRYPTION_KEY: options.payerEncryption?.keyHex,
       }),
       accessLog: () => {},
       wechatExchange: options.wechatExchange,

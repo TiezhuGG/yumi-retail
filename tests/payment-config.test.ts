@@ -2,6 +2,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { paymentConfiguration, assertDisabledPaymentMode } from '../apps/api/src/payment-config.ts';
 import { applicationConfig } from '../apps/api/src/config.ts';
+import { randomBytes } from 'node:crypto';
+test('payer storage report distinguishes absent, invalid and configured without returning encryption values', () => {
+  const key = randomBytes(32).toString('hex'),
+    keyId = 'synthetic-secret-key-id';
+  const configured = paymentConfiguration({
+    WECHAT_PAYER_KEY_ID: keyId,
+    WECHAT_PAYER_ENCRYPTION_KEY: key,
+  });
+  assert.equal(configured[3]!.status, 'CONFIGURED');
+  assert.ok(!JSON.stringify(configured).includes(key));
+  assert.ok(!JSON.stringify(configured).includes(keyId));
+  assert.equal(paymentConfiguration({ WECHAT_PAYER_KEY_ID: keyId })[3]!.status, 'INVALID');
+  assert.equal(
+    paymentConfiguration({
+      WECHAT_PAYER_KEY_ID: keyId,
+      WECHAT_PAYER_ENCRYPTION_KEY: key,
+      ADDRESS_ENCRYPTION_KEY: key,
+    })[3]!.status,
+    'INVALID',
+  );
+});
 test('optional configuration is missing by default and no environment values or credentials are returned', () => {
   const report = paymentConfiguration({
     WECHAT_PAY_PRIVATE_KEY: 'synthetic-do-not-leak',
@@ -21,7 +42,8 @@ test('format-only fields never claim merchant ownership, connectivity or payment
     'FORMAT_OK',
   );
   const checks = paymentConfiguration(env);
-  assert.ok(checks.every((c) => c.status === 'FORMAT_OK'));
+  assert.ok(checks.slice(0, 3).every((c) => c.status === 'FORMAT_OK'));
+  assert.equal(checks[3]!.status, 'MISSING');
   for (const value of Object.values(env)) assert.ok(!JSON.stringify(checks).includes(value));
   for (const field of ['WECHAT_PAY_APP_ID', 'WECHAT_PAY_MCH_ID'] as const) {
     assert.equal(

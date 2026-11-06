@@ -1,3 +1,15 @@
+## 2026-11-06 请求层C3a（OpenAPI0.72.0）
+
+GET /admin/payment-readiness新增IMPLEMENTATION/JSAPI_TRANSPORT，UNVERIFIED；总项数及maxItems为14。显示私有凭据/固定HTTPS请求层本地已验证，订单尝试持久化/恢复/取消保护未接入；真实商户、公钥来源及灾备仍未验收。原权限、仓库范围、channel=DISABLED与canStartPayment=false保持。
+
+没有新增公开支付、凭据读取/上传/重载、签名或调起参数接口。内部createWechatJsapiGateway.prepay只接受服务端订单/付款人，返回经原文验签的参数与凭据修订号，既不落库也不更改订单。前置拒绝NOT_DISPATCHED，传输开始后的失败统一RESULT_UNKNOWN，不返回上游错误正文或系统细节；未来业务调用须先持久化尝试、事务外HTTP、结果持久化后再提供参数。离线命令不接入Web API，具体材料/调用约束见[运维手册](../operations/WECHAT-PAY-CREDENTIALS.md)。
+
+## 2026-11-06 支付身份C2（OpenAPI0.71.0）
+
+POST /consumer/auth/wechat-session仍只接受code，既有用户/token响应不变，不返回OpenID、密文、密钥标识或session_key。配置独立加密密钥后，在已核验微信身份的同一登录事务内创建/刷新付款人绑定；未配置时保持原哈希身份登录。登录审计或绑定失败整笔回滚，不发出半成品会话；已领取code仍不可复用。
+
+GET /admin/payment-readiness新增CONFIGURATION/PAYER_STORAGE（MISSING/INVALID/CONFIGURED），总项数及maxItems为13；仅返回说明，不返回密钥或标识。原权限/仓库范围与canStartPayment=false保持。内部paymentPayer(tx, request, appId)从当前会话本人的服务端绑定解密，重新校验会话、启用、身份版本、AppID；不提供任何公开查询或任意用户解密接口。未来C3必须在受控的短事务中使用它，不得信任前端OpenID或把数据库锁带入外部HTTP等待。内部错误为401会话失效、403身份/AppID不符、409/PAYER_REFRESH_REQUIRED需重新登录，503加密不可用/身份不可读；本轮不新增公开支付调用。
+
 ## 2026-11-06 支付检查C1（OpenAPI0.70.0）
 
 GET /admin/payment-readiness新增JSAPI_PROTOCOL检查项，IMPLEMENTATION/UNVERIFIED，仅说明JSAPI签名协议已完成离线实现、实际商户/HTTP下单和订单入账未接入；总检查项12，maxItems由11更新12。原角色/仓库权限、状态枚举、channel=DISABLED及canStartPayment=false保持。内部协议不提供公开签名/凭据/支付参数接口，不改变消费者准备单契约，无迁移。支付用户身份项反映原始OpenID安全绑定仍缺，不将已有登录代码误称未实现。

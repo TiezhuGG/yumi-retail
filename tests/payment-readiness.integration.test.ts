@@ -42,7 +42,7 @@ test('report reflects actual operational configuration and never marks payment r
   const r = await read();
   assert.equal(r.data.channel, 'DISABLED');
   assert.equal(r.data.canStartPayment, false);
-  assert.equal(r.data.checks.length, 12);
+  assert.equal(r.data.checks.length, 14);
   const by = (code: string) => r.data.checks.find((c: { code: string }) => c.code === code);
   assert.equal(by('CHECKOUT_POLICY').status, 'CONFIGURED');
   assert.equal(by('SERVICE_AREA').status, 'CONFIGURED');
@@ -51,6 +51,7 @@ test('report reflects actual operational configuration and never marks payment r
   assert.equal(by('CALLBACK').status, 'BLOCKED');
   assert.equal(by('CREDENTIALS').status, 'UNVERIFIED');
   assert.equal(by('JSAPI_PROTOCOL').status, 'UNVERIFIED');
+  assert.equal(by('PAYER_STORAGE').status, 'MISSING');
   assert.ok(by('JSAPI_PROTOCOL').detail.includes('离线验证'));
   await f.runtime.db.checkoutPolicy.update({
     where: { warehouseId: f.warehouseId },

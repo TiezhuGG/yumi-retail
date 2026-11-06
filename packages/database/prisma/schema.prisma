@@ -644,6 +644,7 @@ model ReceiptReversal {
 
 // Development identities are deliberately separate from future verified WeChat identities.
 model ConsumerUser {
+  wechatPayer ConsumerWechatPayer?
  expressReceipts RedemptionExpressReceipt[]
  rewardCart RewardCart?
  redemptionReturns RedemptionReturn[]
@@ -673,6 +674,18 @@ model ConsumerUser {
   @@map("consumer_users")
   orders ConsumerOrder[]
   quotes CheckoutQuote[]
+}
+
+model ConsumerWechatPayer {
+  userId String @id @map("user_id") @db.Uuid
+  appId String @map("app_id") @db.VarChar(18)
+  keyId String @map("key_id") @db.VarChar(32)
+  payload String @db.VarChar(512)
+  version Int @default(0)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+  user ConsumerUser @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("consumer_wechat_payers")
 }
 
 model ConsumerSession {

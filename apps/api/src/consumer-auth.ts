@@ -6,6 +6,8 @@ import type { ApiRequest } from './http.js';
 import { wechatExchange, type WechatExchange } from './wechat-login.js';
 import { fields, str } from './catalog-input.js';
 import { tokenHash } from './staff-auth.js';
+import type { Prisma } from '@yumi/database';
+import { WechatPayerPrivateData } from './wechat-payer-private.js';
 
 export interface ConsumerContext {
   sessionId: string;
@@ -25,11 +27,14 @@ export function validateConsumerEnvironment(databaseUrl: string, config: Applica
     throw Error('Development consumer identities require the isolated local database.');
 }
 export class ConsumerAuthService {
+  private readonly payerStorage: WechatPayerPrivateData;
   constructor(
     readonly db: ReturnType<typeof createDatabase>,
     readonly config: ApplicationConfig,
     readonly exchange: WechatExchange = wechatExchange(config),
-  ) {}
+  ) {
+    this.payerStorage = new WechatPayerPrivateData(config.wechatPayerEncryption);
+  }
 
   developmentAllowed(request: ApiRequest) {
     // Never trust proxy-provided addresses for this intentionally local-only adapter.
@@ -99,6 +104,23 @@ export class ConsumerAuthService {
       const now = (await tx.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS now`)[0]!
           .now,
         expiresAt = new Date(now.getTime() + (this.config.consumerSessionSeconds ?? 28800) * 1000);
+      if (this.payerStorage.configured) {
+        const encrypted = this.payerStorage.encrypt(
+          { userId: user.id, appId: user.wechatAppId!, subject: user.subject },
+          openid,
+        );
+        await tx.consumerWechatPayer.upsert({
+          where: { userId: user.id },
+          create: {
+            userId: user.id,
+            appId: user.wechatAppId!,
+            ...encrypted,
+            createdAt: now,
+            updatedAt: now,
+          },
+          update: { ...encrypted, version: { increment: 1 }, updatedAt: now },
+        });
+      }
       await tx.consumerSession.create({
         data: {
           id: randomUUID(),
@@ -231,6 +253,43 @@ export class ConsumerAuthService {
       provider: session.user.provider as 'DEVELOPMENT' | 'WECHAT',
       expiresAt: session.expiresAt.toISOString(),
     };
+  }
+  // Internal transaction-scoped accessor only. Never expose this return value from an API.
+  async paymentPayer(tx: Prisma.TransactionClient, request: ApiRequest, appId: string) {
+    const context = request.consumerContext;
+    if (!context) throw failure(401, 'AUTH_REQUIRED', '请先登录');
+    const rows = await tx.$queryRaw<
+      Array<{ id: string; provider: string; app_id: string | null; subject: string }>
+    >`
+      SELECT u.id,u.provider,u.wechat_app_id AS app_id,u.subject FROM consumer_sessions s
+      JOIN consumer_users u ON u.id=s.user_id
+      WHERE s.id=${context.sessionId}::uuid AND u.id=${context.userId}::uuid AND u.enabled
+        AND s.revoked_at IS NULL AND s.expires_at>clock_timestamp() AND s.auth_version=u.auth_version
+      FOR SHARE OF s,u`;
+    const user = rows[0];
+    if (!user) throw failure(401, 'SESSION_EXPIRED', '登录已失效，请重新登录');
+    if (
+      user.provider !== 'WECHAT' ||
+      !this.config.wechatLogin ||
+      appId !== this.config.wechatAppId ||
+      user.app_id !== appId
+    )
+      throw failure(403, 'PAYER_IDENTITY_REQUIRED', '请使用当前小程序的微信账号登录');
+    if (!this.payerStorage.configured)
+      throw failure(503, 'PAYER_STORAGE_UNAVAILABLE', '支付身份加密尚未配置');
+    const binding = await tx.consumerWechatPayer.findUnique({ where: { userId: user.id } });
+    if (!binding) throw failure(409, 'PAYER_REFRESH_REQUIRED', '支付身份需重新微信登录后核验');
+    if (binding.appId !== appId)
+      throw failure(503, 'PAYER_IDENTITY_INVALID', '支付身份暂时无法核验');
+    const openId = this.payerStorage.decrypt(
+      { userId: user.id, appId, subject: user.subject },
+      binding,
+    );
+    const valid = await tx.$queryRaw<
+      Array<{ id: string }>
+    >`SELECT id FROM consumer_sessions WHERE id=${context.sessionId}::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp()`;
+    if (!valid.length) throw failure(401, 'SESSION_EXPIRED', '登录已失效，请重新登录');
+    return { provider: 'WECHAT' as const, appId, openId };
   }
   async logout(request: ApiRequest, context: ConsumerContext) {
     await this.db.$transaction(async (tx) => {

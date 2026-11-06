@@ -74,11 +74,19 @@ export class PaymentReadinessService {
                 '请求签名、应答验签和小程序调起参数已实现并做离线验证；尚未接入真实商户凭据、HTTP下单或订单入账。',
             },
             {
+              code: 'JSAPI_TRANSPORT',
+              title: '凭据加载与HTTPS传输',
+              group: 'IMPLEMENTATION',
+              status: 'UNVERIFIED',
+              detail:
+                '私有凭据校验、轮换及固定地址HTTPS请求层已实现，仅用合成材料验证；支付尝试持久化、恢复和取消保护未接入，不提供下单入口。',
+            },
+            {
               code: 'PROVIDER',
               title: '支付渠道实现',
               group: 'IMPLEMENTATION',
               status: 'BLOCKED',
-              detail: '尚未实现渠道下单、查询和关闭，当前始终禁止发起支付。',
+              detail: '订单尚未连接下单请求层，查询和关闭未实现，当前始终禁止发起支付。',
             },
             {
               code: 'CALLBACK',
@@ -100,7 +108,8 @@ export class PaymentReadinessService {
               title: '凭据管理与签名验签',
               group: 'ACCEPTANCE',
               status: 'UNVERIFIED',
-              detail: '本页不接收、读取或校验私钥、APIv3密钥及验签材料；需独立安全接入后验证。',
+              detail:
+                '本页不接收或读取凭据。私有加载器已用合成材料验证；真实商户证书/公钥归属、保管、轮换和灾备尚未验收，APIv3密钥未接入。',
             },
             {
               code: 'IDENTITY',
@@ -108,7 +117,7 @@ export class PaymentReadinessService {
               group: 'ACCEPTANCE',
               status: 'UNVERIFIED',
               detail:
-                '真实微信登录代码已实现，当前账号/环境未验收；支付所需原始OpenID的服务端安全绑定尚未完成，不能使用开发身份或身份哈希替代。',
+                '登录时的付款人加密绑定已实现；旧微信账号需在配置独立密钥后重新登录补齐。开发身份和身份哈希不能用于付款，真实账号/环境尚未验收。',
             },
             {
               code: 'HTTPS_DEVICE',
@@ -140,7 +149,7 @@ export class PaymentReadinessController {
       warehouse: object({ id: { type: 'string', format: 'uuid' }, name: text }),
       checks: {
         type: 'array',
-        maxItems: 12,
+        maxItems: 14,
         items: object({
           code: text,
           title: text,

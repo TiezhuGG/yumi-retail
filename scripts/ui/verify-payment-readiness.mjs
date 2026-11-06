@@ -5,6 +5,9 @@ import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { orderAdminFixture } from '../../tests/helpers/order-admin-fixture.ts';
+import { randomBytes } from 'node:crypto';
+import { PaymentReadinessService } from '../../apps/api/dist/payment-readiness.js';
+import { paymentConfiguration } from '../../apps/api/dist/payment-config.js';
 if (process.env.YUMI_LIVE_UI !== '1' || process.env.NODE_ENV === 'production')
   throw Error('Local opt-in only');
 const require = createRequire(import.meta.url),
@@ -14,6 +17,8 @@ const { createServer } = await import('../../apps/admin-web/node_modules/vite/di
 const react = (await import('../../apps/admin-web/node_modules/@vitejs/plugin-react/dist/index.js'))
   .default;
 const { chromium } = require(process.env.YUMI_PLAYWRIGHT_PATH || 'playwright');
+const shotTag = process.env.YUMI_UI_SHOT_TAG || '';
+if (!/^[A-Z0-9-]{0,20}$/.test(shotTag)) throw Error('Invalid screenshot tag');
 const f = await orderAdminFixture();
 let server, browser;
 try {
@@ -62,7 +67,11 @@ try {
   const page = await context.newPage();
   const shots = [];
   async function shot(name) {
-    const path = 'docs/verification/UI-PAYMENT-READINESS-' + name + '-2026-11-06.png';
+    const path =
+      'docs/verification/UI-PAYMENT-READINESS-' +
+      (shotTag ? shotTag + '-' : '') +
+      name +
+      '-2026-11-06.png';
     await page.screenshot({ path, fullPage: true });
     shots.push(path);
     assert.ok(
@@ -73,13 +82,35 @@ try {
   await page.goto('http://127.0.0.1:5188/');
   await page.getByRole('button', { name: '支付接入检查', exact: true }).click();
   await page.getByRole('heading', { name: '当前不能发起支付', exact: true }).waitFor();
-  assert.equal(await page.locator('.readiness-check').count(), 12);
-  assert.equal(await page.getByText('未配置', { exact: true }).count(), 3);
+  assert.equal(await page.locator('.readiness-check').count(), 14);
+  assert.equal(await page.getByText('未配置', { exact: true }).count(), 4);
   await page.getByRole('heading', { name: 'JSAPI下单与调起签名', exact: true }).waitFor();
+  await page.getByRole('heading', { name: '凭据加载与HTTPS传输', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: '启用支付', exact: true }).count(), 0);
   await shot('DESKTOP');
   await page.setViewportSize({ width: 390, height: 844 });
   await shot('MOBILE');
+  // Exercise the service's sanitized configuration metadata, never mock a successful payment.
+  const service = f.runtime.app.get(PaymentReadinessService),
+    saved = [...service.configuration];
+  service.configuration.splice(
+    0,
+    service.configuration.length,
+    ...paymentConfiguration({
+      WECHAT_PAYER_KEY_ID: 'synthetic-ui-v1',
+      WECHAT_PAYER_ENCRYPTION_KEY: randomBytes(32).toString('hex'),
+    }),
+  );
+  await page.getByRole('button', { name: '刷新接入检查', exact: true }).click();
+  await page
+    .getByText(
+      '独立加密配置格式通过；新微信登录可保存加密付款人绑定，真实平台及密钥保管/恢复仍待验收。',
+      { exact: true },
+    )
+    .waitFor();
+  await page.getByRole('heading', { name: '当前不能发起支付', exact: true }).waitFor();
+  await shot('PAYER-CONFIGURED');
+  service.configuration.splice(0, service.configuration.length, ...saved);
   await f.runtime.db.checkoutPolicy.update({
     where: { warehouseId: f.warehouseId },
     data: { open: false },
@@ -149,7 +180,7 @@ try {
   assert.equal(await op.getByRole('button', { name: '支付接入检查', exact: true }).count(), 0);
   await restricted.close();
   console.log(
-    'Actual admin UI with real isolated API: 12 honest blocked/readiness checks, desktop/mobile, policy pause/missing, loading/error retry, no warehouse and operations role exclusion passed. No provider calls or credentials. Screenshots: ' +
+    'Actual admin UI with real isolated API: 14 honest blocked/readiness checks, desktop/mobile, policy pause/missing, loading/error retry, no warehouse and operations role exclusion passed. No provider calls or credentials. Screenshots: ' +
       shots.length,
   );
 } finally {

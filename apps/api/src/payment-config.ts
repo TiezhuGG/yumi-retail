@@ -1,5 +1,6 @@
 import { isIP } from 'node:net';
 import type { PaymentReadinessCheck } from '@yumi/contracts';
+import { payerEncryptionConfiguration } from './wechat-payer-private.js';
 // Offline shape checks only. Never retain/return environment values or contact a provider.
 export function paymentConfiguration(env: NodeJS.ProcessEnv): PaymentReadinessCheck[] {
   const check = (
@@ -41,7 +42,31 @@ export function paymentConfiguration(env: NodeJS.ProcessEnv): PaymentReadinessCh
       notificationUrl,
       '本地要求公网域名HTTPS完整地址，包含路径；不能带账号、查询串、片段、IP或本地域名。',
     ),
+    payerStorageCheck(env),
   ];
+}
+function payerStorageCheck(env: NodeJS.ProcessEnv): PaymentReadinessCheck {
+  const base = { code: 'PAYER_STORAGE', title: '付款人信息加密', group: 'CONFIGURATION' as const };
+  try {
+    return payerEncryptionConfiguration(env)
+      ? {
+          ...base,
+          status: 'CONFIGURED',
+          detail:
+            '独立加密配置格式通过；新微信登录可保存加密付款人绑定，真实平台及密钥保管/恢复仍待验收。',
+        }
+      : {
+          ...base,
+          status: 'MISSING',
+          detail: '尚未配置独立的付款人加密密钥与标识；微信登录仍可用，支付身份不会保存。',
+        };
+  } catch {
+    return {
+      ...base,
+      status: 'INVALID',
+      detail: '付款人加密密钥与标识需成对配置，且不能复用地址加密密钥；本页不显示配置原值。',
+    };
+  }
 }
 export function notificationUrl(s: string) {
   if (
