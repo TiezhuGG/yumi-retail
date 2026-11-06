@@ -4636,3 +4636,147 @@ button:disabled {
     background: transparent;
   }
 }
+
+.points-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 20px;
+}
+.points-report-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.points-report-filters input,
+.points-report-filters select {
+  font: inherit;
+  color: inherit;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+.points-report-metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.points-report-metrics strong,
+.points-report-checks strong {
+  overflow-wrap: anywhere;
+}
+.points-report-section {
+  margin: 24px 0;
+  padding: 24px;
+}
+.points-report-section h2 {
+  margin: 0;
+}
+.points-report-section .points-report-filters {
+  padding: 0 0 20px;
+}
+.points-report-checks {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.points-report-checks article {
+  padding: 16px;
+  background: #f7f8f2;
+  border-radius: 12px;
+}
+.points-report-checks strong {
+  display: block;
+  font-size: 24px;
+  margin-top: 10px;
+}
+.points-report-accounts article {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.points-report-net {
+  font-size: 18px;
+}
+.points-report-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 0 16px;
+}
+@media (max-width: 1100px) {
+  .points-report-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .points-report-checks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 680px) {
+  .points-report-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .points-report-filters label,
+  .points-report-filters input,
+  .points-report-filters select {
+    width: 100%;
+  }
+  .points-report-section {
+    padding: 18px;
+  }
+  .points-report-entries .points-table {
+    min-width: 0;
+    width: 100%;
+    display: block;
+  }
+  .points-report-entries .points-table thead {
+    display: none;
+  }
+  .points-report-entries .points-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .points-report-entries .points-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    gap: 10px;
+  }
+  .points-report-entries .points-table td {
+    display: block;
+    border: 0;
+    padding: 0;
+    white-space: normal;
+  }
+  .points-report-entries .points-table td:last-child {
+    text-align: left;
+  }
+  .points-report-entries {
+    border: 0;
+    background: transparent;
+  }
+}
+
+.points-report-entries .points-table td small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.points-report-entries .points-table td:last-child {
+  width: 150px;
+}
+.points-report-entries .points-table .badge {
+  white-space: nowrap;
+}
+@media (max-width: 680px) {
+  .points-report-entries .points-table td:last-child {
+    width: auto;
+  }
+}

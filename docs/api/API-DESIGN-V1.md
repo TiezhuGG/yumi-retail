@@ -1125,3 +1125,16 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 返回 `MallTasks`：checkedAt、lowStockThreshold、stock{outOfStock,lowStock,items:[{id,title,name,spec,unit,available}],nextCursor}、queues:[{code,count,oldestAt}]。8个code固定为WAIT_SHIP/GRANTS/CORRECTIONS/FEEDBACK_OPEN/FEEDBACK_PROCESSING/REQUESTED/WAIT_RETURN/READY_TO_REFUND。无待办count=0、oldestAt=null；反馈时间为最近更新，退回/退分时间由APPROVE/RECEIVE事实确定。只返回数量、时间和商品展示信息，无顾客身份、电话、地址、内部成本或密钥。库存复用visibleSkus，限定当前开放的本仓上架兑换商品；冻结、盘点、安全量、预占、隔离、效期和库位均参与计算。
 
 兼容增加 `GET /admin/points/grants` 与 `/admin/points/corrections` 可选status=SUBMITTED/APPROVED/REJECTED/CANCELED，服务端在分页前筛选，可组合userId与cursor；不传保留原行为，非法400。前端待办带SUBMITTED进入，审批仍需原独立负责人及预算校验。现有订单/反馈/售后接口未改契约，仅新增前端初始筛选及商品详情定位。无新写接口，无迁移。
+
+
+## 2026-11-06 积分报表（0.76.0）
+
+新增 `GET /api/v1/admin/points/report`，员工Cookie、points.read及当前有效SUPER_ADMIN/OPERATIONS经营仓授权，Cache-Control:no-store；在RepeatableRead事务首尾复验会话/角色/仓绑定，仅查询，不接受客户端warehouseId。消费者401，无权限或仓绑定失效403，经营仓未配置503。
+
+查询from/to为必填有效YYYY-MM-DD，按北京时间自然日包含起止日，转换为[from零点,to次日零点)的入账时间范围，1至366天；非法日期、范围、未知参数400。kind可选GRANT/REDEEM/CANCEL/RETURN/CORRECTION；view为LEDGER（默认，期间入账流水）或ISSUES（本仓全历史差异）。cursor为原响应不透明业务键，按key升序分页最多20条，种类/范围过滤在分页前执行；accountCursor为原响应账户UUID，独立分页全局账户差异。请求间不维持历史快照，处理/数据变化后应刷新首页。
+
+响应 `PointsReport`：checkedAt、from、to、view、totals[{kind,count,points}]、netPoints、daily[{date,incoming,outgoing,net}]、reconciliation、items、nextCursor、accountDifferences{items,nextCursor}。所有积分值包括累计SUM为十进制字符串，不转换JS Number。totals/daily按所选日期全部类型入账流水统计，不受kind/view/cursor限制；incoming/outgoing为非负绝对值，net及各kind.points为带符号变动。daily只返回有流水日期，按日期升序，最多366条。
+
+reconciliation固定为当前全历史：本仓sourceIssues/missingLedger/invalidLedger/unexpectedLedger、全局accountIssues/currentGlobalBalance/globalLedgerTotal、全局unassignedCount/unassignedPoints。不将全局余额当作本仓期间余额；未归属流水排除各仓业务分类并单独提示。账户差异items为userId/displayName/balance/ledgerTotal，只读授权资料。业务明细items为key/kind/sourceId/reference/displayName/expectedPoints/actualPoints/occurredAt/ledgerAt/issue，issue=MISSING/INVALID/UNEXPECTED或null；无流水actualPoints/ledgerAt为null，尚未批准或未发生入账业务的expectedPoints为0。不返回手机号、收件地址、OpenID、密文、会话、密钥或私有成本。
+
+核对覆盖标准业务action_key、用户、delta、actor/consumer_actor、redemption_id/action及REFUND事件ledger_id；原业务状态决定应记/不应记。错误动作键或未知来源另外进入未归属提示，不声称它们都已有可核实来源。无新写接口/迁移，旧接口不变。

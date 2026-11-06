@@ -918,3 +918,14 @@ RECEIVE是独立退货隔离保管台账，记录整项实物及位置，不冒�
 待办按redemption_orders+redemption_outbox（ACTIVE/EXPRESS/EXPRESS_WAIT）、points_grants/points_corrections（SUBMITTED）、redemption_after_sales（OPEN/PROCESSING）、redemption_returns与不可变事件聚合。退货排除REJECT/CANCEL/REFUND终态；未审核REQUESTED、批准需退且未验收WAIT_RETURN、无需退回或已验收READY_TO_REFUND，各申请最多进入一队列。APPROVE/RECEIVE时间是当前退回/退分阶段起点，反馈采用updated_at。正常业务数据与现有约束为前提；异常事实仍由首发检查核对，不自动修账。
 
 授权人员仍需有效会话、经营仓绑定及运营角色，事务首尾复验。输出无收件资料或密文、不修改库存、积分、经营开关或业务审计；处理页面继续走原业务动作。积分申请列表新增可选状态筛选，沿用现有仓库/UUID分页索引；经营规模扩大后需按真实查询计划再考虑索引，当前不新增迁移。
+
+
+## 2026-11-06 积分报表只读核对
+
+无迁移（仍62项）、新增表/列或经营数据写入。PointsReportService从points_grants、points_corrections、redemption_orders、redemption_returns与REFUND事件构造唯一业务key来源，按原规则expected状态生成应记delta，左联points_ledger，保留缺流水/非入账状态已有流水；校验用户、金额、员工/消费者归属、兑换动作指针及退款事件账目ID。未知key不误归类，单列全局未归属流水计数/净额。
+
+期间报表以ledger.created_at的北京时间自然日为准，不按申请或下单日期冒充入账日期；终止日期转为次日零点排他边界，最多366天。SUM使用PostgreSQL numeric并转text、服务端净额用BigInt；全局账户逐用户比较COALESCE(balance,0)与SUM(delta)，避免总体净差抵消掩盖坏账。全局账户与未归属统计、本仓业务差异均为当前全历史，明确区别于本仓期间统计。
+
+RepeatableRead单次事务统一快照，事务首尾校验经营仓及当前角色/会话，报表无业务审计/幂等写入。业务明细按唯一action_key分页、账户差异按user_id分页，每页20条，不承诺跨请求历史快照。经营仓仍由服务端配置确定，用户不能传仓库参数。
+
+测试中异常注入仅允许随机address_ui_临时schema：临时停用相关用户触发器构造缺账/错账与抵消差异，复原/清理；任何业务或生产schema均不执行该步骤。运行时原账本不可变、余额配平及业务凭据约束全部保留，报表不会更改触发器或自动调平。

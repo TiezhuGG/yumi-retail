@@ -19,6 +19,7 @@ const paths = {
   shield: 'm12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Zm-4 10 3 3 5-6',
 };
 const icons: Record<WorkspaceView, keyof typeof paths> = {
+  'points-report': 'history',
   'mall-tasks': 'alert',
   customers: 'account',
   overview: 'home',

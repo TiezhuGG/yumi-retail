@@ -1,3 +1,4 @@
+import { PointsReportWorkbench } from './points-report.js';
 import { MallTasksWorkbench, type MallTaskCode } from './mall-tasks.js';
 import { CustomersWorkbench } from './customers.js';
 import { RedemptionReturnsWorkbench, type ReturnQueueStatus } from './redemption-returns.js';
@@ -30,6 +31,7 @@ import { OrderWorkbench } from './orders.js';
 import { Brand } from './brand.js';
 import { NavIcon } from './nav-icon.js';
 export type WorkspaceView =
+  | 'points-report'
   | 'mall-tasks'
   | 'customers'
   | 'redemption-delivery'
@@ -71,6 +73,13 @@ const routes: Array<{
   hint: string;
   permission: string;
 }> = [
+  {
+    id: 'points-report',
+    name: '积分报表与对账',
+    glyph: '◇',
+    hint: '积分变动汇总与业务流水核对',
+    permission: 'points.read',
+  },
   {
     id: 'mall-tasks',
     name: '商城待办',
@@ -319,6 +328,7 @@ const operationsNavigation: { label: string; views: WorkspaceView[] }[] = [
   {
     label: '积分与快递',
     views: [
+      'points-report',
       'mall-tasks',
       'customers',
       'points',
@@ -626,6 +636,8 @@ function WorkspaceSession({
             <OrderWorkbench />
           ) : activeView === 'checkout-policy' ? (
             <CheckoutPolicyWorkbench profile={profile} />
+          ) : activeView === 'points-report' ? (
+            <PointsReportWorkbench />
           ) : activeView === 'mall-tasks' ? (
             <MallTasksWorkbench
               profile={profile}

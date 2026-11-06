@@ -1341,3 +1341,42 @@ export interface MallTasks {
     oldestAt: string | null;
   }>;
 }
+
+export type PointsReportKind = 'GRANT' | 'CORRECTION' | 'REDEEM' | 'CANCEL' | 'RETURN';
+export interface PointsReport {
+  accountDifferences: {
+    items: Array<{ userId: string; displayName: string; balance: string; ledgerTotal: string }>;
+    nextCursor: string | null;
+  };
+  checkedAt: string;
+  from: string;
+  to: string;
+  view: 'LEDGER' | 'ISSUES';
+  totals: Array<{ kind: PointsReportKind; count: number; points: string }>;
+  netPoints: string;
+  daily: Array<{ date: string; incoming: string; outgoing: string; net: string }>;
+  reconciliation: {
+    sourceIssues: number;
+    missingLedger: number;
+    invalidLedger: number;
+    unexpectedLedger: number;
+    accountIssues: number;
+    currentGlobalBalance: string;
+    globalLedgerTotal: string;
+    unassignedCount: number;
+    unassignedPoints: string;
+  };
+  items: Array<{
+    key: string;
+    kind: PointsReportKind;
+    sourceId: string;
+    reference: string;
+    displayName: string;
+    expectedPoints: string;
+    actualPoints: string | null;
+    occurredAt: string;
+    ledgerAt: string | null;
+    issue: 'MISSING' | 'INVALID' | 'UNEXPECTED' | null;
+  }>;
+  nextCursor: string | null;
+}
