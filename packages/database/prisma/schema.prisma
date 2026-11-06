@@ -1831,7 +1831,22 @@ model RedemptionExpressPolicy {
  @@map("redemption_express_policies")
 }
 
+model RedemptionExpressParcel {
+ id String @id @db.Uuid
+ warehouseId String @map("warehouse_id") @db.Uuid
+ userId String @map("user_id") @db.Uuid
+ executionMode String @map("execution_mode") @db.VarChar(20)
+ orderIds String[] @map("order_ids") @db.Uuid
+ actorId String @map("actor_id") @db.Uuid
+ requestId String @map("request_id") @db.Uuid
+ createdAt DateTime @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
+ shipments RedemptionExpressShipment[]
+ @@map("redemption_express_parcels")
+}
+
 model RedemptionExpressShipment {
+ parcelId String? @map("parcel_id") @db.Uuid
+ parcel RedemptionExpressParcel? @relation(fields:[parcelId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  receipt RedemptionExpressReceipt?
  corrections RedemptionExpressShipmentCorrection[]
  id String @id @db.Uuid
@@ -1848,7 +1863,7 @@ model RedemptionExpressShipment {
  order RedemptionOrder @relation(fields:[orderId,warehouseId,skuId],references:[id,warehouseId,skuId],onDelete:Restrict,onUpdate:NoAction)
  actor Staff @relation(fields:[actorId],references:[id],onDelete:Restrict,onUpdate:NoAction)
  @@unique([orderId,warehouseId,skuId])
- @@unique([warehouseId,carrierCode,carrierName,trackingNo],map:"redemption_express_tracking_key")
+
  @@map("redemption_express_shipments")
 }
 

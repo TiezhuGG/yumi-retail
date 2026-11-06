@@ -1168,3 +1168,11 @@ POST严格body={scopeId,message}，scopeId须匹配当前服务端经营仓，�
 `POST /api/v1/admin/redemptions/consolidated-print-preview`：当前经营仓SUPER_ADMIN/OPERATIONS及points.read权限，要求有效会话和CSRF，响应`Cache-Control: no-store`。请求仅`{ids: string[]}`，2–20个不重复UUID；未知字段、重复或数量错误400，缺单404，无权限403，已取消/非待发货/混顾客/混原地址/混运行模式409。无幂等键需求（纯读取）。
 
 响应沿用`RedemptionPrintPreview`的`generatedAt/items`，新增可选`consolidatedLines`（title/spec/unit/quantity）；该接口始终返回汇总行，旧逐单打印接口不返回。items保留请求顺序和原订单地址/备注/积分；不返回顾客UUID、地址密文或库存分配。比较联系人/电话/省市区/详情/地址备注，订单备注单独保留。按SKU+历史标题/规格/单位分组，合计积分采用BigInt。订单按UUID顺序FOR SHARE，串行于取消/发货操作，事务末重验当前权限。预览不授权未来操作；每次点击打印重新请求并在失败时清空旧预览。OpenAPI已同步，旧接口兼容。
+
+## 2026-11-07 合包确认与发货（0.80.0）
+
+- `POST /api/v1/admin/redemptions/parcel-preview`：points.read、当前SUPER_ADMIN/OPERATIONS经营仓权限及CSRF；仅`{ids}`，2–20个不重复UUID；no-store。返回executionMode、原address、逐单items（id/orderNo/version/title/spec/unit/quantity/orderNote及原allocations的批次/库位名/数量）、canShip及可读blockers。状态/归属/地址/运行模式不合格整批拒绝，不返回部分私密资料；库存或作业开关阻断时展示完整核对资料并禁用提交。
+- `POST /api/v1/admin/redemptions/ship-parcel`：points.write、当前SUPER_ADMIN/OPERATIONS仓权限、CSRF与Idempotency-Key。请求`{orders:[{id,version}],carrierCode,carrierName?,trackingNo,dispatchConfirmed:true}`；2–20个不重复订单，要求实物已核对并同包交给快递。服务端排序订单、规范化运单后哈希，作用域为操作者+动作+经营仓（改选订单不能复用原键），只存包裹ID和orderIds结果。返回`{id,orderIds}`。成功原键可在开关暂停后核实，当前会话/角色/仓权限仍必须有效。未知结果不产生新键。
+- 400参数/实物确认缺失，403权限/CSRF，404授权范围内缺单，409混顾客/原地址/模式、状态/版本/库存/运单占用冲突，503开关关闭或可重试竞争；500事务失败不允许前端宣称已发货。全部订单一次提交或全部回滚。
+- 现有`/:id/shipping-corrections`若属于合包，会排序锁整包订单并追加所有成员的同版本运单更正；原因和原始事实继续保留。原接口路径/参数不变，UI提前告知整包影响；任何成员不符合条件整包失败。原单更正语义不变。
+- `RedemptionExpressShipmentView`新增可选`parcel:{id,orderCount}`（旧单不附加），消费者只看到本人订单最新运单和同包数量，不暴露其他顾客、操作者或收件地址。收货与售后仍按原单处理，不自动批量确认。

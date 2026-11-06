@@ -3,6 +3,7 @@ import type { RedemptionOrderView, RedemptionOrderPage, StaffProfile } from '@yu
 import { staffRequest, StaffRequestError } from './index.js';
 import { ExpressShippingPanel } from './express-shipping.js';
 import { ExpressPolicyWorkbench } from './express-policy.js';
+import { ExpressParcelDialog, pendingParcelIds, parcelStorage } from './express-parcel.js';
 import { RedemptionPrintDialog } from './redemption-print.js';
 
 const fulfillmentTabs = [
@@ -18,6 +19,7 @@ export function RedemptionsWorkbench({
   profile: StaffProfile;
   initialFulfillment?: string;
 }) {
+  const [parcelIds, setParcelIds] = useState<string[] | null>(() => pendingParcelIds(profile));
   const [selected, setSelected] = useState<string[]>([]),
     [printIds, setPrintIds] = useState<string[] | null>(null),
     [consolidated, setConsolidated] = useState(false);
@@ -285,6 +287,15 @@ export function RedemptionsWorkbench({
             >
               汇总配货打印
             </button>
+            <button
+              className="primary-button"
+              disabled={
+                loading || (selected.length < 2 && !sessionStorage.getItem(parcelStorage(profile)))
+              }
+              onClick={() => setParcelIds(pendingParcelIds(profile) ?? [...selected])}
+            >
+              {sessionStorage.getItem(parcelStorage(profile)) ? '核实待处理合包' : '合包发货'}
+            </button>
           </div>
           {items.length > 0 && (
             <div className="points-table-wrap">
@@ -389,6 +400,18 @@ export function RedemptionsWorkbench({
             </button>
           )}
         </div>
+      )}
+      {parcelIds && (
+        <ExpressParcelDialog
+          key={parcelIds.join(':')}
+          ids={parcelIds}
+          profile={profile}
+          onClose={() => setParcelIds(null)}
+          onDone={() => {
+            setParcelIds(null);
+            void load();
+          }}
+        />
       )}
       {printIds && (
         <RedemptionPrintDialog

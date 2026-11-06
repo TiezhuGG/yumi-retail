@@ -4912,3 +4912,21 @@ button:disabled {
     gap: 12px;
   }
 }
+
+.parcel-order-list {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0;
+}
+.parcel-order-list li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line, #e5e7dd);
+  overflow-wrap: anywhere;
+}
+.parcel-order-list h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.parcel-order-list p {
+  margin: 5px 0;
+}

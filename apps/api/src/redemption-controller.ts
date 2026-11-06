@@ -85,15 +85,27 @@ const quote = object({
   snapshot,
 });
 const expressShipment = {
-  ...object({
-    carrierCode: text,
-    carrierName: text,
-    trackingNo: text,
-    shippedAt: text,
-    receivedAt: nullable,
-    correctionVersion: integer,
-    correctedAt: nullable,
-  }),
+  ...object(
+    {
+      parcel: object({ id: text, orderCount: integer }),
+      carrierCode: text,
+      carrierName: text,
+      trackingNo: text,
+      shippedAt: text,
+      receivedAt: nullable,
+      correctionVersion: integer,
+      correctedAt: nullable,
+    },
+    [
+      'carrierCode',
+      'carrierName',
+      'trackingNo',
+      'shippedAt',
+      'receivedAt',
+      'correctionVersion',
+      'correctedAt',
+    ],
+  ),
   nullable: true,
 };
 const orderProperties = {
@@ -394,6 +406,73 @@ export class AdminRedemptionController {
     fields(q, []);
     return success(r, await this.shipping.ship(r, uuid(id), key(r), b));
   }
+  @Post('parcel-preview')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiBody({
+    schema: object({
+      ids: { type: 'array', minItems: 2, maxItems: 20, uniqueItems: true, items: text },
+    }),
+  })
+  @ApiResult(
+    object({
+      executionMode: text,
+      address,
+      items: {
+        type: 'array',
+        items: object({
+          id: text,
+          orderNo: text,
+          version: integer,
+          title: text,
+          spec: text,
+          unit: text,
+          quantity: integer,
+          orderNote: text,
+          allocations: {
+            type: 'array',
+            items: object({ batchNo: text, locationName: text, quantity: integer }),
+          },
+        }),
+      },
+      canShip: { type: 'boolean' },
+      blockers: { type: 'array', items: text },
+    }),
+    errors,
+  )
+  async parcelPreview(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.shipping.parcelPreview(r, b));
+  }
+  @Post('ship-parcel')
+  @Permissions('points.write')
+  @HttpCode(200)
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiBody({
+    schema: object(
+      {
+        orders: {
+          type: 'array',
+          minItems: 2,
+          maxItems: 20,
+          items: object({ id: text, version: integer }),
+        },
+        carrierCode: text,
+        carrierName: text,
+        trackingNo: text,
+        dispatchConfirmed: { type: 'boolean', enum: [true] },
+      },
+      ['orders', 'carrierCode', 'trackingNo', 'dispatchConfirmed'],
+    ),
+  })
+  @ApiResult(object({ id: text, orderIds: { type: 'array', items: text } }), errors)
+  async shipParcel(@Req() r: ApiRequest, @Body() b: unknown, @Query() q: unknown) {
+    fields(q, []);
+    return success(r, await this.shipping.shipParcel(r, key(r), b));
+  }
+
   @Post('consolidated-print-preview')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')

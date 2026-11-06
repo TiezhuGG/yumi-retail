@@ -1,7 +1,7 @@
 import type { Prisma } from '@yumi/database';
 import type { RedemptionExpressShipmentView } from '@yumi/contracts';
 export const expressShipmentInclude = {
-  include: { receipt: true, corrections: { orderBy: { version: 'desc' as const } } },
+  include: { parcel: true, receipt: true, corrections: { orderBy: { version: 'desc' as const } } },
 } as const;
 export function expressShipmentView(
   s: Prisma.RedemptionExpressShipmentGetPayload<typeof expressShipmentInclude> | null,
@@ -9,6 +9,7 @@ export function expressShipmentView(
   if (!s) return null;
   const latest = s.corrections[0] ?? s;
   return {
+    ...(s.parcel ? { parcel: { id: s.parcel.id, orderCount: s.parcel.orderIds.length } } : {}),
     carrierCode: latest.carrierCode,
     carrierName: latest.carrierName,
     trackingNo: latest.trackingNo,

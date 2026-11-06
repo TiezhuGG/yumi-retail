@@ -152,6 +152,11 @@ export function ExpressShippingPanel({
           </div>
           {view.shipment && (
             <div className="picking-pack-proof">
+              {view.shipment.parcel && (
+                <p className="notice">
+                  同包发货 · 共{view.shipment.parcel.orderCount}笔订单。运单更正会同步整个包裹。
+                </p>
+              )}
               <h4>{view.shipment.receivedAt ? '已完成 · 用户确认收货' : '已快递发货'}</h4>
               {view.shipment.receivedAt && (
                 <p>

@@ -52,6 +52,7 @@ export class CatalogService {
     key: string,
     input: unknown,
     run: (tx: Tx) => Promise<unknown>,
+    validate?: (tx: Tx) => Promise<unknown>,
   ) {
     const scope = `${request.staffContext!.staffId}:${action}:${resourceId}`;
     const keyHash = hash(key);
@@ -60,6 +61,7 @@ export class CatalogService {
       return await this.db.$transaction(
         async (tx) => {
           await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${scope + ':' + keyHash},0))::text`;
+          await validate?.(tx);
           const previous = await tx.idempotencyRecord.findUnique({
             where: { scope_keyHash: { scope, keyHash } },
           });
@@ -70,6 +72,7 @@ export class CatalogService {
           }
           const result = jsonValue(await run(tx)) as Prisma.InputJsonValue;
           await tx.idempotencyRecord.create({ data: { scope, keyHash, requestHash, result } });
+          await validate?.(tx);
           return result;
         },
         { timeout: 15000, maxWait: 10000 },

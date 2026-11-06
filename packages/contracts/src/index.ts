@@ -1109,6 +1109,7 @@ export const EXPRESS_CARRIERS = {
   OTHER: '其他快递',
 } as const;
 export interface RedemptionExpressShipmentView {
+  parcel?: { id: string; orderCount: number };
   receivedAt: string | null;
   carrierCode: string;
   carrierName: string;
@@ -1116,6 +1117,23 @@ export interface RedemptionExpressShipmentView {
   shippedAt: string;
   correctionVersion: number;
   correctedAt: string | null;
+}
+export interface ExpressParcelPreview {
+  executionMode: 'DEVELOPMENT' | 'CONTROLLED' | 'PRODUCTION';
+  address: RedemptionOrderAddress;
+  items: Array<{
+    id: string;
+    orderNo: string;
+    version: number;
+    title: string;
+    spec: string;
+    unit: string;
+    quantity: number;
+    orderNote: string;
+    allocations: Array<{ batchNo: string; locationName: string; quantity: number }>;
+  }>;
+  canShip: boolean;
+  blockers: string[];
 }
 export interface RedemptionExpressShippingView {
   id: string;

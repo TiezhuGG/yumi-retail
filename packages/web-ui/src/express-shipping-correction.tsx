@@ -118,6 +118,11 @@ export function ExpressShippingCorrection({
   return (
     <section aria-label="运单资料更正" className="picking-pack-proof">
       <h4>运单资料更正</h4>
+      {view.shipment?.parcel && (
+        <p className="notice">
+          本次更正将同步同包全部{view.shipment.parcel.orderCount}笔订单，保留各单历史。
+        </p>
+      )}
       <p>用于纠正已寄出包裹的录入错误。不会重新发货、改变收件地址或调整积分库存。</p>
       {error && (
         <p className="notice task-error" role="alert">
