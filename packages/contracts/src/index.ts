@@ -1380,3 +1380,22 @@ export interface PointsReport {
   }>;
   nextCursor: string | null;
 }
+
+export interface CustomerStatusHistory {
+  items: Array<{
+    id: string;
+    action: 'CUSTOMER_DISABLED' | 'CUSTOMER_ENABLED';
+    actorName: string;
+    reason: string;
+    fromEnabled: boolean;
+    toEnabled: boolean;
+    createdAt: string;
+  }>;
+  nextCursor: string | null;
+}
+
+export interface CustomerNotesPage {
+  scopeId: string;
+  items: Array<{ id: string; message: string; actorName: string; createdAt: string }>;
+  nextCursor: string | null;
+}

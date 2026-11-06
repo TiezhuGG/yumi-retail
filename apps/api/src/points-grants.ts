@@ -101,6 +101,7 @@ export class PointsGrantService {
           throw failure(409, 'VERSION_CONFLICT', '规则已更新');
         await tx.$executeRaw`INSERT INTO points_grant_policies(warehouse_id,enabled,single_limit,daily_limit,version) VALUES(${warehouse}::uuid,${input.enabled as boolean},${BigInt(input.singleLimit as string)},${BigInt(input.dailyLimit as string)},1) ON CONFLICT(warehouse_id) DO UPDATE SET enabled=EXCLUDED.enabled,single_limit=EXCLUDED.single_limit,daily_limit=EXCLUDED.daily_limit,version=points_grant_policies.version+1`;
       } else if (action === 'create') {
+        await tx.$queryRaw`SELECT id FROM consumer_users WHERE id=${input.userId as string}::uuid AND enabled FOR SHARE`;
         const user = await tx.consumerUser.findUnique({ where: { id: input.userId as string } });
         if (!user?.enabled) throw failure(409, 'USER_UNAVAILABLE', '用户不可用');
         const grantId = randomUUID();

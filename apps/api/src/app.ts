@@ -1,3 +1,5 @@
+import { CustomerNotesController, CustomerNotesService } from './customer-notes.js';
+import { CustomerStatusController, CustomerStatusService } from './customer-status.js';
 import { PointsReportController, PointsReportService } from './points-report.js';
 import { MallTasksController, MallTasksService } from './mall-tasks.js';
 import {
@@ -197,6 +199,8 @@ export async function createApplication(
   }
   @Module({
     controllers: [
+      CustomerNotesController,
+      CustomerStatusController,
       AdminCustomersController,
       AdminMallProductController,
       HealthController,
@@ -326,6 +330,11 @@ export async function createApplication(
       },
       { provide: PointsCorrectionService, useValue: new PointsCorrectionService(catalog) },
       { provide: PointsGrantService, useValue: new PointsGrantService(catalog) },
+      {
+        provide: CustomerNotesService,
+        useValue: new CustomerNotesService(catalog, config.addressEncryptionKey),
+      },
+      { provide: CustomerStatusService, useValue: new CustomerStatusService(catalog) },
       { provide: AdminMallService, useValue: new AdminMallService(catalog) },
       { provide: PointsService, useValue: new PointsService(catalog) },
       { provide: StaffAuthService, useValue: auth },
@@ -462,7 +471,7 @@ export async function createApplication(
       .setDescription(
         '员工认证、消费者开发/微信身份会话、购物车与地址、商品仓储、积分兑换、独立正式门禁、人工快递及售后反馈已实现本地验证；真实微信、HTTPS/真机及正式环境验收未通过，支付尚未实现。',
       )
-      .setVersion('0.76.0')
+      .setVersion('0.78.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'consumerSession')
       .addCookieAuth('yumi_staff_session', { type: 'apiKey', in: 'cookie' }, 'staffSession')
       .build(),

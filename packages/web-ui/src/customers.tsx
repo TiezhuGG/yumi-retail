@@ -1,3 +1,5 @@
+import { CustomerNotesPanel } from './customer-notes.js';
+import { CustomerStatusPanel } from './customer-status.js';
 import { useEffect, useRef, useState } from 'react';
 import type { StaffProfile } from '@yumi/contracts';
 import { staffRequest, StaffRequestError } from './index.js';
@@ -8,6 +10,7 @@ type Customer = {
   displayName: string;
   provider: string;
   enabled: boolean;
+  stateVersion: number;
   createdAt: string;
   balance: string;
 };
@@ -32,7 +35,9 @@ export function CustomersWorkbench({ profile }: { profile: StaffProfile }) {
     [loading, setLoading] = useState(true),
     [error, setError] = useState(''),
     [tab, setTab] = useState<'ledger' | 'grants' | 'corrections'>('ledger'),
-    [locked, setLocked] = useState(false);
+    [locked, setLocked] = useState(false),
+    [statusLocked, setStatusLocked] = useState(false),
+    [notesLocked, setNotesLocked] = useState(false);
   const sequence = useRef(0),
     applied = useRef({ keyword: '', provider: '', enabled: '' }),
     pending = useRef<string | undefined>(undefined);
@@ -82,12 +87,16 @@ export function CustomersWorkbench({ profile }: { profile: StaffProfile }) {
     <section aria-label="顾客管理" className="points-workbench">
       {selected ? (
         <div className="points-toolbar">
-          <button className="secondary-button" disabled={locked} onClick={() => setSelected(null)}>
+          <button
+            className="secondary-button"
+            disabled={locked || statusLocked || notesLocked}
+            onClick={() => setSelected(null)}
+          >
             返回顾客列表
           </button>
           <button
             className="secondary-button"
-            disabled={loading || locked}
+            disabled={loading || locked || statusLocked || notesLocked}
             onClick={() => void load()}
           >
             刷新资料
@@ -210,6 +219,21 @@ export function CustomersWorkbench({ profile }: { profile: StaffProfile }) {
               {detail.user.id}
             </details>
           </div>
+          <CustomerStatusPanel
+            key={detail.user.id}
+            customer={detail.user}
+            profile={profile}
+            locked={locked || loading || notesLocked}
+            onPendingChange={setStatusLocked}
+            onChanged={() => void load()}
+          />
+          <CustomerNotesPanel
+            key={'notes:' + detail.user.id}
+            id={detail.user.id}
+            profile={profile}
+            locked={locked || statusLocked || loading}
+            onPendingChange={setNotesLocked}
+          />
           <div className="points-toolbar">
             {(['ledger', 'grants', 'corrections'] as const)
               .filter((t) => t === 'ledger' || profile.permissions.includes('points.write'))
@@ -217,7 +241,7 @@ export function CustomersWorkbench({ profile }: { profile: StaffProfile }) {
                 <button
                   key={t}
                   className={tab === t ? 'primary-button' : 'secondary-button'}
-                  disabled={locked}
+                  disabled={locked || statusLocked || notesLocked}
                   onClick={() => setTab(t)}
                 >
                   {t === 'ledger' ? '积分明细' : t === 'grants' ? '发放积分' : '误发冲正'}

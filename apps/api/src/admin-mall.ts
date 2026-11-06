@@ -102,11 +102,12 @@ export class AdminMallService {
             displayName: string;
             provider: string;
             enabled: boolean;
+            stateVersion: number;
             createdAt: Date;
             balance: string;
           }>
         >(
-          Prisma.sql`SELECT u.id,u.display_name AS "displayName",u.provider,u.enabled,u.created_at AS "createdAt",COALESCE(a.balance,0)::text AS balance FROM consumer_users u LEFT JOIN points_accounts a ON a.user_id=u.id WHERE ${where} AND (${id ?? null}::uuid IS NULL OR u.id=${id ?? null}::uuid) AND (${cursor}::uuid IS NULL OR u.id>${cursor}::uuid) ORDER BY u.id LIMIT 21`,
+          Prisma.sql`SELECT u.id,u.display_name AS "displayName",u.provider,u.enabled,u.auth_version AS "stateVersion",u.created_at AS "createdAt",COALESCE(a.balance,0)::text AS balance FROM consumer_users u LEFT JOIN points_accounts a ON a.user_id=u.id WHERE ${where} AND (${id ?? null}::uuid IS NULL OR u.id=${id ?? null}::uuid) AND (${cursor}::uuid IS NULL OR u.id>${cursor}::uuid) ORDER BY u.id LIMIT 21`,
         );
         const items = rows
           .slice(0, 20)
@@ -145,6 +146,7 @@ const userSchema = object({
   displayName: text,
   provider: { type: 'string', enum: ['WECHAT', 'DEVELOPMENT'] },
   enabled: { type: 'boolean' },
+  stateVersion: { type: 'integer', minimum: 0 },
   createdAt: text,
   balance: text,
 });

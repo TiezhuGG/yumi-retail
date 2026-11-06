@@ -4780,3 +4780,135 @@ button:disabled {
     width: auto;
   }
 }
+
+.customer-status-panel {
+  padding: 24px;
+  margin: 24px 0;
+}
+.customer-status-panel h2 {
+  margin: 0;
+}
+.customer-status-history {
+  padding: 0;
+  list-style: none;
+  margin: 20px 0;
+}
+.customer-status-history li {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.customer-status-history li > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.customer-status-history li > div span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.customer-status-history p {
+  margin: 8px 0;
+}
+.customer-status-reason {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.customer-status-form {
+  display: grid;
+  gap: 20px;
+}
+.customer-status-form label {
+  display: grid;
+  gap: 10px;
+}
+.customer-status-form textarea {
+  min-height: 110px;
+  resize: vertical;
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.customer-status-form .customer-status-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.customer-status-confirm input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+@media (max-width: 680px) {
+  .customer-status-panel {
+    padding: 18px;
+  }
+  .customer-status-panel .readiness-heading {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+}
+
+.customer-notes-panel {
+  padding: 24px;
+  margin: 24px 0;
+}
+.customer-notes-panel h2 {
+  margin: 0;
+}
+.customer-notes-list {
+  padding: 0;
+  list-style: none;
+  margin: 20px 0;
+}
+.customer-notes-list li {
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line);
+}
+.customer-notes-list li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.customer-notes-list time {
+  color: var(--muted);
+  font-size: 13px;
+}
+.customer-notes-list p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+.customer-notes-form {
+  display: grid;
+  gap: 16px;
+}
+.customer-notes-form label {
+  display: grid;
+  gap: 10px;
+}
+.customer-notes-form textarea {
+  min-height: 140px;
+  resize: vertical;
+  width: 100%;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+@media (max-width: 680px) {
+  .customer-notes-panel {
+    padding: 18px;
+  }
+  .customer-notes-panel .readiness-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}

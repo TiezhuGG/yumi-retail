@@ -1138,3 +1138,27 @@ OpenAPI0.59.0由代码导出，订单/报价/打印增加模式字段，需先�
 reconciliation固定为当前全历史：本仓sourceIssues/missingLedger/invalidLedger/unexpectedLedger、全局accountIssues/currentGlobalBalance/globalLedgerTotal、全局unassignedCount/unassignedPoints。不将全局余额当作本仓期间余额；未归属流水排除各仓业务分类并单独提示。账户差异items为userId/displayName/balance/ledgerTotal，只读授权资料。业务明细items为key/kind/sourceId/reference/displayName/expectedPoints/actualPoints/occurredAt/ledgerAt/issue，issue=MISSING/INVALID/UNEXPECTED或null；无流水actualPoints/ledgerAt为null，尚未批准或未发生入账业务的expectedPoints为0。不返回手机号、收件地址、OpenID、密文、会话、密钥或私有成本。
 
 核对覆盖标准业务action_key、用户、delta、actor/consumer_actor、redemption_id/action及REFUND事件ledger_id；原业务状态决定应记/不应记。错误动作键或未知来源另外进入未归属提示，不声称它们都已有可核实来源。无新写接口/迁移，旧接口不变。
+
+
+## 2026-11-06 顾客账号专用状态动作（0.77.0）
+
+顾客目录/详情user增加兼容字段stateVersion:integer（既有consumer_users.auth_version，用于状态并发；不改变消费者响应）。旧客户端可忽略，调用新写接口须读取后携带。无通用状态写入接口。
+
+`POST /api/v1/admin/customers/:id/status/disable`或`enable`：员工Cookie、CSRF、Idempotency-Key，points.write且事务内当前SUPER_ADMIN/有效会话/启用经营仓绑定，OPERATIONS无权变更。body严格为{version:0..2147483646整数,reason:1..200字符,confirmed:true}，不接受query或额外字段。返回{id,enabled,stateVersion}为原动作确认结果，不保证是重放时当前状态，客户端成功后必须重读资料。未知动作/顾客404、非法输入/缺确认400、无会话401、无权/缺CSRF403、状态已变/重复状态/改键内容409、并发可重试503；不暴露令牌或原始身份。相同键不同body拒绝，相同键并发只变更/审计一次。
+
+动作在ReadCommitted事务内先验证权限、锁原请求、检查已保存结果，再锁consumer_users FOR UPDATE。要求version与当前auth_version一致且处于相反状态，更新enabled并递增auth_version；操作审计使用实际DB clock_timestamp，避免把等待锁之前的事务开始时间当作动作时间。审计与幂等记录同事务。重放在等待锁后也重新校验当前权限/会话有效期，不绕过撤权。停用及恢复都使旧会话永远不匹配；不删除session或其他业务记录。新登录可在恢复后重新获取当前代次。
+
+`GET /api/v1/admin/customers/:id/status-history?cursor=UUID`：points.read及当前有效负责人/运营经营仓授权，Cache-Control:no-store。返回CustomerStatusHistory{items:[{id,action:CUSTOMER_DISABLED|CUSTOMER_ENABLED,actorName,reason,fromEnabled,toEnabled,createdAt}],nextCursor}，按(createdAt,id)倒序，每页20；cursor须属于该顾客专用操作，否则409。资料、原因和姓名属于授权运营信息，不返回会话、subject、OpenID、密钥、电话或收件资料。账号是全局身份，历史按顾客全局展示，不以操作来源仓错误隐藏身份变更。
+
+不改变原退款/发放审批等业务API契约。发放申请新增事务内有效用户共享锁，已停用时与原审批一致拒绝；不会自动驳回历史申请。原语义保留，无迁移。
+
+
+## 2026-11-06 顾客内部备注（0.78.0）
+
+新增 `/api/v1/admin/customers/:id/notes`，员工Cookie，服务端当前SUPER_ADMIN/OPERATIONS、启用经营仓绑定及有效会话，Cache-Control:no-store。GET需要points.read，POST需要points.write/CSRF/Idempotency-Key，消费者401、仓管/失权403，不接受query中的warehouseId或额外字段。与顾客全局账号状态不同，备注按经营仓隔离。
+
+GET支持cursor=原记录UUID，返回CustomerNotesPage{scopeId,items:[{id,message,actorName,createdAt}],nextCursor}，按(createdAt,id)倒序最多20条。scopeId为当前服务端经营仓，用于请求一致性核对，不能选择查询外仓。cursor须为该顾客、本仓、CUSTOMER_NOTE_ADDED记录，否则409；顾客不存在404，非法参数400。授权后才解密正文，不返回payload、subject、会话或收件资料。
+
+POST严格body={scopeId,message}，scopeId须匹配当前服务端经营仓，不能借参数切换仓；不匹配409 SCOPE_CHANGED。message为trim后1至500 UTF-16单位文本，允许LF换行，拒绝其他C0/DEL控制字符。返回{id}，不把正文放入幂等结果。按员工/仓库/顾客/键串行，规范正文和范围哈希一致才可重放；改内容409 IDEMPOTENCY_CONFLICT，等待锁后/提交前复验当前权限，撤权不能通过历史请求读取旧成功结果。缺CSRF403，密钥未配置503 CUSTOMER_NOTES_UNAVAILABLE，已有记录不可解密503 CUSTOMER_NOTES_UNREADABLE，并发冲突503 RETRYABLE_CONFLICT。
+
+备注事件和幂等记录同事务，失败不留下部分备注，原键可恢复。记录可供后台为停用顾客跟进，不恢复该账号或旧会话，不改变积分、订单或售后事实。无通用编辑/删除接口，无旧接口字段变化，无迁移。

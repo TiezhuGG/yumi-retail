@@ -36,7 +36,7 @@ export function PointsGrants({
   profile: StaffProfile;
   initialStatus?: string;
   correction?: boolean;
-  targetCustomer?: { id: string; displayName: string };
+  targetCustomer?: { id: string; displayName: string; enabled?: boolean };
   onPendingChange?: (pending: boolean) => void;
 }) {
   const base = correction ? '/admin/points/corrections' : '/admin/points/grants';
@@ -200,10 +200,14 @@ export function PointsGrants({
             : '发放暂停或尚未配置预算。可提交申请，审批入账前须配置规则。'}{' '}
         {!correction && '· 按北京时间核算每日预算。'}
       </div>
+      {!correction && targetCustomer?.enabled === false && (
+        <p className="notice">该账号已停用，新发放申请及入账暂停；已有申请仍可核对、撤销或驳回。</p>
+      )}
       <div className="points-toolbar">
         <h2 className="points-queue-heading">{correction ? '冲正申请队列' : '积分审批队列'}</h2>
         <button
           className="primary-button"
+          disabled={!correction && targetCustomer?.enabled === false}
           onClick={() => {
             setEditor('create');
             setUsers(targetCustomer && !correction ? [targetCustomer] : []);

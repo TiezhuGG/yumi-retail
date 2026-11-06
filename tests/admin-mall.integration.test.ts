@@ -136,7 +136,15 @@ test('customer directory includes zero-balance and disabled users, paginates and
   assert.ok(detail.data.lastLoginAt);
   assert.equal(detail.data.redemptions, 0);
   const keys = Object.keys(detail.data.user).sort();
-  assert.deepEqual(keys, ['balance', 'createdAt', 'displayName', 'enabled', 'id', 'provider']);
+  assert.deepEqual(keys, [
+    'balance',
+    'createdAt',
+    'displayName',
+    'enabled',
+    'id',
+    'provider',
+    'stateVersion',
+  ]);
   for (const q of [
     '?enabled=1',
     '?provider=OTHER',

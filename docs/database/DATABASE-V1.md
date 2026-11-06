@@ -929,3 +929,21 @@ RECEIVE是独立退货隔离保管台账，记录整项实物及位置，不冒�
 RepeatableRead单次事务统一快照，事务首尾校验经营仓及当前角色/会话，报表无业务审计/幂等写入。业务明细按唯一action_key分页、账户差异按user_id分页，每页20条，不承诺跨请求历史快照。经营仓仍由服务端配置确定，用户不能传仓库参数。
 
 测试中异常注入仅允许随机address_ui_临时schema：临时停用相关用户触发器构造缺账/错账与抵消差异，复原/清理；任何业务或生产schema均不执行该步骤。运行时原账本不可变、余额配平及业务凭据约束全部保留，报表不会更改触发器或自动调平。
+
+
+## 2026-11-06 顾客停用/恢复及审计
+
+无新迁移（仍62项）、表、列或数据补丁。复用consumer_users.enabled/auth_version：每次专用停用/恢复在身份行FOR UPDATE内核对旧代次并递增；消费者会话及新登录沿用现有代次校验，恢复不重新启用历史令牌。不更新session行，避免与昵称会话共享锁→身份更新锁形成反序；与登录upsert、交易身份共享锁、新发放申请/批准共享锁串行。
+
+复用business_audits追加不可变约束，新增action=CUSTOMER_DISABLED/CUSTOMER_ENABLED，resource_id为顾客、warehouse_id为操作来源，reason至多200字符，details为前后enabled/代次及当时actorName快照。created_at取状态锁内clock_timestamp；不允许前端传时间/操作者。复用idempotency_records，scope按员工/专用动作/顾客、键哈希及规范body哈希；状态更新、审计和结果同事务，失败无部分提交，原键重放重新校验权限。
+
+历史按(resource_id,created_at,id)查询并限制两个action，游标属于该顾客；沿用资源/时间既有索引，不建未经测量的新索引。账号是全局身份，资料与历史需当前经营仓授权，但不能把停用误解释为仅禁用某仓账号。库存、订单、预占、积分、购物车、售后及付款人密文不被状态动作改写。
+
+
+## 2026-11-06 顾客内部备注
+
+无迁移（仍62项）、新表或资料补丁。复用business_audits追加不可变存储，action=CUSTOMER_NOTE_ADDED，resource_id=顾客，warehouse_id=服务端经营仓，reason固定“新增顾客内部备注”，details为payload密文及当时actorName；created_at取DB clock_timestamp。查询限定action/资源/仓库，分页游标必须属于相同范围。仅后台授权后解密，顾客资料/消费者接口不包含备注。
+
+正文复用OrderPrivateData AES-256-GCM及既有ADDRESS_ENCRYPTION_KEY，AAD绑定顾客与customer-note:warehouseId:noteId上下文，不能把密文复制到其他顾客/仓库/记录后读取。密钥仍需随既有资料加密恢复方案备份，丢失/变更不自动生成新密钥；读取失败503，不伪造空记录。不把正文写入审计reason、日志或idempotency结果。
+
+新备注取得顾客FOR KEY SHARE保证存在性，仅追加审计及原请求记录，不更新consumer_users或资产。幂等scope含员工/仓库/顾客，保存正文与范围的SHA-256请求哈希，返回结果仅ID；权限及范围检查在重放路径同样执行。读取为RepeatableRead，新增为ReadCommitted，均在事务内首尾校验会话/经营仓授权。既有业务审计不可改删触发器保持，不新增未经测量的索引。
