@@ -100,6 +100,7 @@ export default function ReturnFeedbackList() {
           setGuest(true);
           setData([]);
           setCursor(null);
+          setStatus('');
           setKeyword('');
           setAppliedKeyword('');
           applied.current = { status: '', keyword: '' };
@@ -149,12 +150,6 @@ export default function ReturnFeedbackList() {
   }
   return (
     <View className="account-page redemption-list-page">
-      <View className="account-hero return-list-heading">
-        <Text className="account-name">售后反馈</Text>
-        <Button className="account-link" onClick={() => void Taro.navigateBack()}>
-          退货退积分
-        </Button>
-      </View>
       <View className="account-content">
         <View className="reward-search redemption-search">
           <Input

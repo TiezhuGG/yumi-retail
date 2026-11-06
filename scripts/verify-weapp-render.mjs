@@ -96,6 +96,11 @@ for (const [route, expected] of [
     await sleep(25);
   }
   const rendered = JSON.stringify(updates);
+  if (route === 'pages/account/index')
+    assert.doesNotMatch(rendered, /member-heading|欢迎来到玉米百货/);
+  if (route === 'pages/points-cart/index') assert.doesNotMatch(rendered, /account-name/);
+  if (route === 'pages/redemptions/index')
+    assert.doesNotMatch(rendered, /account-hero|account-name/);
   assert.ok(
     expected.every((label) => rendered.includes(label)),
     route + ' did not render expected data',
